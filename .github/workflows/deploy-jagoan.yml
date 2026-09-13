@@ -83,11 +83,17 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: DUO/dist/
-          # If the FTP account is chrooted to its own home, this is "public_html".
-          # If it can see the account root, it needs the full path. Getting it
-          # wrong uploads into a directory nobody serves, and the deploy still
-          # reports success.
-          server-dir: /public_html/
+          # The FTP account is chrooted: inside its session "/" is already its
+          # home directory, not the server root. Uploading to "/public_html/"
+          # therefore means "<ftp home>/public_html/", which is not necessarily
+          # the document root the domain serves — and when it is not, every file
+          # uploads successfully into a directory nobody serves and the deploy
+          # still reports success. That is exactly what happened.
+          #
+          # "/" assumes the FTP account was created with its directory set to
+          # public_html, which is what cPanel offers by default and what makes
+          # the FTP session start inside the docroot.
+          server-dir: /
           # `dangerous-clean-slate` is deliberately NOT enabled. It deletes
           # everything under server-dir that is not in the build, which would
           # take out the mailbox directories and anything else living there.
