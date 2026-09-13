@@ -22,6 +22,8 @@ const bill: ExportBill = {
   account_number: '1234567890',
   account_holder: 'Alee',
   paid_by_person: null,
+  qris_path: null,
+  payment_method: 'bank',
   items: [
     { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
     { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
@@ -31,6 +33,7 @@ const bill: ExportBill = {
     {
       pay_token: null,
       amount_paid: 0,
+      payments: [],
       person: 'Budi',
       discount_share: 2817,
       tax_share: 3718,
@@ -43,6 +46,7 @@ const bill: ExportBill = {
     {
       pay_token: null,
       amount_paid: 0,
+      payments: [],
       person: 'Sarah',
       discount_share: 2183,
       tax_share: 2882,

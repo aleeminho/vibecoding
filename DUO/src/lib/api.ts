@@ -19,6 +19,7 @@ import { normalizeExtraction, stripCodeFence } from './normalize'
 import {
   DEMO_AUDIT,
   DEMO_BILLS,
+  DEMO_DELETED,
   DEMO_EXPORT_BILLS,
   DEMO_FLAGGED,
   DEMO_MONTHLY,
@@ -351,7 +352,7 @@ let paymentsAvailable = true
  * which keeps that parsing intact through the fallback.
  */
 const SHARES_WITH_PAYMENTS =
-  'bill_participants(person, amount_owed, status, paid_date, payments(amount_read, recipient_ok))' as const
+  'bill_participants(person, amount_owed, status, paid_date, payments(amount_read, amount_due, recipient_ok, verdict, image_path, created_at))' as const
 const SHARES_PLAIN = 'bill_participants(person, amount_owed, status, paid_date)' as const
 
 export async function listBills(limit = 60): Promise<BillWithShares[]> {
@@ -710,6 +711,35 @@ export async function deleteBill(billId: string, refCode: string): Promise<void>
   await logAudit('bill.deleted', { billId, refCode })
 }
 
+export interface DeletedBill {
+  id: string
+  ref_code: string
+  place: string
+  bill_date: string
+  total: number
+  deleted_at: string
+}
+
+/**
+ * Bills that were deleted and can still be brought back.
+ *
+ * Read rather than only written, because until now nothing could: `restoreBill`
+ * existed and was unreachable, so the delete confirmation's promise that "the
+ * data is still there if you got it wrong" was one the app could not keep.
+ */
+export async function listDeletedBills(): Promise<DeletedBill[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_DELETED
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select('id, ref_code, place, bill_date, total, deleted_at')
+    .not('deleted_at', 'is', null)
+    .order('deleted_at', { ascending: false })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as DeletedBill[]
+}
+
 export async function restoreBill(billId: string, refCode: string): Promise<void> {
   if (import.meta.env.DEV && isDemo()) return
 
@@ -731,12 +761,12 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  * bill. Written twice they drifted the moment a column was added, which is
  * exactly what happened when `total` was introduced.
  */
-const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder, paid_by_person,
+const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder, paid_by_person, qris_path, payment_method,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
    bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date`
 
 const EXPORT_PLAIN = `${EXPORT_BASE})`
-const EXPORT_WITH_PAYMENTS = `${EXPORT_BASE}, payments(amount_read, recipient_ok))`
+const EXPORT_WITH_PAYMENTS = `${EXPORT_BASE}, payments(amount_read, amount_due, recipient_ok, verdict, image_path, created_at))`
 
 type ExportRow = {
   total: number
@@ -747,6 +777,8 @@ type ExportRow = {
   account_number: string | null
   account_holder: string | null
   paid_by_person: string | null
+  qris_path: string | null
+  payment_method: 'bank' | 'qris' | 'both'
   bill_items: {
     position: number
     name: string
@@ -755,7 +787,7 @@ type ExportRow = {
     bill_item_assignees: { bill_participants: { person: string } | null }[]
   }[]
   bill_participants: (Omit<ExportBill['shares'][number], 'amount_paid'> & {
-    payments: { amount_read: number | null; recipient_ok: boolean | null }[] | null
+    payments: ExportBill['shares'][number]['payments'] | null
   })[]
 }
 
@@ -769,6 +801,8 @@ function mapExportBill(bill: ExportRow): ExportBill {
     account_number: bill.account_number,
     account_holder: bill.account_holder,
     paid_by_person: bill.paid_by_person ?? null,
+    qris_path: bill.qris_path ?? null,
+    payment_method: bill.payment_method ?? 'bank',
     items: (bill.bill_items ?? [])
       .sort((a, b) => a.position - b.position)
       .map((item) => ({
@@ -782,6 +816,7 @@ function mapExportBill(bill: ExportRow): ExportBill {
     shares: (bill.bill_participants ?? []).map(({ payments, ...s }) => ({
       ...s,
       rounding_share: s.rounding_share ?? 0,
+      payments: payments ?? [],
       // Summed here for the same reason listBills sums it there: the running
       // total is derived from the proofs, never stored beside them.
       amount_paid: (payments ?? []).reduce(

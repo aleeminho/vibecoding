@@ -249,6 +249,10 @@ Deno.serve(async (req: Request) => {
     // for it: that word covers both an instalment and a transfer to a
     // stranger, and only one of those should reduce what someone owes.
     recipient_ok: recipientOk,
+    // What it was compared against. Recorded rather than recomputed, because
+    // the share's remaining balance moves with every instalment and the export
+    // needs the gap this proof actually had, not today's.
+    amount_due: due,
     verdict,
     note,
     image_path: imagePath,
@@ -270,9 +274,11 @@ Deno.serve(async (req: Request) => {
   // failing the upload and telling the payer their money was not received.
   if (!insertRes.ok) {
     const detail = await insertRes.clone().text()
-    if (detail.includes('recipient_ok')) {
-      const { recipient_ok: _dropped, ...withoutColumn } = record
-      insertRes = await insert(withoutColumn)
+    if (detail.includes('recipient_ok') || detail.includes('amount_due')) {
+      // Both were added by migrations. Dropping whichever one PostgREST names
+      // still records the proof, which matters more than either field.
+      const { recipient_ok: _r, amount_due: _d, ...withoutColumns } = record
+      insertRes = await insert(withoutColumns)
     } else {
       return json({ error: `Nggak bisa nyatet buktinya: ${detail}` }, 502)
     }

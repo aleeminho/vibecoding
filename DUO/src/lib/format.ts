@@ -39,12 +39,29 @@ export function parseRupiah(input: string): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null
 }
 
+const MONTHS = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+  'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+]
+
 /** "2026-09-12" -> "12 Sep 2026". Dates are stored as plain ISO strings. */
 export function formatDate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
-  const months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
-  ]
-  return `${d} ${months[m - 1]} ${y}`
+  return `${d} ${MONTHS[m - 1]} ${y}`
+}
+
+/**
+ * An ISO timestamp as "13 Sep 2026, 21.19", in the reader's own timezone.
+ *
+ * Local rather than UTC, unlike `formatDate`: that one renders a bill's date,
+ * which is a calendar fact about a day and should not shift. This one renders
+ * when an action happened, and an audit entry that reads three hours off from
+ * the clock on the wall is an audit entry nobody trusts.
+ */
+export function formatDateTime(iso: string): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return iso
+  const time = `${String(at.getHours()).padStart(2, '0')}.${String(at.getMinutes()).padStart(2, '0')}`
+  const day = `${at.getDate()} ${MONTHS[at.getMonth()]} ${at.getFullYear()}`
+  return `${day}, ${time}`
 }

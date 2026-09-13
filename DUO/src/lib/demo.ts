@@ -21,6 +21,7 @@
 import type {
   AuditEntry,
   BillWithShares,
+  DeletedBill,
   FlaggedPayment,
   PaymentPageInfo,
   SettleUpEntry,
@@ -175,6 +176,23 @@ export const DEMO_SETTLE_UP: SettleUpEntry[] = [
   { bill_id: 'demo-3', ref_code: 'BILL_20260530_001', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000, amount_paid: 0 },
 ]
 
+/**
+ * A bill that was deleted and not yet brought back.
+ *
+ * One entry, so the restore control has something to act on — a section that
+ * only ever renders its empty state is a section nobody has looked at.
+ */
+export const DEMO_DELETED: DeletedBill[] = [
+  {
+    id: 'demo-gone',
+    ref_code: 'BILL_20260602_001',
+    place: 'Bakmi GM Grand Indonesia',
+    bill_date: '2026-06-02',
+    total: 187000,
+    deleted_at: '2026-06-03T02:14:00Z',
+  },
+]
+
 export const DEMO_AUDIT: AuditEntry[] = [
   { id: 'a-1', action: 'share.paid', ref_code: 'BILL_20260626_001', detail: { person: 'Andi' }, created_at: '2026-07-02T11:20:00Z' },
   { id: 'a-2', action: 'bill.amount_changed', ref_code: 'BILL_20260614_001', detail: { field: 'total', from: 75900, to: 75900 }, created_at: '2026-06-15T09:04:00Z' },
@@ -198,14 +216,16 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
     account_number: '1234567890',
     account_holder: 'Alee',
     paid_by_person: null,
+    qris_path: null,
+    payment_method: 'bank',
     items: [
       { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
       { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
       { name: 'Kentang Goreng Gede', qty: 1, line_total: 30000, assigned_to: ['Sarah'] },
     ],
     shares: [
-      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000001', amount_paid: 42760, discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
-      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000002', amount_paid: 33140, discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000001', amount_paid: 42760, payments: [], discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000002', amount_paid: 33140, payments: [], discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
     ],
   },
   {
@@ -222,6 +242,8 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
     account_number: '1234567890',
     account_holder: 'Alee',
     paid_by_person: null,
+    qris_path: 'demo/qris.png',
+    payment_method: 'both',
     items: [
       { name: 'Long Black', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
       { name: 'Ice Caramel Latte', qty: 1, line_total: 45000, assigned_to: ['Sarah'] },
@@ -232,10 +254,10 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { name: 'Aqua Reflections Natural', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
     ],
     shares: [
-      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000003', amount_paid: 100000, discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
-      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000004', amount_paid: 0, discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
-      { person: 'Andi', pay_token: '00000000-0000-4000-8000-000000000005', amount_paid: 0, discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
-      { person: 'Dewi', pay_token: '00000000-0000-4000-8000-000000000006', amount_paid: 0, discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000003', amount_paid: 100000, payments: [], discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000004', amount_paid: 0, payments: [], discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', pay_token: '00000000-0000-4000-8000-000000000005', amount_paid: 0, payments: [], discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
+      { person: 'Dewi', pay_token: '00000000-0000-4000-8000-000000000006', amount_paid: 0, payments: [], discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
     ],
   },
 ]

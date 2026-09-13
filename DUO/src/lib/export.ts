@@ -73,6 +73,8 @@ export interface ExportBill {
   account_holder: string | null
   /** The participant who paid the vendor, or null if nobody was marked. */
   paid_by_person: string | null
+  qris_path: string | null
+  payment_method: 'bank' | 'qris' | 'both'
   items: {
     name: string
     qty: number
@@ -91,6 +93,14 @@ export interface ExportBill {
     pay_token: string | null
     /** Part of this share already settled by a proof of payment. */
     amount_paid: number
+    /**
+     * The proofs themselves, oldest first.
+     *
+     * Read for the export's payment columns. Nothing here recomputes
+     * `amount_paid` — that is summed by the same rule in one place, and this is
+     * only the evidence behind it.
+     */
+    payments: PaymentProof[]
     discount_share: number
     tax_share: number
     service_share: number
@@ -99,6 +109,22 @@ export interface ExportBill {
     status: string
     paid_date: string | null
   }[]
+}
+
+/**
+ * One uploaded proof, as the export needs it.
+ *
+ * `amount_due` is what the transfer was compared against at the time. It is
+ * stored rather than recomputed because a share's remaining balance moves with
+ * every instalment — see the payment_due migration.
+ */
+export interface PaymentProof {
+  amount_read: number | null
+  amount_due: number | null
+  recipient_ok: boolean | null
+  verdict: 'matched' | 'mismatch' | 'unclear'
+  image_path: string
+  created_at: string
 }
 
 /** A row of the CSV, in the column order the PRD specifies. */
@@ -112,6 +138,15 @@ export interface ExportRow {
   item_subtotal: number
   person_name: string
   person_share_amount: number
+  /**
+   * What has actually landed against this share, allocated across this
+   * person's rows the same way `person_share_amount` is.
+   *
+   * Allocated rather than repeated, so that summing a column in Excel gives the
+   * right answer. A share-level figure copied onto every row would be counted
+   * once per item, which is a spreadsheet that lies.
+   */
+  amount_paid: number
   payment_status: string
   payment_method: string
   bank_name: string
@@ -133,6 +168,7 @@ export const EXPORT_COLUMNS: (keyof ExportRow)[] = [
   'item_subtotal',
   'person_name',
   'person_share_amount',
+  'amount_paid',
   'payment_status',
   'payment_method',
   'bank_name',
@@ -202,6 +238,8 @@ export interface PersonBreakdown {
    */
   is_payer: boolean
   paid_date: string | null
+  /** Newest last. Empty when nothing has been uploaded. */
+  payments: PaymentProof[]
 }
 
 /**
@@ -291,6 +329,7 @@ export function allocateBill(bill: ExportBill): PersonBreakdown[] {
       amount_paid: share.amount_paid,
       is_payer: bill.paid_by_person === person,
       paid_date: share.paid_date,
+      payments: share.payments ?? [],
     })
   }
 
@@ -311,6 +350,20 @@ export function buildExportRows(bills: ExportBill[]): ExportRow[] {
         person.items.map((i) => i.amount),
       )
 
+      // Same treatment for what has been paid: allocated across the rows in
+      // proportion to the rows themselves, so a SUMIFS over the column gives
+      // the share's paid total rather than a multiple of it.
+      const paid = allocate(
+        person.amount_paid,
+        person.items.map((i) => i.amount),
+      )
+
+      // The newest proof, which is the one that describes where the share
+      // stands now. Older instalments are still in the database; one cell can
+      // hold one, and the most recent is the one anybody is asking about.
+      const latest = person.payments.at(-1) ?? null
+      const settled = person.is_payer || person.status === 'lunas' || person.amount_paid >= person.total
+
       person.items.forEach((item, i) => {
         rows.push({
           ref_code: bill.ref_code,
@@ -326,25 +379,44 @@ export function buildExportRows(bills: ExportBill[]): ExportRow[] {
           // This person's slice, carrying their share of everything that is not
           // tied to an item. Summed down a person's rows this equals amount_owed.
           person_share_amount: item.amount + extras[i],
-          payment_status: person.status === 'lunas' ? 'paid' : 'unpaid',
-          payment_method: bill.account_number ? 'transfer' : '',
+          amount_paid: paid[i],
+          // Three states, not two. A share paid in halves is neither settled
+          // nor untouched, and calling it `unpaid` puts the full amount back
+          // into an outstanding total that already has half of it.
+          payment_status: settled ? 'paid' : person.amount_paid > 0 ? 'partial' : 'unpaid',
+          // What the bill offers, which is not the same as what was used —
+          // there is no record of which method a payer actually chose.
+          payment_method: methodOf(bill),
           bank_name: bill.bank_name ?? '',
           account_number: bill.account_number ?? '',
           recipient_name: bill.account_holder ?? '',
           paid_at: person.paid_date ?? '',
-          // Not built yet. Present because the column set is what the PRD asks
-          // for and what an existing spreadsheet will be pointed at; empty
-          // because there is nothing honest to put here until the payment link
-          // feature exists.
-          proof_of_payment_url: '',
-          validation_status: '',
-          discrepancy_amount: '',
+          // The object path, not a URL. The bucket is private, so the only URLs
+          // are signed ones that expire — and a spreadsheet exported today and
+          // opened in a month would be full of dead links that look like broken
+          // data rather than like expired ones.
+          proof_of_payment_url: latest?.image_path ?? '',
+          validation_status: latest?.verdict ?? '',
+          // What the proof was short by, against what was due when it was
+          // judged. Both numbers are stored, so this needs no reconstruction.
+          discrepancy_amount:
+            latest && latest.amount_read !== null && latest.amount_due !== null
+              ? String(latest.amount_read - latest.amount_due)
+              : '',
         })
       })
     }
   }
 
   return rows
+}
+
+/** Which ways the bill offers to be paid. */
+function methodOf(bill: ExportBill): string {
+  const qris = Boolean(bill.qris_path)
+  if (bill.payment_method === 'qris') return qris ? 'qris' : ''
+  if (bill.payment_method === 'both') return qris ? 'transfer+qris' : 'transfer'
+  return bill.account_number ? 'transfer' : ''
 }
 
 /**

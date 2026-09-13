@@ -16,16 +16,24 @@
    * data out" is how a tool stops being used.
    */
   import { onMount } from 'svelte'
-  import { formatDate, rupiah } from '../lib/format'
+  import { formatDate, formatDateTime, rupiah } from '../lib/format'
+  import { describeAudit } from '../lib/audit'
   import {
+    listAuditLog,
+    listDeletedBills,
     listExportBills,
     listMonthlySpend,
     listOutstanding,
+    restoreBill,
+    type AuditEntry,
+    type DeletedBill,
     type MonthlyRow,
     type Outstanding,
   } from '../lib/api'
   import { buildExportRows, toCsv } from '../lib/export'
 
+  let deleted = $state<DeletedBill[]>([])
+  let audit = $state<AuditEntry[]>([])
   let monthly = $state<MonthlyRow[]>([])
   let outstanding = $state<Outstanding[]>([])
   let status = $state<'loading' | 'ready' | 'error'>('loading')
@@ -52,12 +60,33 @@
     if (next) month = next
   }
 
+  let busy = $state<string | null>(null)
+
+  async function restore(bill: DeletedBill) {
+    busy = bill.id
+    try {
+      await restoreBill(bill.id, bill.ref_code)
+      await load()
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
   async function load() {
     status = 'loading'
     try {
-      const [spend, owed] = await Promise.all([listMonthlySpend(), listOutstanding()])
+      const [spend, owed, gone, log] = await Promise.all([
+        listMonthlySpend(),
+        listOutstanding(),
+        listDeletedBills(),
+        listAuditLog(50),
+      ])
       monthly = spend
       outstanding = owed
+      deleted = gone
+      audit = log
       if (!month) {
         month = [...new Set(spend.map((r) => r.month.slice(0, 7)))].sort().reverse()[0] ?? ''
       }
@@ -213,6 +242,33 @@
       </div>
     </div>
 
+    <!--
+      Bills that were deleted, and the way back. The delete dialog promises the
+      data is still there; this is what makes that true rather than a thing the
+      dialog says.
+    -->
+    {#if deleted.length > 0}
+      <h3 class="group-title">Terhapus</h3>
+      <div class="group">
+        <div class="list">
+          {#each deleted as bill (bill.id)}
+            <div class="row">
+              <div class="stack">
+                <span class="strong">{bill.place}</span>
+                <span class="faint small">
+                  {formatDate(bill.bill_date)} · <span class="num">{bill.ref_code}</span>
+                </span>
+              </div>
+              <span class="row-value num faint">{rupiah(bill.total)}</span>
+              <button class="plain" disabled={busy === bill.id} onclick={() => restore(bill)}>
+                {busy === bill.id ? '…' : 'Balikin'}
+              </button>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <h3 class="group-title">Belum lunas (semua waktu)</h3>
     <div class="group">
       <div class="list">
@@ -241,6 +297,29 @@
       </button>
       <button class="primary" onclick={() => window.print()}>Simpan PDF</button>
     </div>
+
+    <!--
+      What was done to whose money, and when. Last on the screen because it is
+      the thing nobody opens until something looks wrong.
+    -->
+    {#if audit.length > 0}
+      <h3 class="group-title no-print">Catatan perubahan</h3>
+      <div class="group no-print">
+        <div class="list">
+          {#each audit as entry (entry.id)}
+            <div class="row">
+              <div class="stack">
+                <span>{describeAudit(entry)}</span>
+                <span class="faint small">
+                  {formatDateTime(entry.created_at)}
+                  {#if entry.ref_code}· <span class="num">{entry.ref_code}</span>{/if}
+                </span>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     {#if exportNote}
       <p class="pad dim small">{exportNote}</p>
