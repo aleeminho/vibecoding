@@ -407,7 +407,6 @@
                       {item.name}
                       {#if item.shared > 1}<em class="frac">1/{item.shared}</em>{/if}
                     </span>
-                    <i class="dots"></i>
                     <span class="num">{rupiahDigits(item.amount)}</span>
                   </li>
                 {/each}
@@ -790,20 +789,19 @@
     list-style: none;
   }
 
+  /*
+   * Name left, figure right, and nothing between them. The dotted leader that
+   * used to run across was the reference document's, and it was dropped: on a
+   * card this narrow the rule was doing the work the gap already does, and it
+   * made every line look like a table row in a document that is not one.
+   */
   .slip__line {
     display: flex;
+    justify-content: space-between;
     align-items: baseline;
-    gap: 7px;
+    gap: 12px;
     padding: 4px 0;
     font-size: 13px;
-  }
-
-  /* Empty element: its baseline is its bottom edge, so the dotted rule lands
-     exactly on the text baseline. */
-  .dots {
-    flex: 1 1 auto;
-    min-width: 14px;
-    border-bottom: 1px dotted var(--rule);
   }
 
   .slip__line .num {
@@ -818,11 +816,23 @@
     color: var(--ink-2);
   }
 
+  /*
+   * Anchored to the bottom of the card, which is what makes two cards in a row
+   * line up.
+   *
+   * Cards in a grid are stretched to the tallest, and the due band was already
+   * pinned down — so the totals matched and everything above them did not. A
+   * card with three items put its Subtotal a line lower than the card beside it
+   * with two, which reads as two tables that disagree rather than as one
+   * document. `margin-top: auto` pushes this block and everything under it to
+   * the foot, so Subtotal, the charge line and the band are all on the same
+   * rows across the row.
+   */
   .slip__sub {
     display: grid;
     grid-template-columns: 1fr auto;
     gap: 3px 12px;
-    margin: 11px 0 13px;
+    margin: auto 0 13px;
     padding-top: 9px;
     border-top: 1px solid var(--rule-soft);
     font-size: 13px;
@@ -929,11 +939,19 @@
     gap: 26px;
   }
 
-  /* Padding is extra quiet zone on top of the code's own. */
+  /*
+   * Padding is extra quiet zone on top of the code's own, and the height is the
+   * image's own too.
+   *
+   * Forcing a square squashed whatever did not happen to be one — a QR that is
+   * taller than it is wide came out stretched, and a stretched QR is one a
+   * scanner may refuse. `height: auto` lets the code keep the shape it was
+   * photographed in, which is the shape it was made in.
+   */
   .pay__qr {
     flex: none;
     width: 148px;
-    height: 148px;
+    height: auto;
     padding: 10px;
     border: 1px solid var(--rule);
     border-radius: 6px;
@@ -1126,6 +1144,18 @@
 
     .ledger tbody td.num {
       padding-left: 24px;
+    }
+
+    /*
+     * Three parts, on their own pages, in one file: who owes what in the
+     * aggregate, then who owes what item by item, then how to pay.
+     *
+     * Each was already a section; what it was not was separable. They ran into
+     * each other, so a page ended in the middle of the slips and the reader had
+     * to hold a table in their head across a page turn.
+     */
+    .block + .block {
+      break-before: page;
     }
 
     .slip,
