@@ -694,12 +694,43 @@
    * `overflow: hidden` is doing two jobs: it rounds the wash footer off at the
    * bottom instead of squaring it over the corners, and it stops the table
    * escaping the border it now sits inside.
+   *
+   * No padding here. The room inside the card comes from the first and last
+   * cells instead, because the header's rule and the footer's wash have to run
+   * the full width of the card — inset them and the card reads as a box with a
+   * smaller box inside it rather than as a table.
    */
   .ledger-wrap {
     border: 1px solid var(--rule);
     border-radius: 6px;
-    padding: 0 14px;
     overflow: hidden;
+  }
+
+  /*
+   * Padding is what keeps a card from looking like a grid someone drew a line
+   * around. The first and last cells carry it so the fill and the rules still
+   * reach the edges; the asymmetry is not one — the figures are right-aligned,
+   * so their column needs the same slack on its far side that the names need
+   * on theirs.
+   */
+  .ledger th:first-child,
+  .ledger td:first-child {
+    padding-left: 24px;
+  }
+
+  .ledger th:last-child,
+  .ledger td:last-child {
+    padding-right: 24px;
+  }
+
+  /*
+   * The headings need the same gap their columns have, or at phone width
+   * "Subtotal" and "Tax + service" run together and read as one word — the
+   * figures underneath were never touching, because the cells carry this and
+   * the headings did not.
+   */
+  .ledger thead th.num {
+    padding-left: 24px;
   }
 
   .ledger {
@@ -708,7 +739,9 @@
   }
 
   .ledger thead th {
-    padding: 0 0 9px;
+    /* Down from the card's top edge, which nothing else provides now that the
+       wrapper has no padding of its own. */
+    padding: 20px 0 10px;
     font: 500 12px/1 var(--sans);
     color: var(--ink-3);
     text-align: left;
@@ -756,7 +789,7 @@
 
   .ledger--people tfoot th,
   .ledger--people tfoot td {
-    padding: 15px 0;
+    padding: 17px 0;
     font-size: 14px;
     font-weight: 600;
     text-align: left;
@@ -1082,6 +1115,19 @@
       white-space: normal;
     }
 
+    /* Everything the card holds comes in a notch, so the four columns still
+       fit a phone without the headings colliding. */
+    .ledger th:first-child,
+    .ledger td:first-child {
+      padding-left: 14px;
+    }
+
+    .ledger th:last-child,
+    .ledger td:last-child {
+      padding-right: 14px;
+    }
+
+    .ledger thead th.num,
     .ledger tbody td.num {
       padding-left: 12px;
     }
