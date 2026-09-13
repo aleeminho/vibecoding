@@ -1,0 +1,47 @@
+# Apache / LiteSpeed config for the cPanel deploy of DUO.
+#
+# Vite copies everything in public/ into the build verbatim, so this file ships
+# with the app and lives in git. That is deliberate: the alternative is a
+# setting that exists only inside a hosting panel, where nobody can see it,
+# nothing reviews it, and it disappears the next time someone uploads by hand.
+#
+# ONLY cPanel uses this. The GitHub Pages workflow deletes it before uploading
+# its artifact, because Pages is not Apache and would happily serve this file to
+# anyone as plain text.
+
+# --- Force HTTPS ------------------------------------------------------------
+#
+# Not cosmetic. A PWA cannot be installed to a home screen over plain HTTP, so
+# an http:// visit is a visit where "Add to Home Screen" silently does nothing
+# useful. Installing is the whole reason the app keeps its login session: as a
+# plain Safari tab, iOS may evict the storage after a week without a visit.
+#
+# The X-Forwarded-Proto check is for the case where TLS is terminated in front
+# of this server; without it that setup redirects to itself forever.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# --- Caching ----------------------------------------------------------------
+#
+# index.html and the manifest must never be cached.
+#
+# Vite puts a content hash in every asset filename, so index.html is the only
+# thing that knows which hash is current. Cache it and a later deploy deletes
+# the old asset while the cached HTML keeps asking for it: the app loads blank,
+# and the deploy looks like it did nothing for anyone who had visited before.
+# That is a genuinely miserable bug to trace back to a cache header.
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|manifest\.webmanifest)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # The hashed assets are the opposite case: their name changes whenever their
+  # contents do, so they can be cached indefinitely.
+  <FilesMatch "^index-[A-Za-z0-9_-]+\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+</IfModule>

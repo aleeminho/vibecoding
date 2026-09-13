@@ -1,0 +1,100 @@
+# Builds DUO and uploads it to Jagoan Hosting over FTP.
+#
+# The second of two deploy targets. GitHub Pages stays as it is — it costs
+# nothing, it is already proven, and if the certificate on the cPanel side ever
+# expires unnoticed this URL keeps working. Both deploy from the same push, so
+# they cannot drift apart.
+#
+# Three repository secrets are required:
+#
+#   FTP_SERVER     ftp.splitfair.xyz, or the server's IP
+#   FTP_USERNAME   the cPanel FTP account
+#   FTP_PASSWORD   its password
+#
+# Add them under Settings -> Secrets and variables -> Actions. Do not put them
+# in a file, and do not paste them into a chat.
+#
+# Until they exist this workflow prints a notice and stops. It deliberately
+# does not fail: a workflow that is permanently red is worse than no workflow,
+# because it teaches you to ignore the colour, and then you ignore the one that
+# matters.
+
+name: Deploy DUO to Jagoan
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'DUO/**'
+      - '.github/workflows/deploy-jagoan.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-jagoan
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for FTP credentials
+        id: creds
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "::notice title=Skipping Jagoan deploy::FTP_SERVER is not set. Add FTP_SERVER, FTP_USERNAME and FTP_PASSWORD under Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.skip != 'true'
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - if: steps.creds.outputs.skip != 'true'
+        name: Install
+        working-directory: DUO
+        run: bun install --frozen-lockfile
+
+      - if: steps.creds.outputs.skip != 'true'
+        name: Build for the domain root
+        working-directory: DUO
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # No BASE_PATH. splitfair.xyz serves from the apex, not a subpath, so
+          # the default "/" is the correct one. Setting it here would produce
+          # the same blank-page failure the Pages build avoids.
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are not set."
+            exit 1
+          fi
+          bun run build
+
+      - if: steps.creds.outputs.skip != 'true'
+        name: Upload to public_html
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: DUO/dist/
+          # If the FTP account is chrooted to its own home, this is "public_html".
+          # If it can see the account root, it needs the full path. Getting it
+          # wrong uploads into a directory nobody serves, and the deploy still
+          # reports success.
+          server-dir: /public_html/
+          # `dangerous-clean-slate` is deliberately NOT enabled. It deletes
+          # everything under server-dir that is not in the build, which would
+          # take out the mailbox directories and anything else living there.
+          # The cost of leaving it off is that superseded hashed assets
+          # accumulate; that is a few hundred kilobytes, and it is not worth
+          # risking the contents of someone's hosting account to avoid it.
+          exclude: |
+            **/.git*
+            **/node_modules/**
+            **/.DS_Store

@@ -77,6 +77,13 @@ jobs:
           fi
           bun run build
 
+      # public/.htaccess exists for the cPanel deploy. Pages is not Apache, so
+      # it would upload this as a readable text file at /.htaccess — noise, and
+      # a config description nobody visiting the site has any use for.
+      - name: Drop the Apache config
+        working-directory: DUO
+        run: rm -f dist/.htaccess
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: DUO/dist
