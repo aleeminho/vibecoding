@@ -25,6 +25,7 @@
   import { formatDate, rupiah } from '../lib/format'
   import {
     deleteBill,
+    getExportBill,
     listBills,
     listOutstanding,
     setBillStatus,
@@ -33,6 +34,7 @@
     type BillWithShares,
     type Outstanding,
   } from '../lib/api'
+  import { allocateBill } from '../lib/export'
   import { buildShareMessage, copyText, whatsappUrl } from '../lib/share'
   import { isDemo } from '../lib/demo'
 
@@ -44,6 +46,8 @@
   let busy = $state<string | null>(null)
   /** Bill id whose message was just copied, so the button can say so. */
   let copied = $state<string | null>(null)
+  /** Bill id whose message is being assembled, which needs a round trip. */
+  let sharing = $state<string | null>(null)
 
   /**
    * `silent` reloads without dropping the screen back to "Memuat…".
@@ -116,20 +120,26 @@
     }
   }
 
-  function messageFor(bill: BillWithShares): string {
+  /**
+   * Build the message for a bill, fetching its items first.
+   *
+   * The breakdown has to come from the same allocation the CSV export uses, and
+   * that needs the items and who shared them — which the bill list does not
+   * carry. Fetched on the tap rather than on every list load, because the item
+   * graph is far more rows than the list needs and only this one action wants
+   * it.
+   */
+  async function messageFor(bill: BillWithShares): Promise<string> {
+    const full = await getExportBill(bill.id)
     return buildShareMessage({
-      ref_code: bill.ref_code,
-      place: bill.place,
-      bill_date: bill.bill_date,
+      ref_code: full.ref_code,
+      place: full.place,
+      bill_date: full.bill_date,
       total: bill.total,
-      bank_name: bill.bank_name,
-      account_number: bill.account_number,
-      account_holder: bill.account_holder,
-      shares: bill.shares.map((s) => ({
-        person: s.person,
-        amount_owed: s.amount_owed,
-        status: s.status,
-      })),
+      bank_name: full.bank_name,
+      account_number: full.account_number,
+      account_holder: full.account_holder,
+      breakdown: allocateBill(full),
     })
   }
 
@@ -141,12 +151,26 @@
    * that did not register — so people tap again, and then paste twice.
    */
   async function shareBill(bill: BillWithShares) {
-    copied = (await copyText(messageFor(bill))) ? bill.id : null
-    setTimeout(() => (copied = null), 2000)
+    sharing = bill.id
+    try {
+      copied = (await copyText(await messageFor(bill))) ? bill.id : null
+      setTimeout(() => (copied = null), 2000)
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      sharing = null
+    }
   }
 
-  function openWhatsApp(bill: BillWithShares) {
-    window.open(whatsappUrl(messageFor(bill)), '_blank', 'noopener')
+  async function openWhatsApp(bill: BillWithShares) {
+    sharing = bill.id
+    try {
+      window.open(whatsappUrl(await messageFor(bill)), '_blank', 'noopener')
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      sharing = null
+    }
   }
 
   /**
@@ -309,10 +333,16 @@
                   Lihat struk
                 </button>
               {/if}
-              <button class="plain" onclick={() => shareBill(bill)}>
-                {copied === bill.id ? 'Tersalin ✓' : 'Copy pesan WA'}
+              <button class="plain" disabled={sharing === bill.id} onclick={() => shareBill(bill)}>
+                {sharing === bill.id
+                  ? 'Nyiapin…'
+                  : copied === bill.id
+                    ? 'Tersalin ✓'
+                    : 'Copy pesan WA'}
               </button>
-              <button class="plain" onclick={() => openWhatsApp(bill)}>Buka WA</button>
+              <button class="plain" disabled={sharing === bill.id} onclick={() => openWhatsApp(bill)}>
+                Buka WA
+              </button>
             </div>
 
             <div class="row actions">

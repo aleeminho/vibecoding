@@ -138,90 +138,162 @@ export const EXPORT_COLUMNS: (keyof ExportRow)[] = [
  * spread across their own rows in proportion to those slices. The last rupiah
  * of each is placed by largest remainder, so the column adds up.
  */
+export interface BreakdownItem {
+  name: string
+  qty: number
+  /** The item's own total on the bill, repeated on each person who shared it. */
+  lineTotal: number
+  /** How many people this item was split between, for "(bagi 2)" in a message. */
+  shared: number
+  /** This person's slice of the item. */
+  amount: number
+}
+
+export interface PersonBreakdown {
+  person: string
+  items: BreakdownItem[]
+  /**
+   * Tax, service, discount and rounding — everything that is not tied to one
+   * item — itemised so a message can explain the number rather than just
+   * assert it. These always sum to `extra`.
+   */
+  components: { label: string; amount: number }[]
+  /**
+   * The same amount as the sum of `components`, derived from `amount_owed`.
+   * Discount may push this negative.
+   */
+  extra: number
+  total: number
+  status: string
+  paid_date: string | null
+}
+
+/**
+ * Work out, per person, their slice of every item and of everything that is
+ * not an item.
+ *
+ * The single source of truth behind both the CSV export and the WhatsApp
+ * message. They have to agree — a message that disagrees with the spreadsheet
+ * is worse than having only one of them — and sharing this function is what
+ * guarantees that, rather than two implementations that happen to stay in step
+ * until one of them is edited.
+ */
+export function allocateBill(bill: ExportBill): PersonBreakdown[] {
+  const shares = new Map(bill.shares.map((s) => [s.person, s]))
+
+  // item index -> each person's slice, and the running raw total per person
+  const perItem: { index: number; total: number; shared: number; shares: Map<string, number> }[] = []
+  const rawByPerson = new Map<string, number>()
+
+  for (const [index, item] of bill.items.entries()) {
+    // A bill committed through commit_bill() cannot have an unassigned item —
+    // gate 3 rejects it — but a defensively skipped line is better than a
+    // crash on data that predates the gate.
+    const people = item.assigned_to.filter((p) => shares.has(p))
+    if (people.length === 0) continue
+
+    const parts = allocate(
+      item.line_total,
+      people.map(() => 1),
+    )
+    const byPerson = new Map<string, number>()
+    people.forEach((person, i) => {
+      byPerson.set(person, parts[i])
+      rawByPerson.set(person, (rawByPerson.get(person) ?? 0) + parts[i])
+    })
+    perItem.push({ index, total: item.line_total, shared: people.length, shares: byPerson })
+  }
+
+  const result: PersonBreakdown[] = []
+
+  for (const [person, share] of shares) {
+    const own = perItem.filter((it) => it.shares.has(person))
+    if (own.length === 0) continue
+
+    // The extra is derived from `amount_owed` rather than rebuilt from
+    // discount/tax/service/rounding. Those components are each rounded
+    // independently when the split is computed, so rebuilding the total from
+    // them can land a rupiah away from what was committed — and `amount_owed`
+    // is what appears in the app, on the bill, and in the outstanding total.
+    // Taking it as the source of truth makes the column tie out by
+    // construction instead of by arithmetic that has to agree.
+    const extra =
+      share.amount_owed - (rawByPerson.get(person) ?? 0)
+
+    const components: { label: string; amount: number }[] = []
+    if (share.discount_share) components.push({ label: 'Diskon', amount: -share.discount_share })
+    if (share.tax_share) components.push({ label: 'PPN', amount: share.tax_share })
+    if (share.service_share) components.push({ label: 'Service', amount: share.service_share })
+    if (share.rounding_share) {
+      components.push({ label: 'Pembulatan', amount: share.rounding_share })
+    }
+
+    // The four components are each rounded independently when the split is
+    // computed, so their sum can sit a rupiah or two away from the difference
+    // above. Naming that residue rather than hiding it keeps the itemised lines
+    // adding up to the total on screen — which is the entire point of printing
+    // them — and the alternative would be a message where the arithmetic
+    // visibly does not work.
+    const componentSum = components.reduce((acc, c) => acc + c.amount, 0)
+    if (extra - componentSum !== 0) {
+      components.push({ label: 'Penyesuaian', amount: extra - componentSum })
+    }
+
+    result.push({
+      person,
+      items: own.map((it) => ({
+        name: bill.items[it.index].name,
+        qty: bill.items[it.index].qty,
+        lineTotal: it.total,
+        shared: it.shared,
+        amount: it.shares.get(person)!,
+      })),
+      components,
+      extra,
+      total: share.amount_owed,
+      status: share.status,
+      paid_date: share.paid_date,
+    })
+  }
+
+  return result
+}
+
 export function buildExportRows(bills: ExportBill[]): ExportRow[] {
   const rows: ExportRow[] = []
 
   for (const bill of bills) {
-    const owed = new Map(bill.shares.map((s) => [s.person, s]))
-
-    // item index -> amount owed per person, and the running raw total per person
-    const perItem: { index: number; shares: Map<string, number> }[] = []
-    const rawByPerson = new Map<string, number>()
-
-    for (const [index, item] of bill.items.entries()) {
-      // A bill committed through commit_bill() cannot have an unassigned item —
-      // gate 3 rejects it — but a defensively skipped line is better than a
-      // crash on data that predates the gate.
-      const people = item.assigned_to.filter((p) => owed.has(p))
-      if (people.length === 0) continue
-
-      const parts = allocate(
-        item.line_total,
-        people.map(() => 1),
+    for (const person of allocateBill(bill)) {
+      // The charges that are not tied to an item are spread across this
+      // person's own rows in proportion to how much of the bill they took, so
+      // that summing their rows gives their total rather than landing a rupiah
+      // short of it.
+      const extras = allocate(
+        person.extra,
+        person.items.map((i) => i.amount),
       )
-      const shares = new Map<string, number>()
-      people.forEach((person, i) => {
-        shares.set(person, parts[i])
-        rawByPerson.set(person, (rawByPerson.get(person) ?? 0) + parts[i])
-      })
-      perItem.push({ index, shares })
-    }
 
-    // Per person, spread the charges that are not tied to a single item across
-    // that person's own rows, in proportion to how much of the bill they took.
-    //
-    // The amount to spread is derived from `amount_owed` rather than rebuilt
-    // from discount/tax/service/rounding. Those components are each rounded
-    // independently when the split is computed, so rebuilding the total from
-    // them can land a rupiah away from what was actually committed — and it is
-    // `amount_owed` that appears in the app, in the outstanding total, and on
-    // the bill. Taking it as the source of truth makes the column tie out by
-    // construction instead of by arithmetic that has to agree.
-    const extrasByPerson = new Map<string, number[]>()
-    for (const [person, share] of owed) {
-      const own = perItem.filter((it) => it.shares.has(person))
-      if (own.length === 0) continue
-
-      const extras = share.amount_owed - (rawByPerson.get(person) ?? 0)
-      const weights = own.map((it) => it.shares.get(person)!)
-      extrasByPerson.set(person, allocate(extras, weights))
-    }
-
-    // index the extras so the row loop can pick the right one per item
-    const extrasAt = new Map<string, Map<number, number>>()
-    for (const [person] of extrasByPerson) {
-      const own = perItem.filter((it) => it.shares.has(person))
-      const parts = extrasByPerson.get(person)!
-      extrasAt.set(person, new Map(own.map((it, i) => [it.index, parts[i]])))
-    }
-
-    for (const [index, item] of bill.items.entries()) {
-      const entry = perItem.find((it) => it.index === index)
-      if (!entry) continue
-
-      for (const [person, itemShare] of entry.shares) {
-        const share = owed.get(person)!
-        const extra = extrasAt.get(person)?.get(index) ?? 0
-
+      person.items.forEach((item, i) => {
         rows.push({
           ref_code: bill.ref_code,
           bill_date: bill.bill_date,
           merchant_name: bill.place,
           item_name: item.name,
           item_qty: item.qty,
-          item_unit_price: item.qty > 0 ? Math.round(item.line_total / item.qty) : item.line_total,
+          item_unit_price:
+            item.qty > 0 ? Math.round(item.lineTotal / item.qty) : item.lineTotal,
           // The item's own total on the bill, not this person's slice of it.
-          item_subtotal: item.line_total,
-          person_name: person,
+          item_subtotal: item.lineTotal,
+          person_name: person.person,
           // This person's slice, carrying their share of everything that is not
           // tied to an item. Summed down a person's rows this equals amount_owed.
-          person_share_amount: itemShare + extra,
-          payment_status: share.status === 'lunas' ? 'paid' : 'unpaid',
+          person_share_amount: item.amount + extras[i],
+          payment_status: person.status === 'lunas' ? 'paid' : 'unpaid',
           payment_method: bill.account_number ? 'transfer' : '',
           bank_name: bill.bank_name ?? '',
           account_number: bill.account_number ?? '',
           recipient_name: bill.account_holder ?? '',
-          paid_at: share.paid_date ?? '',
+          paid_at: person.paid_date ?? '',
           // Not built yet. Present because the column set is what the PRD asks
           // for and what an existing spreadsheet will be pointed at; empty
           // because there is nothing honest to put here until the payment link
@@ -230,7 +302,7 @@ export function buildExportRows(bills: ExportBill[]): ExportRow[] {
           validation_status: '',
           discrepancy_amount: '',
         })
-      }
+      })
     }
   }
 

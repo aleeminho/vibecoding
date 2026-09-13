@@ -15,7 +15,17 @@
  */
 
 import { formatDate, rupiah } from './format'
+import type { PersonBreakdown } from './export'
 
+/**
+ * Everyone's breakdown in `breakdown` must sum to `total`.
+ *
+ * That is the reconciliation the message prints at the bottom. It is not a
+ * sanity check bolted on: a message that lists what each person ordered and
+ * then asks them for a number that does not match the sum of those lines is
+ * worse than a message with no lines at all, because now there is something
+ * concrete to argue with. `allocateBill` guarantees it; this prints it.
+ */
 export interface ShareBill {
   ref_code: string
   place: string
@@ -24,7 +34,7 @@ export interface ShareBill {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
-  shares: { person: string; amount_owed: number; status: string }[]
+  breakdown: PersonBreakdown[]
 }
 
 /**
@@ -55,28 +65,43 @@ export function buildShareMessage(
   bill: ShareBill,
   { tone = 'initial' }: { tone?: 'initial' | 'reminder' } = {},
 ): string {
-  const who = bill.shares
-  const paid = who.filter((s) => s.status === 'lunas')
-  const unpaid = who.filter((s) => s.status !== 'lunas')
+  const paid = bill.breakdown.filter((p) => p.status === 'lunas')
+  const unpaid = bill.breakdown.filter((p) => p.status !== 'lunas')
 
   const lines: string[] = []
 
   lines.push(tone === 'reminder' ? '*Pengingat split bill*' : '*Split bill*')
-  lines.push(`${plain(bill.place)} — ${formatDate(bill.bill_date)}`)
-  lines.push(`Total ${rupiah(bill.total)}`)
-  lines.push('')
+  lines.push(`*${plain(bill.place)}* — ${formatDate(bill.bill_date)}`)
+  lines.push(`Total struk ${rupiah(bill.total)}`)
 
-  const list = tone === 'reminder' && unpaid.length > 0 ? unpaid : who
-  for (const share of list) {
-    const mark = share.status === 'lunas' ? ' (lunas)' : ''
-    lines.push(`${plain(share.person)}: ${rupiah(share.amount_owed)}${mark}`)
+  // On a reminder, only the people who still owe get itemised. Reprinting the
+  // order of someone who already paid is how a reminder turns into an argument.
+  const list = tone === 'reminder' && unpaid.length > 0 ? unpaid : bill.breakdown
+
+  for (const person of list) {
+    lines.push('')
+    const mark = person.status === 'lunas' ? ' _(lunas)_' : ''
+    lines.push(`*${plain(person.person)}*${mark}`)
+
+    for (const item of person.items) {
+      const split = item.shared > 1 ? ` _(bagi ${item.shared})_` : ''
+      const qty = item.qty > 1 && item.shared === 1 ? ` x${item.qty}` : ''
+      lines.push(`  ${plain(item.name)}${qty}${split} ${rupiah(item.amount)}`)
+    }
+
+    // What turns a list of dishes into the number being asked for. Without it
+    // the items never add up to the total and the first reply is "kok segitu?".
+    for (const part of person.components) {
+      const sign = part.amount < 0 ? '−' : '+'
+      lines.push(`  ${part.label} ${sign}${rupiah(Math.abs(part.amount))}`)
+    }
+
+    lines.push(`  *Total ${rupiah(person.total)}*`)
   }
 
-  // On a reminder, saying who has already paid is the thing that stops the
-  // group chat asking. On the first message it is noise.
   if (tone === 'reminder' && paid.length > 0) {
     lines.push('')
-    lines.push(`Udah lunas: ${paid.map((s) => plain(s.person)).join(', ')}`)
+    lines.push(`Udah lunas: ${paid.map((p) => plain(p.person)).join(', ')}`)
   }
 
   const dest = destination(bill)
@@ -84,6 +109,17 @@ export function buildShareMessage(
     lines.push('')
     lines.push(...dest)
   }
+
+  // The reconciliation, printed rather than assumed. If this ever reads as
+  // anything other than the same number twice, the split is broken and the
+  // message says so instead of quietly asking for the wrong amounts.
+  const summed = bill.breakdown.reduce((acc, p) => acc + p.total, 0)
+  lines.push('')
+  lines.push(
+    summed === bill.total
+      ? `Dicek: ${rupiah(summed)} — pas sama total struk.`
+      : `PERHATIAN: jumlahnya ${rupiah(summed)}, total struk ${rupiah(bill.total)}.`,
+  )
 
   return lines.join('\n')
 }

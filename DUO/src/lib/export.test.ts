@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { allocate, buildExportRows, toCsv, type ExportBill } from './export'
+import { allocate, allocateBill, buildExportRows, toCsv, type ExportBill } from './export'
 
 describe('allocate', () => {
   test('parts add up to the total exactly', () => {
@@ -129,6 +129,62 @@ describe('buildExportRows', () => {
       items: [...bill.items, { name: 'Mystery', qty: 1, line_total: 0, assigned_to: [] }],
     }
     expect(() => buildExportRows([broken])).not.toThrow()
+  })
+})
+
+/**
+ * The itemised breakdown behind the WhatsApp message.
+ *
+ * The whole point of printing item lines is that people check them, so the
+ * arithmetic on screen has to work: the items, plus the charges that are not
+ * items, must equal the number being asked for. If they do not, the message
+ * invites an argument it cannot win.
+ */
+describe('allocateBill', () => {
+  test('the item lines plus the charges equal the total', () => {
+    for (const person of allocateBill(bill)) {
+      const items = person.items.reduce((acc, i) => acc + i.amount, 0)
+      expect(items + person.extra).toBe(person.total)
+    }
+  })
+
+  test('the named charges add up to the extra, with nothing unaccounted for', () => {
+    for (const person of allocateBill(bill)) {
+      const components = person.components.reduce((acc, c) => acc + c.amount, 0)
+      expect(components).toBe(person.extra)
+    }
+  })
+
+  test('a shared item records how many ways it was split', () => {
+    const budi = allocateBill(bill).find((p) => p.person === 'Budi')!
+    const esTeh = budi.items.find((i) => i.name === 'Es Teh')!
+    expect(esTeh.shared).toBe(2)
+    // 16000 split two ways
+    expect(esTeh.amount).toBe(8000)
+    expect(esTeh.lineTotal).toBe(16000)
+    // and the other half lands on the other person, not lost
+    const sarah = allocateBill(bill).find((p) => p.person === 'Sarah')!
+    expect(sarah.items.find((i) => i.name === 'Es Teh')!.amount).toBe(8000)
+  })
+
+  test('the breakdown adds up to the bill total', () => {
+    const summed = allocateBill(bill).reduce((acc, p) => acc + p.total, 0)
+    expect(summed).toBe(75900)
+  })
+
+  // The residue is a real possibility — the four components are each rounded on
+  // their own — and it has to be named rather than dropped, or the printed
+  // lines do not add up to the printed total.
+  test('a residue the components cannot explain is named, not swallowed', () => {
+    const awkward: ExportBill = {
+      ...bill,
+      // amount_owed deliberately one rupiah away from what the components imply
+      shares: [{ ...bill.shares[0], amount_owed: bill.shares[0].amount_owed + 1 }, bill.shares[1]],
+    }
+    const budi = allocateBill(awkward).find((p) => p.person === 'Budi')!
+    const components = budi.components.reduce((acc, c) => acc + c.amount, 0)
+    expect(components).toBe(budi.extra)
+    expect(budi.components.some((c) => c.label === 'Penyesuaian')).toBe(true)
   })
 })
 

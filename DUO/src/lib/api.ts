@@ -544,6 +544,75 @@ export async function listExportBills(from: string, to: string): Promise<ExportB
   }))
 }
 
+/**
+ * One bill with its items, assignees and shares.
+ *
+ * Fetched on demand rather than added to listBills, because the item graph is
+ * an order of magnitude more rows than the bill list needs, and only the share
+ * message asks for it. One extra round trip on a deliberate tap is a better
+ * trade than carrying it on every screen load.
+ */
+export async function getExportBill(billId: string): Promise<ExportBill> {
+  if (import.meta.env.DEV && isDemo()) {
+    const bill = DEMO_BILLS.find((b) => b.id === billId)
+    const fixture = DEMO_EXPORT_BILLS.find((b) => b.ref_code === bill?.ref_code)
+    if (!fixture) throw new Error(`no demo export fixture for ${bill?.ref_code ?? billId}`)
+    return fixture
+  }
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select(
+      `ref_code, bill_date, place, bank_name, account_number, account_holder,
+       bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
+       bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`,
+    )
+    .eq('id', billId)
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  const bill = data as unknown as {
+    ref_code: string
+    bill_date: string
+    place: string
+    bank_name: string | null
+    account_number: string | null
+    account_holder: string | null
+    bill_items: {
+      position: number
+      name: string
+      qty: number
+      line_total: number
+      bill_item_assignees: { bill_participants: { person: string } | null }[]
+    }[]
+    bill_participants: ExportBill['shares']
+  }
+
+  return {
+    ref_code: bill.ref_code,
+    bill_date: bill.bill_date,
+    place: bill.place,
+    bank_name: bill.bank_name,
+    account_number: bill.account_number,
+    account_holder: bill.account_holder,
+    items: (bill.bill_items ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        line_total: item.line_total,
+        assigned_to: (item.bill_item_assignees ?? [])
+          .map((a) => a.bill_participants?.person)
+          .filter((p): p is string => typeof p === 'string'),
+      })),
+    shares: (bill.bill_participants ?? []).map((s) => ({
+      ...s,
+      rounding_share: s.rounding_share ?? 0,
+    })),
+  }
+}
+
 export interface SettleUpEntry {
   bill_id: string
   ref_code: string

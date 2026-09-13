@@ -178,4 +178,32 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { person: 'Sarah', discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
     ],
   },
+  {
+    // The awkward one: seven items, four people, three of them sharing, and
+    // every share a number that does not divide evenly. This is the fixture
+    // that proves the itemisation reconciles, because a fixture where everyone
+    // orders exactly one thing would reconcile no matter how broken the
+    // allocation was.
+    ref_code: 'BILL_20260626_001',
+    bill_date: '2026-06-26',
+    place: 'Lucky Cat Coffee & Kitchen',
+    bank_name: 'BCA',
+    account_number: '1234567890',
+    account_holder: 'Alee',
+    items: [
+      { name: 'Long Black', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
+      { name: 'Ice Caramel Latte', qty: 1, line_total: 45000, assigned_to: ['Sarah'] },
+      { name: 'Lychee Tea', qty: 2, line_total: 80000, assigned_to: ['Budi', 'Sarah'] },
+      { name: 'Peach Tea', qty: 3, line_total: 120000, assigned_to: ['Andi', 'Dewi'] },
+      { name: 'Ice Latte', qty: 1, line_total: 45000, assigned_to: ['Andi'] },
+      { name: 'Japanese', qty: 1, line_total: 35000, assigned_to: ['Dewi'] },
+      { name: 'Aqua Reflections Natural', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
+    ],
+    shares: [
+      { person: 'Budi', discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
+      { person: 'Sarah', discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
+      { person: 'Dewi', discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
+    ],
+  },
 ]
