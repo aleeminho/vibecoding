@@ -75,8 +75,8 @@ Tokens are role-based (`--brand`, `--surface`), never hue-based. `--brand`
 text. Text uses `--brand-light`.
 
 Documents (the nota, the payer page) are **light**, always, and paint their own
-colours rather than inheriting. They leave the app through a PDF or a group
-chat, and a dark document is worse in both.
+colours rather than inheriting. They arrive as a link pasted into a group chat,
+and a dark document is worse there.
 
 ---
 
@@ -86,9 +86,15 @@ chat, and a dark document is worse in both.
   site.** Vite folds it to `false` and drops the fixtures. Behind a helper it
   cannot be eliminated and ships fake bills to production. This already
   happened.
-- **The payment links are in the PDF now**, and the operator knows the
-  trade-off: they are credentials and they all travel together. The amount check
-  on the other end is what catches a mis-tap.
+- **The nota is a link, and `nota_page` is what makes it readable without a
+  session.** `bills` is owner-scoped, so a reader with no account sees no rows —
+  the RPC is the one door through, granted to anon on purpose, with the bill id
+  as the credential, which is the same bet `payment_page` makes on `pay_token`.
+  Read it defensively for the same reason as everything else: if the migration
+  did not run, the function is missing and the whole page is an error.
+- **Every payment link is on that page, so they all travel together again.** One
+  message to the group carries every Pay button in it. The operator knows the
+  trade-off — the amount check at the other end is what catches a mis-tap.
 - **The payment token is the whole security model.** The payer has no account.
   `validate-payment` accepts a token and an image and *nothing else* — no bill
   id, no person, no amount. Do not add a third input without thinking about who
@@ -110,12 +116,12 @@ chat, and a dark document is worse in both.
 - **`sum(integer)` returns `bigint`; `sum(bigint)` returns `numeric`.** So
   `create or replace view` refuses a definition that changes a column's type —
   `SQLSTATE 42P16`. Drop the view first.
-- **The PDF writer is hand-rolled on purpose.** jsPDF is ~300KB against a ~360KB
-  bundle. Helvetica is still unmeasurable, so `text()` **throws** rather than
-  left-aligning it — a figure that silently lands wrong is worse than a build
-  that stops. The embedded serif *is* measurable, because `ttf.ts` reads the
-  widths out of the font file, and that is what lets the amounts be right-aligned
-  in a proportional face at all.
+- **There is no PDF any more, and `pdf.ts` has not been told.** The writer,
+  `ttf.ts`, `nota-font.ts` and their tests are still in the tree and still pass,
+  and nothing the app ships calls any of them — the nota became a link and the
+  print path went with it. So a green `bun run test` says nothing about the nota,
+  and those green tests are not coverage of anything live. Delete the four files
+  and `public/fonts/plex-serif-600.ttf` when convenient.
 
 ---
 
@@ -129,10 +135,6 @@ like a CSS bug.
 A **synthetic `element.click()` is not user activation**, so `navigator.share`
 and `navigator.clipboard` reject it with `NotAllowedError`. Test taps with
 `Input.dispatchMouseEvent` or you will "fix" a path that was working.
-
-**Render the PDF and look at it.** Two layout bugs — "Link bayar" printed on top
-of "Transfer ke", and a row overlapping the account number — were invisible in
-the bytes and only showed up in a render. `bunx pdf-to-png-converter`.
 
 **Check test fixtures are testing the thing.** Three tests passed while the
 payment-link feature was completely broken, because they put the token on the

@@ -915,16 +915,24 @@ export async function getExportBill(billId: string): Promise<ExportBill> {
     return fixture
   }
 
-  const query = (withPayments: boolean) =>
-    supabase.from('bills').select(withPayments ? EXPORT_WITH_PAYMENTS : EXPORT_PLAIN).eq('id', billId).single()
-
-  let { data, error } = await query(paymentsAvailable)
-  if (error && paymentsAvailable && error.message.includes('recipient_ok')) {
-    paymentsAvailable = false
-    ;({ data, error } = await query(false))
-  }
+  /*
+   * An RPC rather than a select, and the reason is who opens this page.
+   *
+   * The nota's link is handed to the group the bill is about, so most readers
+   * have no account — and the bills table is owner-scoped, which for somebody
+   * with no session means no rows at all. `nota_page` is the one door that a
+   * caller without a session can come through, and it decides what they see.
+   *
+   * It has one side effect worth knowing: the defensive retry above is gone
+   * from this path, because a function's shape is fixed when it is created
+   * rather than discovered per request. A missing column here is a migration
+   * that did not run, and it should say so rather than half-work.
+   */
+  const { data, error } = await supabase.rpc('nota_page', { p_id: billId })
 
   if (error) throw new Error(error.message)
+  if (!data) throw new Error('Tagihan nggak ketemu.')
+
   return mapExportBill(data as unknown as ExportRow)
 }
 

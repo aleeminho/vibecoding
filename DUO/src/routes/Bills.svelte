@@ -132,11 +132,11 @@
   /**
    * Open the bill as a document.
    *
-   * The nota is where the PDF and the WhatsApp share both happen. A web page
-   * cannot attach a file to a WhatsApp message directly — `wa.me` only
-   * pre-fills text — so the route in is the share sheet, which iOS offers from
-   * the print preview. One screen, one path, and it carries a document instead
-   * of a wall of text that a proportional font renders as an unreadable column.
+   * The nota is where the WhatsApp share happens, and what it shares is a link
+   * rather than a file: a web page cannot attach anything to a WhatsApp message
+   * — `wa.me` only pre-fills text — and it no longer needs to. One screen, one
+   * path, and the thing it hands the group stays readable, keeps its arithmetic
+   * and still works when it is opened a week later.
    */
   function openNota(bill: BillWithShares) {
     location.hash = `#/nota?id=${bill.id}`

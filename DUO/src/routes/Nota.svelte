@@ -15,9 +15,10 @@
    * rather than being recomputed here, so this file cannot disagree with the
    * export about what anybody owes.
    *
-   * Light, always. The app is dark, but this leaves the app — through a PDF, a
-   * print, or a screenshot in a group chat — and a dark document is worse in
-   * all three. Colours are set here rather than inherited for that reason.
+   * Light, always. The app is dark, but this arrives as a link pasted into a
+   * group chat, and it is read on a phone next to the message that carried it
+   * rather than inside the app's own shell. Colours are set here rather than
+   * inherited for that reason.
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
@@ -39,21 +40,35 @@
   let note = $state<string | null>(null)
 
   /**
-   * The PDF is this page, printed.
+   * Hand the group this page's address.
    *
-   * It used to be drawn by a PDF writer in `pdf.ts`, one primitive at a time,
-   * and the result was a document that shared the design's structure and none
-   * of its type: one face embedded where the design uses two, no leaders,
-   * square cards, one column. Reimplementing a layout engine to approximate a
-   * page the browser can already render exactly is a bad trade, and it was the
-   * approximation that showed.
+   * The document stopped being a PDF and became a link, and that was the whole
+   * argument for it: a link keeps working. The Pay button on each card is a
+   * real destination rather than a printed word that cannot be tapped, the
+   * screen it opens is the one the payer's own share lives on, and no part of
+   * the document has to be redrawn in a format that has forgotten it was ever
+   * a page.
    *
-   * The cost is the tap: this opens the print sheet, where the document is
-   * saved or shared from. That is two or three taps where the writer was one,
-   * and it is worth it — the thing being sent is the thing that was designed.
+   * This is the operator's copy of the address. Everyone else gets it in the
+   * message.
    */
-  function printNota() {
-    window.print()
+  async function shareNota() {
+    const url = location.href
+    note = null
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, title: `Nota ${bill?.place ?? ''}` })
+        return
+      }
+    } catch (err) {
+      // Dismissing the share sheet is a decision, not a failure.
+      if ((err as Error).name === 'AbortError') return
+    }
+
+    note = (await copyText(url))
+      ? 'Link notanya udah disalin.'
+      : 'Nggak bisa nyalin otomatis — tekan lama link di address bar.'
   }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
@@ -158,59 +173,6 @@
     return linkFor(p.person)
   }
 
-  /**
-   * Hand one person their link.
-   *
-   * The PDF carries these too, for the one-tap case. This is for sending one
-   * link to one person without the whole group seeing it — the link is the
-   * credential that lets somebody mark a share paid, so the two routes trade
-   * convenience against who ends up holding a copy.
-   *
-   * Three routes, in order of how good they are on a phone, and the third is
-   * the one that matters. `navigator.share` opens the share sheet and gets the
-   * link to a specific person in two taps; `copyText` puts it on the clipboard
-   * where it works everywhere including plain HTTP, which is how this gets
-   * tested off a laptop.
-   *
-   * Both of those can fail or not exist. What that used to do was show an
-   * error — `undefined is not an object (evaluating 'navigator.clipboard
-   * .writeText')`, on a LAN address, because the whole clipboard API needs a
-   * secure context. Which meant there was NO way to get the link at all, on a
-   * screen whose only job is handing it out. So a failure now reveals the URL
-   * itself, in a field that can be long-pressed and copied by hand. The link is
-   * the whole feature; losing it silently is not an option the screen gets.
-   */
-  let sent = $state<string | null>(null)
-  let shown = $state<string | null>(null)
-
-  async function sendLink(person: string) {
-    const url = linkFor(person)
-    if (!url) return
-    sent = null
-    shown = null
-
-    try {
-      if (navigator.share) {
-        await navigator.share({ url, title: `Bayar ${bill?.place ?? ''}` })
-        return
-      }
-    } catch (err) {
-      // Dismissing the share sheet is not a failure — the operator decided
-      // against it. Anything else, fall through and offer the link another way.
-      if ((err as Error).name === 'AbortError') return
-    }
-
-    if (await copyText(url)) {
-      sent = person
-      return
-    }
-
-    // Neither worked. Put the link on screen rather than an error message
-    // about why it could not be put on the clipboard.
-    shown = url
-    note = 'Nggak bisa nyalin otomatis — tekan lama link di bawah terus Copy.'
-  }
-
   onMount(async () => {
     if (!billId) {
       error = 'Nggak ada tagihan yang diminta.'
@@ -255,17 +217,16 @@
   <p class="msg">Memuat…</p>
 {:else}
   <div class="screen">
-    <div class="controls no-print">
-      <button class="go" onclick={printNota}>Print / simpan PDF</button>
+    <div class="controls">
+      <button class="go" onclick={shareNota}>Bagikan link nota</button>
       <button class="back" onclick={() => history.back()}>Kembali</button>
       <p class="hint">
         {#if note}
           {note}
         {:else}
-          Di layar print, pilih tujuan <strong>Save as PDF</strong> — bukan
-          Microsoft Print to PDF. Cuma yang itu yang ngebawa tombol Pay-nya
-          hidup. Di iPhone, tombol Share di layar print bisa langsung ke
-          WhatsApp.
+          Kirim link ini ke grupnya. Tiap orang buka notanya sendiri dan pencet
+          tombol <strong>Pay</strong> di kartunya — langsung masuk halaman
+          bayarnya.
         {/if}
       </p>
     </div>
@@ -379,33 +340,20 @@
               <!--
                 Beside the name, because the link is that person's.
 
-                An anchor rather than a button so that long-press offers the
-                address and so the screen still works if the handler does not,
-                but the click is intercepted: here the reader is the operator,
-                and what they want is the link sent to somebody rather than
-                opened by themselves.
+                A real destination, and that is what the link replaced the PDF
+                for: the browser's print pipeline drops link annotations, so in
+                a printed document this was a word that looked tappable and was
+                not — inside a document about money.
 
-                It prints, so the tap depends on where the PDF comes from.
-                Chrome's own "Save as PDF" keeps link annotations; the Windows
-                "Microsoft Print to PDF" driver does not keep them in anything,
-                and one of those two is what a print dialog offers by default.
-                The button is worth the risk because the alternative is a
-                document that tells somebody what they owe and gives them no way
-                to settle it — but if the links turn out not to survive, this
-                element takes `no-print` and the screen sends them one at a
-                time.
+                Everyone's button is on the page and they all travel together,
+                which is the trade-off the operator made when the links went
+                into the document. The amount check at the other end is what
+                catches a mis-tap.
               -->
               <div class="slip__head">
                 <h3 class="slip__name">{person.person}</h3>
                 {#if linkOf(person)}
-                  <a
-                    class="slip__pay"
-                    href={linkOf(person)}
-                    onclick={(e) => {
-                      e.preventDefault()
-                      sendLink(person.person)
-                    }}>{sent === person.person ? 'copied' : 'Pay'}</a
-                  >
+                  <a class="slip__pay" href={linkOf(person)}>Pay</a>
                 {/if}
               </div>
 
@@ -438,28 +386,6 @@
                   </span>
                 </p>
 
-                <!--
-                  The last resort, when neither the share sheet nor the
-                  clipboard works. Never printed: it is the operator's copy of
-                  a URL, not part of the document.
-                -->
-                {#if shown && shown === linkOf(person)}
-                  <!--
-                    A textarea, not an input, and that is the whole point: an
-                    input never wraps, so a 90-character URL is shown with its
-                    tail cut off — still copyable, but not readable, and this
-                    exists to be read. readonly rather than disabled, because a
-                    disabled field cannot be selected and selecting it by hand
-                    is why it is here at all. `onfocus` takes the lot so one tap
-                    then Copy is enough.
-                  -->
-                  <textarea
-                    class="slip__url no-print"
-                    readonly
-                    rows="3"
-                    onfocus={(e) => e.currentTarget.select()}
-                  >{shown}</textarea>
-                {/if}
               </div>
             </article>
           {/each}
@@ -561,7 +487,7 @@
     white-space: nowrap;
   }
 
-  /* ---- controls, never printed ---- */
+  /* ---- controls, outside the sheet ---- */
 
   .controls {
     max-width: 830px;
@@ -962,11 +888,8 @@
 
   /*
    * The one control on this page. It carries the person's own link — the
-   * credential that lets them mark their share paid.
-   *
-   * Two readers, one element. On paper it is the payer's: they tap it and land
-   * on their page. On screen it is the operator's, and the click is
-   * intercepted so that tapping it sends the link instead of opening it.
+   * credential that lets them mark their share paid — and it opens it, because
+   * the reader of this page is whoever the operator sent it to.
    *
    * Against the right edge of the card rather than after the name, so that the
    * buttons line up down a column — a name-length-dependent position would put
@@ -981,23 +904,6 @@
     color: var(--accent-deep);
     text-decoration: none;
     cursor: pointer;
-  }
-
-  /* Monospace and small so a 90-character URL fits the width without wrapping
-     into something that looks broken, and read-only so a tap selects rather
-     than opening the keyboard. It only ever appears after both automatic
-     routes failed, so it never competes with them. */
-  .slip__url {
-    display: block;
-    width: 100%;
-    padding: 8px 10px;
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    background: var(--paper);
-    color: var(--ink);
-    font: 400 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    overflow-wrap: anywhere;
-    resize: none;
   }
 
   /* ---- how to pay ---- */
@@ -1133,132 +1039,4 @@
     }
   }
 
-  /* ---- print ---- */
-
-  @media print {
-    @page {
-      size: A4;
-      margin: 14mm;
-    }
-
-    .no-print {
-      display: none !important;
-    }
-
-    /*
-     * Everything behind the sheet is painted white rather than left alone.
-     *
-     * The app's own shell is dark and it prints, and it showed as a hairline
-     * around the document wherever the two boxes did not quite meet — a line
-     * with nothing behind it, which reads as a rendering fault. `:global`
-     * because the shell lives in App.svelte.
-     *
-     * White and not `none`: the paper is white, so saying so costs nothing and
-     * an explicitly painted colour cannot be the thing that surprises anybody.
-     *
-     * `!important` because the shell's own rule lives in App.svelte, where
-     * Svelte scopes it to two classes — `.shell.svelte-xxxx` — and a single
-     * `:global(.shell)` from here loses to it. The dark background then printed
-     * as a 15px sliver down the side of every page, which is the whole bug.
-     */
-    :global(.shell),
-    :global(#app),
-    :global(body),
-    .screen,
-    .sheet {
-      background: #fff !important;
-    }
-
-    .screen {
-      min-height: 0;
-    }
-
-    /*
-     * No max-width and no padding: the @page margin is the margin now, and
-     * applying both would print the document inset inside an inset.
-     */
-    .sheet {
-      max-width: none;
-      padding: 0;
-      box-shadow: none;
-    }
-
-    /*
-     * The page's layout, stated rather than inherited.
-     *
-     * Some mobile browsers evaluate print media queries against the width of
-     * the device instead of the page box, so a 390px phone printed the phone
-     * layout onto A4: the slips came out one per row at the full width of the
-     * sheet, which is what "too wide" looked like from the other end.
-     *
-     * A paper size is not a viewport. Whatever the screen did, this is the
-     * arrangement the page gets, so it cannot depend on which breakpoint the
-     * browser happened to pick.
-     */
-    .masthead {
-      flex-direction: row;
-      gap: 40px;
-      padding-bottom: 34px;
-    }
-
-    .doc {
-      text-align: right;
-    }
-
-    .doc__meta {
-      grid-template-columns: 1fr auto;
-      gap: 5px 20px;
-    }
-
-    .slips {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .pay__row {
-      flex-direction: row;
-      gap: 26px;
-    }
-
-    /* The headings may wrap on a phone; on paper they have room. */
-    .ledger thead th.num {
-      white-space: nowrap;
-    }
-
-    .ledger tbody td.num {
-      padding-left: 24px;
-    }
-
-    /*
-     * Two parts, in one file: the bill in the aggregate, then the same bill
-     * item by item with how to pay underneath it.
-     *
-     * The break is before the slips and only there — `:not(.pay)` — because
-     * "how to pay" belongs with the slips rather than on a page of its own. It
-     * is the answer to the question the slips ask, and a reader who has just
-     * found their own name should not have to turn a page for the account
-     * number.
-     *
-     * The first section was never separable from the masthead, and the two ran
-     * together, so a page ended in the middle of the slips and the reader had
-     * to hold a table in their head across the turn.
-     */
-    .block + .block:not(.pay) {
-      break-before: page;
-    }
-
-    .slip,
-    .pay,
-    .ledger tr {
-      break-inside: avoid;
-    }
-
-    /* Keep the accent and the wash from printing grey. */
-    .slip__due,
-    .slip--settled .slip__due,
-    .ledger--people tfoot th,
-    .ledger--people tfoot td {
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-  }
 </style>
