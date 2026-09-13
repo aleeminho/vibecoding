@@ -18,7 +18,13 @@
  * whole module is stripped from a production bundle.
  */
 
-import type { AuditEntry, BillWithShares, SettleUpEntry } from './api'
+import type {
+  AuditEntry,
+  BillWithShares,
+  FlaggedPayment,
+  PaymentPageInfo,
+  SettleUpEntry,
+} from './api'
 import type { ExportBill } from './export'
 
 /**
@@ -175,8 +181,8 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { name: 'Kentang Goreng Gede', qty: 1, line_total: 30000, assigned_to: ['Sarah'] },
     ],
     shares: [
-      { person: 'Budi', discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
-      { person: 'Sarah', discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000001', discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000002', discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
     ],
   },
   {
@@ -202,10 +208,94 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { name: 'Aqua Reflections Natural', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
     ],
     shares: [
-      { person: 'Budi', discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
-      { person: 'Sarah', discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
-      { person: 'Andi', discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
-      { person: 'Dewi', discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000003', discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000004', discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', pay_token: '00000000-0000-4000-8000-000000000005', discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
+      { person: 'Dewi', pay_token: '00000000-0000-4000-8000-000000000006', discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
     ],
+  },
+]
+
+/**
+ * The payer's page for a demo token.
+ *
+ * Derived from DEMO_EXPORT_BILLS rather than written out a second time, so a
+ * token that appears on the nota always resolves here — the two cannot drift.
+ * An unknown token returns null, which is what the live RPC returns too, so the
+ * demo lands on the real "link not recognised" screen rather than a special one.
+ */
+export function demoPaymentPage(token: string): PaymentPageInfo | null {
+  for (const bill of DEMO_EXPORT_BILLS) {
+    const share = bill.shares.find((s) => s.pay_token === token)
+    if (!share) continue
+    return {
+      participant_id: token,
+      person: share.person,
+      place: bill.place,
+      bill_date: bill.bill_date,
+      ref_code: bill.ref_code,
+      amount_owed: share.amount_owed,
+      status: share.status,
+      bank_name: bill.bank_name,
+      account_number: bill.account_number,
+      account_holder: bill.account_holder,
+    }
+  }
+  return null
+}
+
+/**
+ * Proofs waiting on a human.
+ *
+ * Three rows, one of each shape the queue actually has to render: read short,
+ * read long, and could-not-read-at-all. The last one is the one worth having a
+ * fixture for — it is the case where `amount_read` is null and a layout that
+ * assumes a number renders "Rp NaN".
+ */
+export const DEMO_FLAGGED: FlaggedPayment[] = [
+  {
+    id: 'p-1',
+    bill_id: 'demo-1',
+    ref_code: 'BILL_20260626_001',
+    place: 'Lucky Cat Coffee & Kitchen',
+    person: 'Budi',
+    amount_owed: 127050,
+    amount_read: 100000,
+    recipient_read: 'BCA 1234567890',
+    recipient_expected: 'BCA 1234567890',
+    verdict: 'mismatch',
+    note: null,
+    image_path: 'bukti/BILL_20260626_001/3f2a1b9c.jpg',
+    created_at: '2026-07-02T11:20:00Z',
+  },
+  {
+    id: 'p-2',
+    bill_id: 'demo-1',
+    ref_code: 'BILL_20260626_001',
+    place: 'Lucky Cat Coffee & Kitchen',
+    person: 'Dewi',
+    amount_owed: 109725,
+    amount_read: 150000,
+    recipient_read: 'BCA 1234567890',
+    recipient_expected: 'BCA 1234567890',
+    verdict: 'mismatch',
+    note: null,
+    image_path: 'bukti/BILL_20260626_001/9c4d2e7f.jpg',
+    created_at: '2026-07-02T09:02:00Z',
+  },
+  {
+    id: 'p-3',
+    bill_id: 'demo-3',
+    ref_code: 'BILL_20260530_001',
+    place: 'Sate Taichan Bang Jali',
+    person: 'Rina',
+    amount_owed: 78000,
+    amount_read: null,
+    recipient_read: null,
+    recipient_expected: 'GoPay 081234567890',
+    verdict: 'unclear',
+    note: 'Gambarnya kek buram, nominalnya nggak kebaca.',
+    image_path: 'bukti/BILL_20260530_001/1a7f3b20.jpg',
+    created_at: '2026-05-31T20:41:00Z',
   },
 ]

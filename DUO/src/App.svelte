@@ -26,8 +26,12 @@
   import Settle from './routes/Settle.svelte'
   import Preview from './routes/Preview.svelte'
   import Nota from './routes/Nota.svelte'
+  import Bayar from './routes/Bayar.svelte'
 
-  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview' | 'nota'
+  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview' | 'nota' | 'bayar'
+
+  /** Routes that are a document rather than a screen: no chrome, white page. */
+  const PAPER: Route[] = ['nota', 'bayar']
 
   /**
    * Tab icons as SVG source. Trusted constants, never user input — which is the
@@ -65,7 +69,7 @@
     // silently falls back to the default route — which looks like the query
     // param was ignored rather than like a routing bug.
     const raw = location.hash.replace(/^#\/?/, '').split('?')[0]
-    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview', 'nota']
+    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview', 'nota', 'bayar']
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
   }
 
@@ -80,6 +84,21 @@
   function go(id: Route) {
     location.hash = `#/${id}`
   }
+
+  /**
+   * Paint the page white on the document routes.
+   *
+   * The app is dark, but the nota and the payment page leave it — as a PDF, a
+   * print, or a screenshot in a group chat — and a dark document is worse in
+   * all three. Done here rather than inside those components because a
+   * `:global()` rule in a component's style block is in the stylesheet for the
+   * whole session the moment the component is bundled, which would take the
+   * app's own background with it everywhere else.
+   */
+  $effect(() => {
+    document.body.classList.toggle('paper', PAPER.includes(route))
+    return () => document.body.classList.remove('paper')
+  })
 
   /**
    * True when the URL asks for fixture data (see lib/demo.ts). Re-read whenever
@@ -99,6 +118,7 @@
     review: 'Bagi Rata',
     preview: 'Preview',
     nota: 'Nota',
+    bayar: 'Bayar',
   }
 
   onMount(() => {
@@ -119,7 +139,7 @@
     header and no tab bar, so printing has nothing to hide and the page that
     reaches the PDF is only the report.
   -->
-  {#if route !== 'nota'}
+  {#if !PAPER.includes(route)}
   <header class="app-header">
     <div class="brand">
       <span class="mark">D</span>
@@ -136,6 +156,14 @@
 
   {#if route === 'nota'}
     <Nota />
+  {:else if route === 'bayar'}
+    <!--
+      Ahead of the session gate, and that is the point of it. The person opening
+      this is someone the operator split a bill with: they have no account here
+      and never will. Requiring a login to upload a screenshot would mean the
+      feature is never used.
+    -->
+    <Bayar />
   {:else if import.meta.env.DEV && route === 'preview'}
     <!--
       Dev-only, and deliberately ahead of the session gate: the whole point is

@@ -84,21 +84,45 @@
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
 
   /**
-   * Paint the page white while the nota is open.
+   * The payer's link for one person, or null if they have no token yet.
    *
-   * Done imperatively rather than with a `:global()` rule in the style block:
-   * a global rule is in the stylesheet for the whole session the moment this
-   * component is bundled, so the app's own dark background would be gone on
-   * every other screen. This is restored on the way out.
+   * Built from `location` rather than a configured base URL, so it is correct
+   * on localhost, on Pages and on the cPanel host without a build-time setting
+   * that would have to be right in all three.
    */
-  onMount(() => {
-    const previous = document.body.style.cssText
-    document.body.style.backgroundColor = '#ffffff'
-    document.body.style.backgroundImage = 'none'
-    return () => {
-      document.body.style.cssText = previous
+  function linkFor(person: string): string | null {
+    const token = bill?.shares.find((s) => s.person === person)?.pay_token
+    return token ? `${location.origin}${location.pathname}#/bayar?t=${token}` : null
+  }
+
+  /**
+   * Hand one person their link.
+   *
+   * Sent one at a time on purpose. The link is the credential that lets someone
+   * mark a bill paid, so a copy that reaches the group is a copy that lets
+   * anyone mark anyone paid — which is why the PDF never carries them and this
+   * is a per-person action rather than a line in a shared document.
+   */
+  let sent = $state<string | null>(null)
+
+  async function sendLink(person: string) {
+    const url = linkFor(person)
+    if (!url) return
+    sent = null
+
+    try {
+      if (navigator.share) {
+        await navigator.share({ url, title: `Bayar ${bill?.place ?? ''}` })
+        return
+      }
+      await navigator.clipboard.writeText(url)
+      sent = person
+    } catch (err) {
+      // `note`, not `error`: a failed clipboard write replaces the hint under
+      // the button. Replacing the whole document over it would be absurd.
+      if ((err as Error).name !== 'AbortError') note = (err as Error).message
     }
-  })
+  }
 
   onMount(async () => {
     if (!billId) {
@@ -187,6 +211,19 @@
             {/each}
           {/if}
         </div>
+
+        <!--
+          The payer's own link, under their own block. Hidden in print and
+          absent from the PDF, so the document that goes to the group carries
+          the arithmetic and none of the credentials.
+        -->
+        {#if person.status !== 'lunas' && linkFor(person.person)}
+          <div class="pay-link no-print">
+            <button class="link" onclick={() => sendLink(person.person)}>
+              {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}
+            </button>
+          </div>
+        {/if}
       </section>
     {/each}
 
@@ -403,6 +440,38 @@
   .fig.strong {
     font-size: 15px;
     font-weight: 600;
+  }
+
+  /*
+   * The payer's link, set as a footnote to the block rather than as a control
+   * in it. Right-aligned under the figure it belongs to, small, and in the
+   * accent — the only other place the accent is spent, and both are things you
+   * act on rather than read.
+   */
+  .pay-link {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+
+  .link {
+    min-height: 32px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 550;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .link:active {
+    opacity: 0.55;
+    transform: none;
   }
 
   /* A separator spanning the grid, drawn as a grid row of empty cells. */

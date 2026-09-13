@@ -128,6 +128,21 @@ body {
   flex-direction: column;
 }
 
+/*
+ * Routes that are documents rather than screens — the nota, and the payment
+ * page a payer opens from a link. Both leave the app: through a PDF, a print,
+ * or a screenshot in a group chat. A dark document is worse in all three.
+ *
+ * Applied as a class by App.svelte rather than as a :global() rule inside the
+ * components, because a global rule is in the stylesheet for the whole session
+ * the moment the component is bundled, and would take the app's own dark
+ * background with it on every other screen.
+ */
+body.paper {
+  background-color: #ffffff;
+  background-image: none;
+}
+
 h1,
 h2,
 h3,

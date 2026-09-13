@@ -26,17 +26,20 @@
   import {
     deleteBill,
     listBills,
+    listFlaggedPayments,
     listOutstanding,
     setBillStatus,
     setShareStatus,
     signedReceiptUrl,
     type BillWithShares,
+    type FlaggedPayment,
     type Outstanding,
   } from '../lib/api'
   import { isDemo } from '../lib/demo'
 
   let outstanding = $state<Outstanding[]>([])
   let bills = $state<BillWithShares[]>([])
+  let flagged = $state<FlaggedPayment[]>([])
   let status = $state<'loading' | 'ready' | 'error'>('loading')
   let message = $state('')
   let open = $state<string | null>(null)
@@ -58,9 +61,14 @@
   async function load({ silent = false } = {}) {
     if (!silent) status = 'loading'
     try {
-      const [owed, list] = await Promise.all([listOutstanding(), listBills()])
+      const [owed, list, proofs] = await Promise.all([
+        listOutstanding(),
+        listBills(),
+        listFlaggedPayments(),
+      ])
       outstanding = owed
       bills = list
+      flagged = proofs
       message = ''
       status = 'ready'
     } catch (err) {
@@ -160,6 +168,30 @@
     }
   }
 
+  /**
+   * Accept a proof the model would not.
+   *
+   * Marking the share paid is what clears the row — the queue re-reads and the
+   * entry is gone, because `listFlaggedPayments` drops anything already settled.
+   * There is no "dismiss": a proof nobody has decided on is still a decision
+   * waiting to be made, and a queue you can empty without answering is a queue
+   * that gets emptied without answering.
+   *
+   * Addressed by bill id rather than by looking the bill up in `bills`, so it
+   * still works on an entry whose bill has scrolled past the list's limit.
+   */
+  async function acceptProof(p: FlaggedPayment) {
+    busy = p.id
+    try {
+      await setShareStatus(p.bill_id, p.person, true)
+      await load({ silent: true })
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
   function allPaid(bill: BillWithShares): boolean {
     return bill.shares.every((share) => share.status === 'lunas')
   }
@@ -213,6 +245,54 @@
     {:else}
       <div class="group">
         <div class="list"><div class="row ok">Semua lunas. Nggak ada yang nunggak.</div></div>
+      </div>
+    {/if}
+
+    <!--
+      Proofs the model would not settle on its own.
+
+      Above the ledger rather than inside it, because this is the only part of
+      the screen that is asking for something. Everything below is a record.
+    -->
+    {#if flagged.length > 0}
+      <h3 class="group-title">Bukti perlu dicek</h3>
+      <div class="group">
+        <div class="list tint-warn">
+          {#each flagged as p (p.id)}
+            <div class="proof">
+              <div class="proof-who">
+                <span class="strong">{p.person}</span>
+                <span class="faint small">{p.place} · {p.ref_code}</span>
+              </div>
+
+              <p class="proof-read">
+                {#if p.amount_read === null}
+                  Nominalnya nggak kebaca.
+                {:else}
+                  Kebaca <span class="num">{rupiah(p.amount_read)}</span>
+                  {#if p.amount_read < p.amount_owed}
+                    — kurang <span class="num owed">{rupiah(p.amount_owed - p.amount_read)}</span>
+                  {:else if p.amount_read > p.amount_owed}
+                    — lebih <span class="num">{rupiah(p.amount_read - p.amount_owed)}</span>
+                  {/if}
+                {/if}
+              </p>
+
+              {#if p.note}<p class="proof-note">{p.note}</p>{/if}
+
+              <div class="proof-actions">
+                <button class="plain" onclick={() => openReceipt(p.image_path)}>Lihat bukti</button>
+                <button
+                  class="plain"
+                  disabled={busy === p.id}
+                  onclick={() => acceptProof(p)}
+                >
+                  Tandai lunas
+                </button>
+              </div>
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
 
@@ -444,5 +524,56 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* ---- proofs needing a decision ---- */
+
+  /*
+   * Not a `.row`. A row is one line with a value on the right, and this is a
+   * question: who, what was read, and what the operator can do about it. The
+   * sentence and its two actions need to stack.
+   */
+  .proof {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 12px 16px;
+  }
+
+  .proof + .proof {
+    border-top: 1px solid rgba(255, 182, 0, 0.22);
+  }
+
+  /*
+   * Stacked, not spread. This was copied from `.row`'s label/value pair and
+   * space-between was wrong here — there is no value on the right, so the
+   * second line drifted to the middle and the name and the place read as one
+   * run-on sentence.
+   */
+  .proof-who {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .proof-read {
+    font-size: var(--text-sm);
+    color: var(--label-2);
+  }
+
+  .proof-read .num {
+    color: var(--label);
+    font-weight: 600;
+  }
+
+  .proof-note {
+    font-size: var(--text-xs);
+    color: var(--label-3);
+  }
+
+  .proof-actions {
+    display: flex;
+    gap: 4px;
+    margin: 4px 0 0 -10px;
   }
 </style>

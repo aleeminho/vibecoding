@@ -58,7 +58,7 @@ jobs:
           version: latest
 
       - if: steps.creds.outputs.skip != 'true'
-        name: Deploy extract-receipt
+        name: Deploy functions
         working-directory: DUO
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -66,28 +66,58 @@ jobs:
           # The project ref is not a secret — it is the subdomain of the URL
           # that ships inside the public JavaScript bundle — so it is written
           # out rather than stored, which keeps this to one thing to configure.
-          #
-          # --no-verify-jwt is deliberately NOT passed. See the guard below.
+
+          # Gateway verification stays ON. isSignedIn() here reads the JWT
+          # payload without checking its signature, which is only sound because
+          # the gateway checked it first.
           supabase functions deploy extract-receipt \
             --project-ref xkjtzthsqorqyyqkbrzb
 
+          # Verification is OFF, deliberately and for this function alone.
+          # Its callers are the people the operator split a bill with: they have
+          # no account and will not make one to upload a screenshot. There is
+          # therefore no JWT to verify, and the security model is the payment
+          # token in the URL instead — see the note at the top of its index.ts,
+          # which is also why it accepts only a token and an image.
+          supabase functions deploy validate-payment --no-verify-jwt \
+            --project-ref xkjtzthsqorqyyqkbrzb
+
       - if: steps.creds.outputs.skip != 'true'
-        name: Confirm verify_jwt is still on
+        name: Confirm verify_jwt is set per function
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          # isSignedIn() in the function reads the JWT payload WITHOUT verifying
-          # its signature, and that is only sound because the gateway verifies
-          # it first. Turning verification off would make the check forgeable by
-          # anyone who can write a token with role "authenticated" — and since
-          # the publishable key is public by design, that is anyone at all. The
-          # exposure is the operator's API credit.
+          # Asserted per function, not for all of them together.
           #
-          # A deploy is the one moment that setting can change by accident, so
-          # it is checked here rather than being trusted.
-          if supabase functions list --project-ref xkjtzthsqorqyyqkbrzb \
-               --output json 2>/dev/null | grep -q '"verify_jwt": *false'; then
-            echo "::error::verify_jwt is OFF for a deployed function. The auth check in extract-receipt assumes the gateway verifies the token, so this exposes the API key. Redeploy without --no-verify-jwt."
-            exit 1
-          fi
-          echo "verify_jwt is on."
+          # An earlier version of this step demanded verify_jwt be true
+          # everywhere, and a public function has to be the exception — so a
+          # blanket rule would either block the legitimate case or be loosened
+          # until it checked nothing. Naming each function and the value it must
+          # have means flipping either one is caught rather than tolerated.
+          curl -s "https://api.supabase.com/v1/projects/xkjtzthsqorqyyqkbrzb/functions" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            | tr -d '\n' > /tmp/fns.json
+
+          # The newlines are stripped because grep matches line by line, and
+          # pretty-printed JSON puts "slug" and "verify_jwt" on different lines —
+          # so a pattern spanning them matches nothing and the guard reports
+          # every function as broken. That is exactly what the first version of
+          # this step did.
+          fail=0
+          expect() {
+            actual=$(grep -o "\"slug\": *\"$1\"[^}]*\"verify_jwt\": *[a-z]*" /tmp/fns.json \
+                     | grep -o '[a-z]*$')
+            if [ "$actual" != "$2" ]; then
+              echo "::error::$1 has verify_jwt='$actual', expected '$2'."
+              fail=1
+            else
+              echo "$1: verify_jwt=$actual (correct)"
+            fi
+          }
+
+          # extract-receipt trusts the gateway, so it must keep verification on.
+          expect extract-receipt true
+          # validate-payment is called by people with no account, so it must not.
+          expect validate-payment false
+
+          exit $fail

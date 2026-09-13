@@ -19,9 +19,11 @@ import {
   DEMO_AUDIT,
   DEMO_BILLS,
   DEMO_EXPORT_BILLS,
+  DEMO_FLAGGED,
   DEMO_MONTHLY,
   DEMO_OUTSTANDING,
   DEMO_PEOPLE,
+  demoPaymentPage,
   DEMO_SETTLE_UP,
   isDemo,
 } from './demo'
@@ -487,7 +489,7 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  */
 const EXPORT_SELECT = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
-   bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`
+   bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`
 
 type ExportRow = {
   total: number
@@ -583,6 +585,178 @@ export async function getExportBill(billId: string): Promise<ExportBill> {
   return mapExportBill(data as unknown as ExportRow)
 }
 
+
+// ---------------------------------------------------------------------------
+// Paying
+//
+// Nothing in this section requires a session. The payer is someone the operator
+// split a bill with; they have no account here and will not make one. The token
+// in the URL is the whole of their authority, and the server treats it that
+// way — the function behind submitProof accepts a token and an image and
+// nothing else, so there is no field here that could be used to reach another
+// bill even if this code were tampered with.
+// ---------------------------------------------------------------------------
+
+export interface PaymentPageInfo {
+  participant_id: string
+  person: string
+  place: string
+  bill_date: string
+  ref_code: string
+  amount_owed: number
+  status: string
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
+}
+
+export async function paymentPage(token: string): Promise<PaymentPageInfo | null> {
+  if (import.meta.env.DEV && isDemo()) return demoPaymentPage(token)
+
+  const { data, error } = await supabase.rpc('payment_page', { p_token: token })
+  if (error) throw new Error(error.message)
+  return ((data ?? []) as PaymentPageInfo[])[0] ?? null
+}
+
+export interface ProofResult {
+  verdict: 'matched' | 'mismatch' | 'unclear' | 'already_paid'
+  person: string
+  expected?: number
+  read?: number | null
+  message: string
+  error?: string
+}
+
+/** A proof the model would not settle on its own. */
+export interface FlaggedPayment {
+  id: string
+  bill_id: string
+  ref_code: string
+  place: string
+  person: string
+  amount_owed: number
+  amount_read: number | null
+  recipient_read: string | null
+  recipient_expected: string
+  verdict: 'mismatch' | 'unclear'
+  note: string | null
+  image_path: string
+  created_at: string
+}
+
+/**
+ * Proofs the operator has to decide on.
+ *
+ * Anything the model did not settle by itself: the wrong amount, the wrong
+ * account, or an image it could not read. A matched proof is not in here —
+ * that one already did its job.
+ *
+ * Resolved by the share becoming `lunas`, not by a flag on the payment. Marking
+ * someone paid is the decision the queue was asking for, so making that the
+ * thing that clears it means there is no second piece of state to keep in sync,
+ * and no way for the two to disagree.
+ */
+export async function listFlaggedPayments(): Promise<FlaggedPayment[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_FLAGGED
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select(
+      'id, amount_read, recipient_read, recipient_expected, verdict, note, image_path, created_at, bill_participants(person, amount_owed, status, bill_id, bills(place, ref_code))',
+    )
+    // RLS already limits this to the caller's own bills, so there is no owner
+    // predicate here to get wrong.
+    .neq('verdict', 'matched')
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw new Error(error.message)
+
+  type Row = {
+    id: string
+    amount_read: number | null
+    recipient_read: string | null
+    recipient_expected: string
+    verdict: 'mismatch' | 'unclear'
+    note: string | null
+    image_path: string
+    created_at: string
+    bill_participants: {
+      person: string
+      amount_owed: number
+      status: string
+      bill_id: string
+      bills: { place: string; ref_code: string } | null
+    } | null
+  }
+
+  // A loop rather than filter-then-map with non-null assertions on both hops.
+  // Both hops can be null in the type, and a chain of `!` to satisfy the
+  // compiler is a promise about the data that nothing is keeping.
+  const rows = (data as unknown as Row[]) ?? []
+  const out: FlaggedPayment[] = []
+
+  for (const p of rows) {
+    const share = p.bill_participants
+    const bill = share?.bills
+    // Settled since the proof was uploaded — someone marked it paid by hand,
+    // or a later proof matched. Either way the question is answered.
+    if (!share || !bill || share.status === 'lunas') continue
+
+    out.push({
+      id: p.id,
+      bill_id: share.bill_id,
+      ref_code: bill.ref_code,
+      place: bill.place,
+      person: share.person,
+      amount_owed: share.amount_owed,
+      amount_read: p.amount_read,
+      recipient_read: p.recipient_read,
+      recipient_expected: p.recipient_expected,
+      verdict: p.verdict,
+      note: p.note,
+      image_path: p.image_path,
+      created_at: p.created_at,
+    })
+  }
+
+  return out
+}
+
+/**
+ * Send a proof of payment for reading.
+ *
+ * Plain fetch rather than the supabase client's invoke(), because this is the
+ * one call in the app made without a session and the client's auth handling is
+ * built around having one. The publishable key is the only header it needs, and
+ * it is public by design.
+ */
+export async function submitProof(
+  token: string,
+  image: string,
+  mediaType: string,
+): Promise<ProofResult> {
+  // No fixture path here, deliberately. Every other demo function returns rows
+  // so a screen can be looked at; this one would have to invent a verdict, and
+  // a demo that says "Lunas" without a model having read anything is a lie
+  // about the one thing this feature exists to do. It fails honestly instead.
+  if (import.meta.env.DEV && isDemo()) {
+    throw new Error('Mode demo: validasi cuma jalan kalau nyambung ke Supabase.')
+  }
+
+  const url = import.meta.env.VITE_SUPABASE_URL
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
+  const res = await fetch(`${url}/functions/v1/validate-payment`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
+    body: JSON.stringify({ token, image, media_type: mediaType }),
+  })
+
+  const body = (await res.json().catch(() => ({}))) as ProofResult
+  if (!res.ok) throw new Error(body.error ?? `Gagal ngirim buktinya (${res.status}).`)
+  return body
+}
 
 export interface SettleUpEntry {
   bill_id: string

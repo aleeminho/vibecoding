@@ -79,6 +79,14 @@ export interface ExportBill {
   }[]
   shares: {
     person: string
+    /**
+     * This person's private link token, for the page where they upload proof.
+     *
+     * It is read here so the nota screen can hand each person their own link,
+     * and it is deliberately NOT written to the PDF. One document goes to the
+     * whole group, and a token in it would let anyone mark anyone paid.
+     */
+    pay_token: string | null
     discount_share: number
     tax_share: number
     service_share: number
