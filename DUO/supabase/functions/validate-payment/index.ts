@@ -192,8 +192,17 @@ Deno.serve(async (req: Request) => {
    * `amount_paid` only counts payments that reached the right account, so the
    * remainder this produces is the real one rather than a running total of
    * whatever was uploaded.
+   *
+   * Read defensively. Functions deploy from CI the moment they are pushed and
+   * migrations are applied by hand, so there is a window where this code runs
+   * against a database that has never heard of the column. `undefined` would
+   * make the whole comparison NaN and turn every upload into "kurang Rp NaN",
+   * which looks like a broken feature rather than a missing migration. Zero
+   * degrades to the old behaviour instead: an instalment is judged short, and
+   * a transfer to a stranger is still caught, which is the half that matters.
    */
-  const due = Math.max(0, page.amount_owed - page.amount_paid)
+  const alreadyPaid = Number(page.amount_paid) || 0
+  const due = Math.max(0, page.amount_owed - alreadyPaid)
 
   // Everything is already in, but the share was never marked settled — the
   // operator left it for review, or a proof arrived and the status write
@@ -229,25 +238,46 @@ Deno.serve(async (req: Request) => {
     return json({ error: `Nggak bisa nyimpen gambarnya: ${await uploadRes.text()}` }, 502)
   }
 
-  const insertRes = await fetch(`${url}/rest/v1/payments`, {
-    method: 'POST',
-    headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-    body: JSON.stringify({
-      // The id came back with the page read, resolved from the token by the
-      // database. Nothing the caller sent decides which row this lands on.
-      participant_id: page.participant_id,
-      amount_read: read.amount,
-      recipient_read: read.recipient_name ?? read.recipient_account,
-      recipient_expected: page.account_holder ?? page.account_number ?? '',
-      // The field the running total is summed on. A `mismatch` cannot stand in
-      // for it: that word covers both an instalment and a transfer to a
-      // stranger, and only one of those should reduce what someone owes.
-      recipient_ok: recipientOk,
-      verdict,
-      note,
-      image_path: imagePath,
-    }),
-  })
+  const record = {
+    // The id came back with the page read, resolved from the token by the
+    // database. Nothing the caller sent decides which row this lands on.
+    participant_id: page.participant_id,
+    amount_read: read.amount,
+    recipient_read: read.recipient_name ?? read.recipient_account,
+    recipient_expected: page.account_holder ?? page.account_number ?? '',
+    // The field the running total is summed on. A `mismatch` cannot stand in
+    // for it: that word covers both an instalment and a transfer to a
+    // stranger, and only one of those should reduce what someone owes.
+    recipient_ok: recipientOk,
+    verdict,
+    note,
+    image_path: imagePath,
+  }
+
+  const insert = (body: Record<string, unknown>) =>
+    fetch(`${url}/rest/v1/payments`, {
+      method: 'POST',
+      headers: { ...auth, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(body),
+    })
+
+  let insertRes = await insert(record)
+
+  // Same deploy-order guard as the amount above: the column was added by a
+  // migration, and if that has not been applied yet PostgREST rejects the whole
+  // row for naming a column it does not have. Dropping that one field records
+  // the proof without the running-total precision, which is much better than
+  // failing the upload and telling the payer their money was not received.
+  if (!insertRes.ok) {
+    const detail = await insertRes.clone().text()
+    if (detail.includes('recipient_ok')) {
+      const { recipient_ok: _dropped, ...withoutColumn } = record
+      insertRes = await insert(withoutColumn)
+    } else {
+      return json({ error: `Nggak bisa nyatet buktinya: ${detail}` }, 502)
+    }
+  }
+
   if (!insertRes.ok) {
     return json({ error: `Nggak bisa nyatet buktinya: ${await insertRes.text()}` }, 502)
   }
@@ -278,7 +308,7 @@ Deno.serve(async (req: Request) => {
   // part-payer needs and the one the page did not have before. Null once the
   // share is settled, because "sisa Rp 0" reads like a demand for nothing
   // rather than like being done.
-  const paidNow = page.amount_paid + (recipientOk === true && read.amount ? read.amount : 0)
+  const paidNow = alreadyPaid + (recipientOk === true && read.amount ? read.amount : 0)
   const remaining = Math.max(0, page.amount_owed - paidNow)
 
   return json({

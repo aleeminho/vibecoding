@@ -287,45 +287,99 @@ export type PaymentMethod = 'bank' | 'qris' | 'both'
  * nested, so there is nothing for an aggregation view to save. If this ever
  * grows past a few hundred bills, that changes and it becomes a view.
  */
+/**
+ * The bill columns every read wants.
+ *
+ * Named once because listBills and the export both select them, and a column
+ * added to one and not the other is how two reads of the same table start
+ * disagreeing about what a bill is.
+ */
+const BILL_COLUMNS =
+  'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, qris_path, payment_method' as const
+
+/** A participant row as the database returns it, before the reduction below. */
+type RawShare = Omit<BillShare, 'amount_paid'> & {
+  payments?: { amount_read: number | null; recipient_ok: boolean | null }[] | null
+}
+
+/**
+ * Turn embedded rows into the shares the rest of the app uses.
+ *
+ * `payments` may be missing entirely — see `withoutPayments` — in which case
+ * every share reads as having paid nothing, which is what this screen showed
+ * before the column existed.
+ */
+function toShares(rows: RawShare[] | null | undefined): BillShare[] {
+  return (rows ?? []).map(({ payments, ...share }) => ({
+    ...share,
+    amount_paid: (payments ?? []).reduce(
+      (sum, p) => sum + (p.recipient_ok === true && p.amount_read ? p.amount_read : 0),
+      0,
+    ),
+  }))
+}
+
+/**
+ * Whether this database has the partial-payments migration.
+ *
+ * A module-level flag, not a probe per query: the answer cannot change while a
+ * session is open, and asking again on every read would double the round trips
+ * to re-answer a settled question.
+ *
+ * Why it is needed at all: the embedded `payments(...recipient_ok)` names a
+ * column a migration adds. The frontend deploys from CI the moment it is
+ * pushed; migrations are applied by hand. In the window between the two, a
+ * select naming a column that does not exist fails the ENTIRE request — which
+ * would take the bills screen down over one derived figure. So the first
+ * failure is remembered and every read after it drops the embed.
+ */
+let paymentsAvailable = true
+
+/*
+ * The two participant embeds, as literal types rather than a function returning
+ * `string`. supabase-js parses the select at the type level, and a plain string
+ * tells it nothing — every column comes back as `any` and every typo stops
+ * being a compile error. The ternaries below pick between these two literals,
+ * which keeps that parsing intact through the fallback.
+ */
+const SHARES_WITH_PAYMENTS =
+  'bill_participants(person, amount_owed, status, paid_date, payments(amount_read, recipient_ok))' as const
+const SHARES_PLAIN = 'bill_participants(person, amount_owed, status, paid_date)' as const
+
 export async function listBills(limit = 60): Promise<BillWithShares[]> {
   if (import.meta.env.DEV && isDemo()) return DEMO_BILLS
 
-  const { data, error } = await supabase
-    .from('bills')
-    .select(
-      'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, qris_path, payment_method, bill_participants(person, amount_owed, status, paid_date, payments(amount_read, recipient_ok))',
-    )
-    // Deleted bills are hidden, not gone. Every read path filters here rather
-    // than relying on the caller to remember.
-    .is('deleted_at', null)
-    .order('bill_date', { ascending: false })
-    .order('ref_code', { ascending: false })
-    .limit(limit)
+  const query = (withPayments: boolean) =>
+    supabase
+      .from('bills')
+      .select(
+        withPayments
+          ? `${BILL_COLUMNS}, ${SHARES_WITH_PAYMENTS}`
+          : `${BILL_COLUMNS}, ${SHARES_PLAIN}`,
+      )
+      // Deleted bills are hidden, not gone. Every read path filters here rather
+      // than relying on the caller to remember.
+      .is('deleted_at', null)
+      .order('bill_date', { ascending: false })
+      .order('ref_code', { ascending: false })
+      .limit(limit)
+
+  let { data, error } = await query(paymentsAvailable)
+
+  if (error && paymentsAvailable && error.message.includes('recipient_ok')) {
+    paymentsAvailable = false
+    ;({ data, error } = await query(false))
+  }
 
   if (error) throw new Error(error.message)
 
   // The embedded resource arrives under its table name. Reshaping it here keeps
   // the rest of the app from knowing about PostgREST's nesting convention.
   return (data ?? []).map((row) => {
-    // Omit, not `BillShare &`: the raw row has no amount_paid — that field only
-    // exists after the reduction below, and a type that claims otherwise is the
-    // one thing that would let a caller read it before it is computed.
-    type RawShare = Omit<BillShare, 'amount_paid'> & {
-      payments?: { amount_read: number | null; recipient_ok: boolean | null }[]
-    }
     const { bill_participants, ...bill } = row as Record<string, unknown> & {
       bill_participants?: RawShare[]
     }
-    return {
-      ...(bill as unknown as BillWithShares),
-      shares: (bill_participants ?? []).map(({ payments, ...share }) => ({
-        ...share,
-        amount_paid: (payments ?? []).reduce(
-          (sum, p) => sum + (p.recipient_ok === true && p.amount_read ? p.amount_read : 0),
-          0,
-        ),
-      })),
-    }
+    return { ...(bill as unknown as BillWithShares), shares: toShares(bill_participants) }
   })
 }
 
@@ -655,9 +709,12 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  * bill. Written twice they drifted the moment a column was added, which is
  * exactly what happened when `total` was introduced.
  */
-const EXPORT_SELECT = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
+const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
-   bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date, payments(amount_read, recipient_ok))`
+   bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date`
+
+const EXPORT_PLAIN = `${EXPORT_BASE})`
+const EXPORT_WITH_PAYMENTS = `${EXPORT_BASE}, payments(amount_read, recipient_ok))`
 
 type ExportRow = {
   total: number
@@ -723,13 +780,20 @@ function mapExportBill(bill: ExportRow): ExportBill {
 export async function listExportBills(from: string, to: string): Promise<ExportBill[]> {
   if (import.meta.env.DEV && isDemo()) return DEMO_EXPORT_BILLS
 
-  const { data, error } = await supabase
-    .from('bills')
-    .select(EXPORT_SELECT)
-    .is('deleted_at', null)
-    .gte('bill_date', from)
-    .lte('bill_date', to)
-    .order('bill_date', { ascending: true })
+  const query = (withPayments: boolean) =>
+    supabase
+      .from('bills')
+      .select(withPayments ? EXPORT_WITH_PAYMENTS : EXPORT_PLAIN)
+      .is('deleted_at', null)
+      .gte('bill_date', from)
+      .lte('bill_date', to)
+      .order('bill_date', { ascending: true })
+
+  let { data, error } = await query(paymentsAvailable)
+  if (error && paymentsAvailable && error.message.includes('recipient_ok')) {
+    paymentsAvailable = false
+    ;({ data, error } = await query(false))
+  }
 
   if (error) throw new Error(error.message)
   return ((data ?? []) as unknown as ExportRow[]).map(mapExportBill)
@@ -751,11 +815,14 @@ export async function getExportBill(billId: string): Promise<ExportBill> {
     return fixture
   }
 
-  const { data, error } = await supabase
-    .from('bills')
-    .select(EXPORT_SELECT)
-    .eq('id', billId)
-    .single()
+  const query = (withPayments: boolean) =>
+    supabase.from('bills').select(withPayments ? EXPORT_WITH_PAYMENTS : EXPORT_PLAIN).eq('id', billId).single()
+
+  let { data, error } = await query(paymentsAvailable)
+  if (error && paymentsAvailable && error.message.includes('recipient_ok')) {
+    paymentsAvailable = false
+    ;({ data, error } = await query(false))
+  }
 
   if (error) throw new Error(error.message)
   return mapExportBill(data as unknown as ExportRow)
