@@ -22,6 +22,7 @@
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
   import { getExportBill } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
+  import { buildNotaPdf } from '../lib/pdf'
 
   /**
    * Read from the hash rather than threaded through props, the same way the
@@ -34,6 +35,51 @@
   let bill = $state<Awaited<ReturnType<typeof getExportBill>> | null>(null)
   let breakdown = $state<PersonBreakdown[]>([])
   let error = $state<string | null>(null)
+  let note = $state<string | null>(null)
+  let busy = $state(false)
+
+  /**
+   * The PDF, built in the page.
+   *
+   * One tap, straight to the share sheet. The alternative — `window.print()`
+   * and its preview — reaches the same place on iOS but through a dialog that
+   * has to be dismissed, and does not exist at all on a desktop browser without
+   * a print-to-PDF driver.
+   *
+   * `navigator.canShare` is checked with the actual file rather than by feature
+   * detection on `navigator.share` alone: desktop Chrome has share and will
+   * reject a file, so asking about the file specifically is the only version of
+   * the question that has a useful answer.
+   */
+  async function sharePdf() {
+    if (!bill || busy) return
+    busy = true
+    note = null
+
+    try {
+      const blob = buildNotaPdf(bill, breakdown)
+      const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
+
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Nota ${bill.place}` })
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = file.name
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 0)
+      note = 'HP-nya nggak dukung share langsung, jadi PDF-nya ke-download.'
+    } catch (err) {
+      // Dismissing the share sheet is not an error, and telling someone their
+      // own cancel failed is a small insult.
+      if ((err as Error).name !== 'AbortError') error = (err as Error).message
+    } finally {
+      busy = false
+    }
+  }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
 
@@ -79,11 +125,17 @@
 {:else}
   <div class="sheet">
     <div class="controls no-print">
-      <button class="go" onclick={() => window.print()}>Simpan / kirim PDF</button>
+      <button class="go" disabled={busy} onclick={sharePdf}>
+        {busy ? 'Nyiapin…' : 'Bagikan PDF'}
+      </button>
       <button class="back" onclick={() => history.back()}>Kembali</button>
       <p class="hint">
-        Di iPhone: tombol Share di preview print itu bisa langsung kirim PDF-nya
-        ke WhatsApp.
+        {#if note}
+          {note}
+        {:else}
+          PDF-nya ke-generate di HP lu, terus share sheet-nya kebuka — pilih
+          WhatsApp dan dokumennya nempel sendiri.
+        {/if}
       </p>
     </div>
 
