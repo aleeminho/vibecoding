@@ -1147,14 +1147,20 @@
     }
 
     /*
-     * Three parts, on their own pages, in one file: who owes what in the
-     * aggregate, then who owes what item by item, then how to pay.
+     * Two parts, in one file: the bill in the aggregate, then the same bill
+     * item by item with how to pay underneath it.
      *
-     * Each was already a section; what it was not was separable. They ran into
-     * each other, so a page ended in the middle of the slips and the reader had
-     * to hold a table in their head across a page turn.
+     * The break is before the slips and only there — `:not(.pay)` — because
+     * "how to pay" belongs with the slips rather than on a page of its own. It
+     * is the answer to the question the slips ask, and a reader who has just
+     * found their own name should not have to turn a page for the account
+     * number.
+     *
+     * The first section was never separable from the masthead, and the two ran
+     * together, so a page ended in the middle of the slips and the reader had
+     * to hold a table in their head across the turn.
      */
-    .block + .block {
+    .block + .block:not(.pay) {
       break-before: page;
     }
 
