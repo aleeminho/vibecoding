@@ -17,7 +17,40 @@
  * and the output is a few kilobytes of actual content.
  */
 
+import { FIRST_CHAR, LAST_CHAR, widthOf, type FontMetrics } from './ttf'
+
 const A4 = { width: 595.28, height: 841.89 }
+
+/**
+ * A real font, for the figures the document is about.
+ *
+ * The base-14 faces are free because every reader already has them, which is
+ * what keeps this writer small. The price is that the only serif available is
+ * Times, and Times reads as a legal brief — not as the amount somebody owes.
+ * So one face travels inside the document instead: about 70KB on the way out,
+ * against a document that was 6KB without it.
+ *
+ * Already compressed when it arrives. Compressing 155KB of font per build, in
+ * a browser, is a job worth doing once and caching rather than once per tap.
+ */
+export interface NotaFont {
+  /** The font file, exactly as it arrived, or Flate-compressed when `flate`. */
+  data: Uint8Array
+  flate: boolean
+  /** Byte length before compression, which the font stream has to declare. */
+  uncompressed: number
+  metrics: FontMetrics
+}
+
+/** Exact, because a proportional face has no fixed advance. In 1/1000 em. */
+export function serifWidth(metrics: FontMetrics, text: string, size: number): number {
+  let total = 0
+  for (const char of text) {
+    const code = char.codePointAt(0)!
+    total += widthOf(metrics, code > 255 ? 0 : code)
+  }
+  return (total * size) / 1000
+}
 
 /** Courier's advance width, in ems. Fixed for every glyph, which is the point. */
 const COURIER_ADVANCE = 0.6
@@ -49,14 +82,18 @@ export const SOFT: Rgb = [0.42, 0.396, 0.376]
 export const RULE: Rgb = [0.89, 0.87, 0.85]
 export const ACCENT: Rgb = [0.816, 0.29, 0.008]
 
-type Font = 'sans' | 'sans-bold' | 'mono' | 'mono-bold'
+type Font = 'sans' | 'sans-bold' | 'mono' | 'mono-bold' | 'serif'
 
 /**
- * The four faces, in the order they are written into the file.
+ * The four base-14 faces, in the order they are written into the file.
  *
  * An array rather than an object keyed by name: object key order would decide
  * which /F number each face gets, and a rename that reordered the keys would
  * silently swap sans and mono throughout the document.
+ *
+ * The embedded serif is not here. These four are numbered 3 to 6 with the
+ * catalog and the page tree ahead of them, and every page and content object
+ * after; the serif is numbered beyond all of that, so it cannot move anything.
  */
 const FONTS: { key: Font; base: string }[] = [
   { key: 'sans', base: 'Helvetica' },
@@ -65,7 +102,16 @@ const FONTS: { key: Font; base: string }[] = [
   { key: 'mono-bold', base: 'Courier-Bold' },
 ]
 
-const FONT_INDEX: Record<Font, number> = { sans: 1, 'sans-bold': 2, mono: 3, 'mono-bold': 4 }
+const FONT_INDEX: Record<Font, number> = {
+  sans: 1,
+  'sans-bold': 2,
+  mono: 3,
+  'mono-bold': 4,
+  serif: 5,
+}
+
+/** The name the embedded face is declared under. No spaces, per the spec. */
+const SERIF_NAME = 'PlexSerif-SemiBold'
 
 function escapeText(input: string): string {
   let out = ''
@@ -87,6 +133,25 @@ export function textWidth(text: string, size: number): number {
   return text.length * COURIER_ADVANCE * size
 }
 
+/**
+ * One character per byte, so a string's length is a byte offset.
+ *
+ * The writer assembles the file as a string and measures every object offset
+ * with `.length`, which is only the byte offset if nothing widens on the way
+ * out — see the latin1 conversion at the end of `build()`.
+ *
+ * Chunked because `String.fromCharCode(...bytes)` on a hundred kilobytes of
+ * font data overflows the argument stack, and the throw arrives as "too many
+ * arguments" from a line that has nothing to do with fonts.
+ */
+function latin1(bytes: Uint8Array): string {
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 8192) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 8192))
+  }
+  return out
+}
+
 export class Pdf {
   private pages: string[][] = [[]]
   /**
@@ -98,6 +163,22 @@ export class Pdf {
    */
   private annots: string[][] = [[]]
   private y = A4.height - 56
+
+  /**
+   * The embedded serif, or null when the document is drawn in the base-14
+   * faces alone. Held here rather than passed to every `text()` call, because
+   * whether a face exists is a property of the document and not of a line.
+   */
+  private font: NotaFont | null
+
+  constructor(font: NotaFont | null = null) {
+    this.font = font
+  }
+
+  /** Whether right-aligned text in the embedded face can be placed at all. */
+  get hasSerif(): boolean {
+    return this.font !== null
+  }
 
   readonly left = 48
   readonly right = A4.width - 48
@@ -156,25 +237,58 @@ export class Pdf {
   ): void {
     if (!content) return
 
-    // Right alignment needs a width, and only the monospaced faces have one
-    // here — Helvetica would need an AFM metrics table, which is the bulk of
-    // what a PDF writer usually carries and the reason this one is small.
-    // Drawing anyway would silently left-align, which is worse than stopping.
-    if (align === 'right' && !font.startsWith('mono')) {
-      throw new Error(`pdf: right-align needs a monospaced font, got "${font}" for "${content}"`)
+    // Right alignment needs a width. Courier has one by construction; the
+    // embedded serif has one because its widths were read out of the font file;
+    // Helvetica would need an AFM metrics table, which is the bulk of what a
+    // PDF writer usually carries and the reason this one is small. Drawing
+    // anyway would silently left-align, which is worse than stopping.
+    const measurable = font.startsWith('mono') || (font === 'serif' && this.font !== null)
+    if (align === 'right' && !measurable) {
+      throw new Error(`pdf: right-align needs a measured font, got "${font}" for "${content}"`)
     }
 
-    const drawX = align === 'right' ? x - textWidth(content, size) : x
+    // Measured after escaping, because that is what actually gets drawn: an
+    // escaped parenthesis is two bytes on the page. Money never contains one,
+    // so this changes nothing for the column that depends on it.
+    const escaped = escapeText(content)
+    const width =
+      font === 'serif' && this.font
+        ? serifWidth(this.font.metrics, escaped, size)
+        : textWidth(escaped, size)
+
+    const drawX = align === 'right' ? x - width : x
 
     this.current().push(
       `BT ${color.join(' ')} rg /F${FONT_INDEX[font]} ${size} Tf ` +
-        `1 0 0 1 ${drawX.toFixed(2)} ${y.toFixed(2)} Tm (${escapeText(content)}) Tj ET`,
+        `1 0 0 1 ${drawX.toFixed(2)} ${y.toFixed(2)} Tm (${escaped}) Tj ET`,
     )
   }
 
   rule(x1: number, y: number, x2: number, color: Rgb = RULE, thickness = 0.7): void {
     this.current().push(
       `${color.join(' ')} RG ${thickness} w ${x1.toFixed(2)} ${y.toFixed(2)} m ${x2.toFixed(2)} ${y.toFixed(2)} l S`,
+    )
+  }
+
+  /** A stroked rectangle, for a slip's card. */
+  box(x: number, y: number, w: number, h: number, color: Rgb = RULE): void {
+    this.current().push(
+      `${color.join(' ')} RG 0.7 w ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re S`,
+    )
+  }
+
+  /** A filled rectangle, for the bands the design puts behind a total. */
+  fill(x: number, y: number, w: number, h: number, color: Rgb): void {
+    this.current().push(
+      `${color.join(' ')} rg ${x.toFixed(2)} ${y.toFixed(2)} ${w.toFixed(2)} ${h.toFixed(2)} re f`,
+    )
+  }
+
+  /** A dotted leader, the run of dots between a label and its figure. */
+  leader(x1: number, y: number, x2: number, color: Rgb = RULE): void {
+    this.current().push(
+      `q ${color.join(' ')} RG 0.6 w [1 2.2] 0 d ${x1.toFixed(2)} ${y.toFixed(2)} m ` +
+        `${x2.toFixed(2)} ${y.toFixed(2)} l S Q`,
     )
   }
 
@@ -206,8 +320,11 @@ export class Pdf {
   build(): Blob {
     const objects: string[] = []
     const pageCount = this.pages.length
-    // 1 catalog, 2 pages, then 4 font objects, then a page and a content per page
+    // 1 catalog, 2 pages, then 4 font objects, then a page and a content per
+    // page, then the embedded face if there is one.
     const firstPageObj = 7
+    const font = this.font
+    const fontObj = firstPageObj + pageCount * 2
 
     for (const { base } of FONTS) {
       objects.push(
@@ -229,13 +346,41 @@ export class Pdf {
       // disturb it cannot break it.
       const links = this.annots[i]
       const annots = links.length > 0 ? ` /Annots [${links.join(' ')}]` : ''
+      const faces = `/F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R${font ? ` /F5 ${fontObj} 0 R` : ''}`
       objects.push(
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4.width} ${A4.height}] ` +
-          `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >>${annots} ` +
+          `/Resources << /Font << ${faces} >> >>${annots} ` +
           `/Contents ${firstPageObj + i * 2 + 1} 0 R >>`,
       )
       objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
     })
+
+    if (font) {
+      // Three objects, numbered past every page and content object so that
+      // adding a font cannot move anything that was already numbered — the same
+      // rule the page dictionaries follow, and the reason this writer's xref
+      // survives being extended.
+      const { widths, bbox, ascent, descent, capHeight } = font.metrics
+      objects.push(
+        `<< /Type /Font /Subtype /TrueType /BaseFont /${SERIF_NAME} ` +
+          `/FirstChar ${FIRST_CHAR} /LastChar ${LAST_CHAR} /Encoding /WinAnsiEncoding ` +
+          `/Widths [${widths.join(' ')}] /FontDescriptor ${fontObj + 1} 0 R >>`,
+      )
+      objects.push(
+        `<< /Type /FontDescriptor /FontName /${SERIF_NAME} ` +
+          // Serif (2) and Nonsymbolic (32). A reader that has to guess picks
+          // worse defaults for both.
+          `/Flags 34 /FontBBox [${bbox.join(' ')}] /ItalicAngle 0 ` +
+          `/Ascent ${ascent} /Descent ${descent} /CapHeight ${capHeight} /StemV 110 ` +
+          `/FontFile2 ${fontObj + 2} 0 R >>`,
+      )
+      objects.push(
+        `<< /Length ${font.data.length} /Length1 ${font.uncompressed}` +
+          `${font.flate ? ' /Filter /FlateDecode' : ''} >>\nstream\n` +
+          latin1(font.data) +
+          `\nendstream`,
+      )
+    }
 
     let file = '%PDF-1.4\n'
     const offsets: number[] = []
@@ -297,113 +442,112 @@ export interface NotaBill {
 }
 
 /**
+ * The colours the sheet is printed in.
+ *
+ * The same values as the screen's, so the document and the screen are the same
+ * document. The accent is the app's brand orange, and it is spent on exactly
+ * two things here: the total the bill is about, and the amount each person
+ * owes. `DEEP` exists because the accent itself is 4.25:1 on white and fails
+ * AA as small text — it is a fill, and a label on a wash takes the darker tone.
+ */
+const INK2: Rgb = [0.353, 0.38, 0.431]
+const INK3: Rgb = [0.525, 0.553, 0.6]
+const RULE_SOFT: Rgb = [0.933, 0.941, 0.953]
+const DEEP: Rgb = [0.659, 0.231, 0]
+const WASH: Rgb = [0.992, 0.949, 0.918]
+
+/** Inside a card or a band. */
+const PAD = 14
+
+/**
+ * Break a paragraph into lines that fit.
+ *
+ * By estimate, because Helvetica cannot be measured here — the writer has no
+ * metrics table for it and that is the whole reason it is small. Each character
+ * is charged a deliberately unkind 0.65em, where the face's average for mixed
+ * text is nearer 0.5 and only a line of capitals and digits reaches 0.6. The
+ * budget has to be unkind for the same reason: a line that ends early is a
+ * paragraph, and a line that ends past the margin is a bug on paper.
+ */
+function wrap(text: string, size: number, width: number): string[] {
+  const budget = Math.max(8, Math.floor(width / (size * 0.65)))
+  const lines: string[] = []
+  let current = ''
+
+  for (const word of text.split(/\s+/)) {
+    if (current && current.length + 1 + word.length > budget) {
+      lines.push(current)
+      current = word
+    } else {
+      current = current ? `${current} ${word}` : word
+    }
+  }
+
+  if (current) lines.push(current)
+  return lines
+}
+
+/**
  * Lay the bill out as a document.
  *
- * Mirrors the on-screen nota deliberately — same order, same information, same
- * right-aligned money column — because the two are the same artifact seen two
- * ways, and a PDF that reorganises what the screen showed is a second document
- * to keep correct.
+ * The same document the screen draws, in the same order: the bill in one glance
+ * at the top, then each person's slip, then how to pay. The two are one
+ * artifact seen twice, and a PDF that reorganises what the screen showed is a
+ * second document to keep correct.
  *
- * The money column carries no "Rp". It is stated once at the top, the way a
- * till does it, and repeating it fourteen times down a narrow column is what
- * makes a receipt hard to scan.
+ * The arithmetic a reader can check is the same arithmetic: a slip's items sum
+ * to its subtotal, subtotal plus the charge line is its total, and the ledger's
+ * three money columns sum to its footer. All of it is derived from the same
+ * `allocateBill` the summary table uses rather than recomputed here.
  *
  * `baseUrl` is where the app is served from — `location.origin + pathname`.
  * Passed in rather than read from `location` inside, so this module stays pure
  * and testable without a DOM, and so the caller decides what a link points at
  * rather than this file assuming it knows.
+ *
+ * `font` is the embedded serif. Without it the document still lays out, in the
+ * base-14 faces alone — every figure lands, they are simply set in Helvetica.
+ * That is the fallback for a phone that could not fetch the file, not a second
+ * design.
  */
 export function buildNotaPdf(
   bill: NotaBill,
   breakdown: PersonBreakdown[],
   baseUrl = '',
+  font: NotaFont | null = null,
 ): Blob {
-  const pdf = new Pdf()
+  const pdf = new Pdf(font)
   const { left, right } = pdf
-  const OPERATOR_X = right - 62
+  const COLUMN = right - left
 
-  // What the bill offers, which is the operator's choice and not a record of
-  // what any one payer used — nothing in the database says that. A method set
-  // to qris with no code uploaded is a real state (see the payment method
-  // control), and it prints no transfer box rather than printing the one the
-  // operator turned off. The code itself is not in this document at all: the
-  // payer's own page shows it, and that is one tap from here.
-  const offersBank = bill.payment_method !== 'qris' && Boolean(bill.account_number)
+  /** Right edges of the ledger's money columns. One width for all three. */
+  const COL_TOTAL = right
+  const COL_CHARGE = right - 104
+  const COL_SUBTOTAL = right - 208
 
-  /**
-   * Step down by `points`, breaking the page first if `needed` would not fit.
-   *
-   * The trap, and it has cost a render twice: `line(0, block)` tests the fit
-   * and then moves the cursor nowhere, which reads as "start a block here" and
-   * is not. A section that follows another section's text is sitting on that
-   * text's baseline until something moves it, so the leading gap has to be the
-   * first argument — `line(26, block + 26)` — and the `needed` has to include
-   * that gap, because the fit is measured before the move.
-   *
-   * Nothing in the output says any of this. Two blocks printed on top of each
-   * other are two well-formed blocks.
-   */
   const line = (points: number, needed = 0) => {
     // Break before a line that would not fit, not after one that already has.
     if (needed > 0 && pdf.remaining < needed) pdf.newPage()
     pdf.moveDown(points)
   }
 
-  // ---- head ----
-  pdf.text(bill.place, left, pdf.cursor, { size: 16, font: 'sans-bold' })
-  line(20)
-  pdf.text(`${formatDate(bill.bill_date)} · ${bill.ref_code}`, left, pdf.cursor, {
-    size: 9,
-    color: SOFT,
-  })
-  line(28)
-
-  const totalText = rupiahDigits(bill.total)
-  // Right-aligned in a monospaced face so the gap is exact. Placing it by its
-  // left edge against a measured total put the two 4.6pt inside each other, and
-  // Helvetica's own width is not knowable here without a metrics table.
-  pdf.text('Rp', right - textWidth(totalText, 22) - 9, pdf.cursor, {
-    size: 11,
-    font: 'mono-bold',
-    color: ACCENT,
-    align: 'right',
-  })
-  pdf.text(totalText, right, pdf.cursor, {
-    size: 22,
-    font: 'mono-bold',
-    color: ACCENT,
-    align: 'right',
-  })
-  line(16)
-  pdf.rule(left, pdf.cursor, right, INK, 1.6)
-  line(22)
-
   /*
-   * Each person's payment link, under their own items rather than collected at
-   * the foot.
+   * The two faces, and what they become when the font never arrived.
    *
-   * The link is the credential — whoever holds it can mark that share paid —
-   * and putting it in the block it belongs to means the document says whose it
-   * is by position instead of by a row of small print at the bottom that has to
-   * be read across. It is also where the screen has always put it.
+   * Every use of the embedded face has to go through one of these. A `serif`
+   * that is asked for when nothing was embedded is not a fallback — the page
+   * resources have no /F5, so the text is drawn in a font the reader does not
+   * have and simply does not appear. And a right-aligned one throws.
    *
-   * Resolved before the loop rather than inside it, because a block's height
-   * has to account for its link before the block is drawn or a page break lands
-   * through somebody's items.
-   *
-   * `is_payer` is excluded as a rule rather than as a consequence. Their share
-   * being settled is the mechanism; not handing them a link is the intent, and
-   * the two are written by separate calls. If the marker landed and the status
-   * write did not, the document would otherwise tell somebody they paid the
-   * vendor and then ask them to pay.
-   *
-   * The trade-off, stated where it is made rather than left implicit: these are
-   * credentials and the document they are on goes to the whole group. A mis-tap
-   * is possible. What catches it is the amount check at the other end — paying
-   * Rp 98.175 against a page expecting Rp 127.050 settles nothing and lands in
-   * the review queue instead. Two people owing the exact same amount is the
-   * case that gets through, and it is rare enough to accept.
+   * The fallbacks are not a second design. Helvetica and Courier are what this
+   * writer drew in before there was a font at all, and every figure lands in
+   * the same place: Courier measures exactly too.
    */
+  const prose: Font = font ? 'serif' : 'sans'
+  const figures: Font = font ? 'serif' : 'mono'
+  /** Courier is wider than the serif, so display sizes have to come down. */
+  const figuresSize = (big: number, small: number) => (font ? big : small)
+
   const payLink = new Map<string, string>()
   if (baseUrl) {
     for (const share of bill.shares) {
@@ -418,140 +562,273 @@ export function buildNotaPdf(
     }
   }
 
-  // ---- one block per person ----
-  for (const person of breakdown) {
-    const link = payLink.get(person.person)
-    const blockHeight =
-      52 + person.items.length * 13 + person.components.length * 13 + (link ? 19 : 0)
-    line(0, blockHeight)
+  const subtotalOf = (p: PersonBreakdown) => p.total - p.extra
+  const chargeLabel = (p: PersonBreakdown) => (p.extra < 0 ? 'Diskon' : 'PPN & service')
+  const signed = (n: number) => (n < 0 ? `−${rupiahDigits(n)}` : rupiahDigits(n))
+  const hasDiscount = breakdown.some((p) => p.extra < 0)
 
-    // Beside the name rather than in the money column. The column has to keep
-    // adding up to the bill total in the reconciliation at the foot, and a
-    // remainder there would break it — the figure stays the person's share of
-    // the split, and what has landed is a note about it.
-    //
-    // The payer is marked differently from someone who has paid, because it is
-    // a different fact: they are in the split only because their dinner is part
-    // of the bill, and their share was never a debt. "sudah bayar" would raise
-    // the question of who they paid.
-    const mark = person.is_payer
-      ? '  ·  yang bayar ke vendor'
-      : person.status === 'lunas'
-        ? '  ·  sudah bayar'
-        : person.amount_paid > 0
-          ? `  ·  udah masuk ${rupiahDigits(person.amount_paid)}`
-          : ''
-    pdf.text(`${person.person}${mark}`, left, pdf.cursor, { size: 11, font: 'sans-bold' })
-    pdf.text(rupiahDigits(person.total), right, pdf.cursor, {
-      size: 11,
-      font: 'mono-bold',
+  // ---------------------------------------------------------------------------
+  // Masthead
+  // ---------------------------------------------------------------------------
+
+  const mast = pdf.cursor
+  pdf.text(bill.place, left, mast, { size: 17, font: prose })
+  pdf.text('Nota', right, mast, { size: 22, font: figures, align: 'right' })
+
+  pdf.moveDown(15)
+  pdf.text(formatDate(bill.bill_date), left, pdf.cursor, { size: 9.5, color: INK2 })
+  if (bill.paid_by_person) {
+    pdf.moveDown(13)
+    pdf.text(`Dibayar dulu sama ${bill.paid_by_person}`, left, pdf.cursor, {
+      size: 9.5,
+      color: INK2,
+    })
+  }
+
+  // The bill's own numbers, keyed at the left of their column so the labels
+  // need no measuring and the figures stay in a tabular face.
+  const meta: [string, string][] = [
+    ['Tagihan', bill.ref_code],
+    ['Orang', String(breakdown.length)],
+    ['Total', `Rp ${rupiahDigits(bill.total)}`],
+  ]
+  meta.forEach(([key, value], i) => {
+    const y = mast - 20 - i * 13
+    pdf.text(key, left + COLUMN - 150, y, { size: 9, color: INK2 })
+    pdf.text(value, right, y, { size: 9.5, font: 'mono', align: 'right' })
+  })
+
+  line(46)
+  pdf.rule(left, pdf.cursor, right, ACCENT, 2.4)
+  line(26)
+
+  // ---------------------------------------------------------------------------
+  // The bill in one glance
+  // ---------------------------------------------------------------------------
+
+  pdf.text('Bagian tiap orang', left, pdf.cursor, { size: 9, color: INK3 })
+  line(16)
+
+  for (const l of wrap(
+    'Satu baris per orang, PPN dan service sudah masuk. Barisnya berjumlah pas dengan ' +
+      'total struk — rincian itemnya ada di bawah.',
+    10,
+    COLUMN,
+  )) {
+    pdf.text(l, left, pdf.cursor, { size: 10, color: INK2 })
+    line(13)
+  }
+  line(8)
+
+  // Header. The middle column is named for its sign, the same way a slip is:
+  // one heading cannot be true of a column holding tax for one person and a
+  // discount for the next.
+  const headY = pdf.cursor
+  pdf.text('Nama', left, headY, { size: 9, color: INK3 })
+  const chargeHead = hasDiscount ? ['PPN, service', '& diskon'] : ['PPN & service']
+  pdf.text('Subtotal', COL_SUBTOTAL, headY, { size: 9, font: figures, color: INK3, align: 'right' })
+  chargeHead.forEach((l, i) => {
+    pdf.text(l, COL_CHARGE, headY - i * 10, { size: 9, font: figures, color: INK3, align: 'right' })
+  })
+  pdf.text('Total', COL_TOTAL, headY, { size: 9, font: figures, color: INK3, align: 'right' })
+
+  line(chargeHead.length > 1 ? 26 : 16)
+  pdf.rule(left, pdf.cursor, right, ACCENT, 1.4)
+  line(16)
+
+  for (const person of breakdown) {
+    const rowY = pdf.cursor
+    pdf.text(person.person, left, rowY, { size: 10.5, font: 'sans-bold' })
+    pdf.text(rupiahDigits(subtotalOf(person)), COL_SUBTOTAL, rowY, {
+      size: 10,
+      font: 'mono',
       align: 'right',
     })
-    line(13)
-    pdf.rule(left, pdf.cursor, right)
-    line(15)
+    pdf.text(signed(person.extra), COL_CHARGE, rowY, { size: 10, font: 'mono', align: 'right' })
+    pdf.text(rupiahDigits(person.total), COL_TOTAL, rowY, { size: 10, font: 'mono', align: 'right' })
 
+    // The state, under the name rather than in the column: the column has to
+    // keep adding up to the footer, and a remainder in it would break that.
+    const state = person.is_payer
+      ? 'Yang bayar ke vendor'
+      : person.status === 'lunas'
+        ? 'Sudah lunas'
+        : person.amount_paid > 0
+          ? `Udah masuk ${rupiahDigits(person.amount_paid)}`
+          : ''
+    line(13)
+    if (state) {
+      pdf.text(state, left, pdf.cursor, { size: 8.5, color: INK2 })
+      line(12)
+    }
+    line(5)
+    pdf.rule(left, pdf.cursor, right, RULE_SOFT, 0.6)
+    line(15)
+  }
+
+  // Footer, on the wash so that it reads as a result rather than as one more
+  // row. The three columns sum to it, which is the one thing this table claims.
+  const footTop = pdf.cursor + 14
+  pdf.fill(left, footTop - 24, COLUMN, 24, WASH)
+  pdf.rule(left, footTop, right, ACCENT, 1.6)
+  pdf.text('Total struk', left + 6, footTop - 16, { size: 10.5, font: 'sans-bold', color: DEEP })
+  pdf.text(
+    rupiahDigits(breakdown.reduce((a, p) => a + subtotalOf(p), 0)),
+    COL_SUBTOTAL,
+    footTop - 16,
+    { size: 10.5, font: 'mono-bold', align: 'right' },
+  )
+  pdf.text(signed(breakdown.reduce((a, p) => a + p.extra, 0)), COL_CHARGE, footTop - 16, {
+    size: 10.5,
+    font: 'mono-bold',
+    align: 'right',
+  })
+  pdf.text(rupiahDigits(breakdown.reduce((a, p) => a + p.total, 0)), COL_TOTAL, footTop - 16, {
+    size: 10.5,
+    font: 'mono-bold',
+    align: 'right',
+  })
+  line(34)
+
+  // ---------------------------------------------------------------------------
+  // One slip per person
+  // ---------------------------------------------------------------------------
+
+  pdf.text('Rincian per orang', left, pdf.cursor, { size: 9, color: INK3 })
+  line(20)
+
+  for (const person of breakdown) {
+    const link = payLink.get(person.person)
+    const subRows = person.extra === 0 ? 1 : 2
+    const bandH = link ? 50 : 32
+    // Derived from where the drawing below actually puts the baselines, not
+    // from the design's box model: 25 to the name, 20 to the first item, 12 a
+    // row, 6 to the subtotal, 12 more for the charge, 4 under the last
+    // descender. Over-counting shows up as a gap between the figures and the
+    // band, which reads as a slip somebody forgot to finish.
+    const cardH = PAD + 11 + 20 + person.items.length * 12 + 6 + (subRows - 1) * 12 + 4 + bandH
+
+    // The whole card, so a page break lands before it and never through it.
+    line(0, cardH + 4)
+    const cardTop = pdf.cursor
+    const cardBottom = cardTop - cardH
+
+    pdf.box(left, cardBottom, COLUMN, cardH, RULE)
+
+    let y = cardTop - PAD - 11
+    pdf.text(person.person, left + PAD, y, { size: 12, font: 'sans-bold' })
+
+    y -= 20
     for (const item of person.items) {
-      const shared = item.shared > 1 ? `  (dibagi ${item.shared})` : ''
-      pdf.text(`${item.name}${shared}`, left, pdf.cursor, { size: 9.5 })
-      pdf.text(rupiahDigits(item.amount), right, pdf.cursor, {
+      const shared = item.shared > 1 ? `  1/${item.shared}` : ''
+      pdf.text(`${item.name}${shared}`, left + PAD, y, { size: 9.5 })
+      pdf.text(rupiahDigits(item.amount), right - PAD, y, {
         size: 9.5,
         font: 'mono',
         align: 'right',
       })
-      line(13)
+      y -= 12
     }
 
-    if (person.components.length > 0) {
-      line(5)
-      for (const part of person.components) {
-        pdf.text(part.label, left + 12, pdf.cursor, { size: 9.5, color: SOFT })
-        pdf.text(part.amount < 0 ? '−' : '+', OPERATOR_X, pdf.cursor, {
-          size: 9.5,
-          font: 'mono',
-          color: SOFT,
-          align: 'right',
-        })
-        pdf.text(rupiahDigits(Math.abs(part.amount)), right, pdf.cursor, {
-          size: 9.5,
-          font: 'mono',
-          color: SOFT,
-          align: 'right',
-        })
-        line(13)
-      }
-    }
-
-    if (link) {
-      line(5)
-      /*
-       * The word is the link; the URL is not printed.
-       *
-       * A 36-character UUID set in 7.5pt monospace said nothing a reader wanted
-       * to read and looked like small print rather than like something to
-       * press. The row says what it does instead, and the address is where it
-       * always was — in the annotation, which is what a tap follows.
-       *
-       * Left-aligned rather than in the money column, which is a column of
-       * figures in a tabular face and the one place in this document a word
-       * would be read as a number. `text()` cannot right-align a proportional
-       * face anyway: measuring one needs a metrics table, and not carrying one
-       * is what keeps this writer small.
-       */
-      pdf.text('Pembayaran', left + 12, pdf.cursor, {
-        size: 10,
-        font: 'sans-bold',
-        color: ACCENT,
-      })
-      // Wider than the word on purpose. Ten points of Helvetica is a small
-      // target under a thumb, and the width cannot be measured here — the
-      // estimate only has to be generous, not right, because the worst case is
-      // a tap that lands where the link would have been anyway.
-      pdf.link(left + 12, pdf.cursor - 4, 72, 15, link)
-      line(14)
-    }
-
-    line(14)
-  }
-
-  // ---- foot ----
-  line(0, 96)
-  pdf.rule(left, pdf.cursor, right, INK, 1.6)
-  line(20)
-
-  const summed = breakdown.reduce((acc, p) => acc + p.total, 0)
-  const fits = summed === bill.total
-  pdf.text(
-    fits
-      ? `${breakdown.length} orang — cocok dengan total struk`
-      : `${breakdown.length} orang — TIDAK cocok, total struk ${rupiahDigits(bill.total)}`,
-    left,
-    pdf.cursor,
-    { size: 9.5, color: fits ? SOFT : ACCENT },
-  )
-  pdf.text(rupiahDigits(summed), right, pdf.cursor, {
-    size: 11,
-    font: 'mono-bold',
-    align: 'right',
-  })
-
-  if (offersBank) {
-    line(26)
-    const boxTop = pdf.cursor + 6
-    pdf.roundedBox(left, boxTop - 34, right - left, 34)
-    pdf.text('Transfer ke', left + 14, boxTop - 14, { size: 9, color: SOFT })
-    const holder = bill.account_holder ? ` · ${bill.account_holder}` : ''
-    pdf.text(`${bill.bank_name} ${bill.account_number}${holder}`, right - 14, boxTop - 14, {
-      size: 10,
-      font: 'mono-bold',
+    y -= 6
+    pdf.text('Subtotal', left + PAD, y, { size: 9.5, color: INK2 })
+    pdf.text(rupiahDigits(subtotalOf(person)), right - PAD, y, {
+      size: 9.5,
+      font: 'mono',
       align: 'right',
     })
-    // The box is drawn upward from the cursor, so the cursor is left sitting
-    // inside it. Nothing followed this section before, which is why it never
-    // showed — and the payment links did, landing straight on the account
-    // number. Found in a render, not in the bytes.
-    line(42)
+    if (person.extra !== 0) {
+      y -= 12
+      pdf.text(chargeLabel(person), left + PAD, y, { size: 9.5, color: INK2 })
+      pdf.text(rupiahDigits(person.extra), right - PAD, y, {
+        size: 9.5,
+        font: 'mono',
+        align: 'right',
+      })
+    }
+
+    // The band. Quiet means nothing to do here, which is as true of a settled
+    // share as of the payer's — the accent only works while it means one thing.
+    const settled = person.is_payer || person.status === 'lunas'
+    pdf.fill(left, cardBottom, COLUMN, bandH, settled ? RULE_SOFT : WASH)
+    pdf.rule(left, cardBottom + bandH, right, settled ? INK3 : ACCENT, 2)
+
+    const amountY = cardBottom + bandH - 18
+    const label = person.is_payer
+      ? 'Bagian dia, sudah termasuk'
+      : person.status === 'lunas'
+        ? 'Sudah lunas'
+        : person.amount_paid > 0
+          ? `Sisa Rp ${rupiahDigits(person.total - person.amount_paid)}`
+          : bill.paid_by_person
+            ? `Utang ke ${bill.paid_by_person}`
+            : 'Bagian dia'
+    pdf.text(label, left + PAD, amountY, {
+      size: 9,
+      font: 'sans-bold',
+      color: settled ? INK2 : DEEP,
+    })
+    pdf.text(rupiahDigits(person.total), right - PAD, amountY - 2, {
+      size: figuresSize(16, 11),
+      font: figures,
+      color: settled ? INK2 : ACCENT,
+      align: 'right',
+    })
+
+    if (link) {
+      // The word is the link; the address travels in the annotation. Left
+      // aligned rather than at the money column, which is a column of figures
+      // and the one place a word would be read as one.
+      pdf.text('Pembayaran', left + PAD, cardBottom + 14, { size: 10, font: 'sans-bold', color: DEEP })
+      pdf.link(left + PAD - 4, cardBottom + 8, 84, 16, link)
+    }
+
+    pdf.moveDown(cardH)
+    line(18)
   }
+
+  // ---------------------------------------------------------------------------
+  // How to pay
+  // ---------------------------------------------------------------------------
+
+  const banks = bill.bank_name || bill.account_number
+  if (banks || bill.payment_method !== 'bank') {
+    line(0, 70)
+    pdf.text('Cara bayar', left, pdf.cursor, { size: 9, color: INK3 })
+    line(18)
+
+    for (const l of wrap(
+      bill.payment_method === 'qris'
+        ? `Kode QRIS-nya ada di halaman bayar masing-masing orang, di link Pembayaran di atas. Sebutin nomor tagihan ${bill.ref_code} di keterangannya.`
+        : `Transfer ke ${bill.bank_name ?? ''} ${bill.account_number ?? ''}${
+            bill.account_holder ? `, a.n. ${bill.account_holder}` : ''
+          }. Sebutin nomor tagihan ${bill.ref_code} di keterangannya.`,
+      10,
+      COLUMN,
+    )) {
+      pdf.text(l, left, pdf.cursor, { size: 10, color: INK2 })
+      line(13)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Colophon
+  // ---------------------------------------------------------------------------
+
+  const owing = breakdown.filter((p) => !p.is_payer && p.status !== 'lunas').length
+  line(30)
+  pdf.rule(left, pdf.cursor, right, RULE, 0.6)
+  line(18)
+  pdf.text(
+    owing === 0
+      ? 'Semua udah lunas.'
+      : `Tinggal ${owing} dari ${breakdown.length} orang yang belum lunas.`,
+    left,
+    pdf.cursor,
+    { size: 11, font: prose },
+  )
+  line(14)
+  pdf.text('Semua angka dalam rupiah.', left, pdf.cursor, { size: 9, color: INK3 })
 
   return pdf.build()
 }

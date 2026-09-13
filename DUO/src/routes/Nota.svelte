@@ -24,6 +24,7 @@
   import { getExportBill, qrisUrl } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
   import { buildNotaPdf } from '../lib/pdf'
+  import { loadNotaFont } from '../lib/nota-font'
   import { copyText } from '../lib/clipboard'
 
   /**
@@ -59,10 +60,15 @@
     note = null
 
     try {
+      // Fetched here rather than inside the writer, which draws and measures
+      // and knows nothing about the network. Null when the font is not there,
+      // and the document is then set in the faces every reader already has.
+      const font = await loadNotaFont()
+
       // The links in the document point back at wherever this page is being
       // served from, so the same PDF is correct on localhost, on Pages and on
       // the cPanel host without a build-time setting for each.
-      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`)
+      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`, font)
       const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
 
       if (navigator.canShare?.({ files: [file] })) {

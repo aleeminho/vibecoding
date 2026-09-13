@@ -10,8 +10,27 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { buildNotaPdf, Pdf, textWidth } from './pdf'
+import { buildNotaPdf, Pdf, serifWidth, textWidth, type NotaFont } from './pdf'
 import { allocateBill, type ExportBill } from './export'
+import { FIRST_CHAR, LAST_CHAR, readMetrics } from './ttf'
+
+/**
+ * The real face, read off disk.
+ *
+ * Not a fixture. The whole point of this file being here is that a genuine
+ * TrueType font survives the trip into a PDF, and a hand-made stand-in would
+ * have none of the tables that make it fiddly — no cmap to look a character up
+ * in, no hmtx to measure it with.
+ */
+const fontBytes = new Uint8Array(
+  await Bun.file(new URL('../../public/fonts/plex-serif-600.ttf', import.meta.url)).arrayBuffer(),
+)
+const font: NotaFont = {
+  data: fontBytes,
+  flate: false,
+  uncompressed: fontBytes.length,
+  metrics: readMetrics(fontBytes)!,
+}
 
 const bill: ExportBill = {
   ref_code: '9PMXR2KV',
@@ -73,7 +92,19 @@ describe('pdf writer', () => {
 
   test('refuses a right-aligned proportional font rather than left-aligning it', () => {
     const pdf = new Pdf()
-    expect(() => pdf.text('x', 100, 100, { font: 'sans', align: 'right' })).toThrow(/monospaced/)
+    expect(() => pdf.text('x', 100, 100, { font: 'sans', align: 'right' })).toThrow(
+      /needs a measured font/,
+    )
+  })
+
+  test('refuses a right-aligned serif when no font was embedded', () => {
+    // The face is named in the font table whether or not the file came with
+    // it. Drawing anyway would left-align a figure against the margin it was
+    // supposed to end at, which is a column that silently stops adding up.
+    const pdf = new Pdf()
+    expect(() => pdf.text('x', 100, 100, { font: 'serif', align: 'right' })).toThrow(
+      /needs a measured font/,
+    )
   })
 
   test('escapes the characters that would end a PDF string early', async () => {
@@ -108,9 +139,11 @@ describe('pdf writer', () => {
   test('carries the itemisation, including the shared marker', async () => {
     const s = await bytes(bill)
     expect(s).toContain('(Nasi Goreng)')
-    expect(s).toContain('Es Teh  \\(dibagi 2\\)')
+    // A fraction on the line, the way a receipt prints a shared dish, rather
+    // than a word beside it.
+    expect(s).toContain('(Es Teh  1/2)')
     expect(s).toContain('(42.760)')
-    expect(s).toContain('sudah bayar')
+    expect(s).toContain('(Sudah lunas)')
   })
 
   /*
@@ -181,18 +214,21 @@ describe('pdf writer', () => {
       // be read across to find your own name.
       const s = await withLinks(unpaid({}))
       const at = drawnAt(s)
-      expect(at).toBeGreaterThan(s.indexOf('(Sarah)'))
-      expect(at).toBeLessThan(s.indexOf('cocok dengan total struk'))
+      // Past the ledger's footer, and before the pay block: inside the slips,
+      // which is the section the person's own card lives in.
+      expect(at).toBeGreaterThan(s.indexOf('(Total struk)'))
+      expect(at).toBeLessThan(s.indexOf('(Cara bayar)'))
     })
 
-    test('the link is set in the accent the bill total is set in', async () => {
-      // Which is what makes it read as something to press. Asserted on the
-      // operator holding the word rather than on the row, because the accent is
-      // the only thing distinguishing it from the quiet small print around it.
+    test('the link is set in the deep accent, readable on the wash', async () => {
+      // The deeper tone rather than the accent itself, because the row sits on
+      // the washed band and #d04a02 on #fdf2ea is under 4.5:1 — the same reason
+      // the screen's version of this row is `--accent-deep`. Asserted on the
+      // operator holding the word rather than on the row.
       const s = await withLinks(unpaid({}))
       const at = drawnAt(s)
       const op = s.slice(s.lastIndexOf('BT ', at), s.indexOf('Tj ET', at))
-      expect(op).toContain('0.816 0.29 0.008 rg')
+      expect(op).toContain('0.659 0.231 0 rg')
     })
 
     test('the tappable rectangle sits over the word', async () => {
@@ -252,7 +288,8 @@ describe('pdf writer', () => {
         paid_by_person: 'Sarah',
       }
       const s = await withLinks(linked)
-      expect(s).toContain('yang bayar ke vendor')
+      expect(s).toContain('(Yang bayar ke vendor)')
+      expect(s).toContain('(Bagian dia, sudah termasuk)')
       expect(s).not.toContain('/Subtype /Link')
     })
 
@@ -264,23 +301,126 @@ describe('pdf writer', () => {
   })
 
   /*
-   * Only the figures. Everything else in a monospaced face sits somewhere
-   * deliberate: "Rp" is placed to the left of the total, the + and − have their
-   * own inset column so the arithmetic reads down the page, and the account
-   * number sits inside a box with its own padding. Asserting on every
-   * monospaced run makes those look like failures when they are the layout.
+   * The figures, which are the only text whose placement is arithmetic. The
+   * document has four right-aligned columns now — three in the ledger and one
+   * on each slip — so the old assertion that everything ends on the margin is
+   * no longer true and no longer the point. What is still true, and is what
+   * would break first, is that nothing ends past it.
    */
-  test('every figure ends exactly at the right margin', async () => {
+  test('no figure ends past the right margin', async () => {
     const s = await bytes(bill)
     const RIGHT = 595.28 - 48
     const ops = [...s.matchAll(/\/F[34] ([\d.]+) Tf 1 0 0 1 ([\d.]+) [\d.]+ Tm \(([\d.]+)\) Tj/g)]
-    // the two person totals, four item lines, two of them shared, and the
-    // PPN and Service lines
     expect(ops.length).toBeGreaterThan(6)
+
+    const edges = new Set<number>()
     for (const [, size, x, text] of ops) {
       const end = Number(x) + textWidth(text, Number(size))
-      expect(Math.abs(end - RIGHT)).toBeLessThan(0.5)
+      expect(end).toBeLessThanOrEqual(RIGHT + 0.5)
+      edges.add(Math.round(end))
     }
+
+    // And that they are columns rather than a ragged edge: the ledger's three
+    // money columns plus the slips' inset one.
+    expect(edges.size).toBeGreaterThanOrEqual(4)
+  })
+
+  /*
+   * The arithmetic the document claims. Each slip is checked against itself
+   * rather than recomputed, which is what catches a change to one of the two
+   * renderings and not the other — the same thing the design's own checker does
+   * against its HTML.
+   */
+  test('each slip adds up, and the ledger columns sum to its footer', async () => {
+    const s = await bytes(bill)
+
+    // Budi's slip, bounded by the next person's slip and not by their ledger
+    // row — the ledger comes first, so searching back from it gives an empty
+    // slice and a test that passes because it checked nothing.
+    const from = s.indexOf('(Nasi Goreng)')
+    const slip = s.slice(from, s.indexOf('(Sarah)', from))
+
+    // In the order they are drawn: the two items, the subtotal, the charge,
+    // the band.
+    const figures = [...slip.matchAll(/\(([\d.]+)\) Tj/g)].map((m) =>
+      Number(m[1].replace(/\./g, '')),
+    )
+    expect(figures).toHaveLength(5)
+
+    const [first, second, subtotal, charge, total] = figures
+    expect(first + second).toBe(subtotal)
+    expect(subtotal + charge).toBe(total)
+  })
+
+  /*
+   * The embedded face. Everything here is about the two places it can go
+   * quietly wrong: the object numbering, which is what the xref depends on, and
+   * the widths, which is what every right-aligned figure depends on.
+   */
+  describe('the embedded serif', () => {
+    const serifPdf = () => {
+      const pdf = new Pdf(font)
+      pdf.text('456.225', pdf.right, pdf.cursor, { size: 22, font: 'serif', align: 'right' })
+      return pdf
+    }
+
+    test('measures a proportional face, not a monospaced one', () => {
+      // 600 units for every digit and 278 for the stop, against Courier's flat
+      // 0.6em — if these ever come out equal the widths are not being read.
+      expect(serifWidth(font.metrics, '456.225', 22)).toBeCloseTo(85.32, 1)
+      expect(textWidth('456.225', 22)).toBeCloseTo(92.4, 1)
+      expect(font.metrics.widths).toHaveLength(LAST_CHAR - FIRST_CHAR + 1)
+    })
+
+    test('every character the writer emits has a glyph to measure', () => {
+      // The writer's WINANSI table maps these to bytes; a byte the font has no
+      // glyph for measures zero, and a figure on the same line is then placed
+      // as though the character were not there.
+      for (const code of [0x97, 0x96, 0x91, 0x92, 0x93, 0x94, 0x85, 0xb7, 0xd7, 0x2d, 0xbd]) {
+        const width = serifWidth(font.metrics, String.fromCharCode(code), 10)
+        expect(`${code.toString(16)}:${width > 0}`).toBe(`${code.toString(16)}:true`)
+      }
+    })
+
+    test('carries the font, its descriptor and its file', async () => {
+      const s = Buffer.from(await serifPdf().build().arrayBuffer()).toString('latin1')
+      expect(s).toContain('/Subtype /TrueType')
+      expect(s).toContain('/Encoding /WinAnsiEncoding')
+      expect(s).toContain('/FontFile2 11 0 R')
+      expect(s).toContain(`/Length1 ${fontBytes.length}`)
+      // The bytes really are in there, not a reference to something absent.
+      expect(s).toContain('/Flags 34')
+      expect(s.length).toBeGreaterThan(fontBytes.length)
+    })
+
+    test('the font objects do not disturb the xref', async () => {
+      const s = Buffer.from(await serifPdf().build().arrayBuffer()).toString('latin1')
+      const xrefAt = s.indexOf('\nxref\n') + 1
+      expect(Number(s.match(/startxref\n(\d+)/)?.[1])).toBe(xrefAt)
+
+      // one free entry, catalog, pages, four fonts, page, content, then the
+      // face: font, descriptor, file
+      const entries = [...s.slice(xrefAt).matchAll(/^(\d{10}) (\d{5}) [nf] $/gm)]
+      expect(entries.length).toBe(12)
+
+      entries.slice(1).forEach((entry, i) => {
+        expect(s.startsWith(`${i + 1} 0 obj`, Number(entry[1]))).toBe(true)
+      })
+      // Numbered past every page object, so adding a face cannot move one.
+      expect(s.startsWith('9 0 obj', Number(entries[9][1]))).toBe(true)
+    })
+
+    test('a right-aligned figure ends on the margin', async () => {
+      // The whole reason the widths are read at all. Asserted as arithmetic
+      // rather than against a constant, because the placement is the thing that
+      // would be wrong and the constant would have to be wrong with it.
+      const s = Buffer.from(await serifPdf().build().arrayBuffer()).toString('latin1')
+      const op = s.match(/\/F5 22 Tf 1 0 0 1 ([\d.]+) [\d.]+ Tm \((456\.225)\) Tj/)
+      expect(op).not.toBeNull()
+
+      const placed = Number(op![1])
+      expect(placed + serifWidth(font.metrics, '456.225', 22)).toBeCloseTo(595.28 - 48, 1)
+    })
   })
 
   /*
