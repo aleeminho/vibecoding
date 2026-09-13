@@ -1,0 +1,85 @@
+# Builds DUO and publishes it to GitHub Pages.
+#
+# Why this exists at all: DUO is a PWA meant to be installed to a phone and used
+# at a restaurant table. Serving it from a dev server on the laptop means the
+# app only works when the laptop is awake, on the same wifi, with the VPN off.
+# Pages is free and always on, and the parts that hold data — Supabase and its
+# Edge Function — are already hosted separately.
+#
+# Nothing here is a secret in the usual sense. The two VITE_ values are compiled
+# into the JavaScript that every visitor downloads, by design: the publishable
+# key is public and what protects the data is row level security. They are
+# repository VARIABLES rather than secrets for exactly that reason — a secret
+# would imply they are worth hiding, and the next person would treat them that
+# way. The real secrets (the DeepSeek key) live in Supabase and never come near
+# this workflow.
+
+name: Deploy DUO
+
+on:
+  push:
+    branches: [main]
+    # Only rebuild when the app or this workflow changes. A commit that only
+    # touches the root README should not spend a deploy.
+    paths:
+      - 'DUO/**'
+      - '.github/workflows/deploy-duo.yml'
+  # So a deploy can be kicked off by hand from the Actions tab.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. `cancel-in-progress` is false on purpose: a half-finished
+# Pages deploy can leave the site serving a partial build, and waiting is
+# cheaper than that.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        working-directory: DUO
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        working-directory: DUO
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          # Fail loudly rather than deploying an app that cannot reach its own
+          # database. Without these the build still succeeds and produces a
+          # bundle that shows "Supabase belum dikonfigurasi" on every screen —
+          # a green tick and a broken app, which is the worst kind of failure.
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "::error::VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY are not set."
+            echo "Set them under Settings -> Secrets and variables -> Actions -> Variables."
+            exit 1
+          fi
+          bun run build
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: DUO/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
