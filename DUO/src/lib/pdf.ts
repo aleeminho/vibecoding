@@ -330,6 +330,19 @@ export function buildNotaPdf(
   // payer's own page shows it, and that is one tap from here.
   const offersBank = bill.payment_method !== 'qris' && Boolean(bill.account_number)
 
+  /**
+   * Step down by `points`, breaking the page first if `needed` would not fit.
+   *
+   * The trap, and it has cost a render twice: `line(0, block)` tests the fit
+   * and then moves the cursor nowhere, which reads as "start a block here" and
+   * is not. A section that follows another section's text is sitting on that
+   * text's baseline until something moves it, so the leading gap has to be the
+   * first argument — `line(26, block + 26)` — and the `needed` has to include
+   * that gap, because the fit is measured before the move.
+   *
+   * Nothing in the output says any of this. Two blocks printed on top of each
+   * other are two well-formed blocks.
+   */
   const line = (points: number, needed = 0) => {
     // Break before a line that would not fit, not after one that already has.
     if (needed > 0 && pdf.remaining < needed) pdf.newPage()
