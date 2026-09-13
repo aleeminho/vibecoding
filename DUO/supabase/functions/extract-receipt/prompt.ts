@@ -149,7 +149,12 @@ Formatting rules for Indonesian receipts:
 - Numbers use a period as the thousands separator, not a decimal point. "15.000" means fifteen thousand rupiah. This is the single most common way to get every number on the receipt wrong by a factor of 1000, so apply it deliberately to every amount you read.
 - All amounts are whole rupiah. There are no cents or decimals. Never return a decimal number.
 - line_total is the printed total for that line, already multiplied by quantity if the receipt shows a multiplier.
-- Tax may be labeled "PPN", "Pajak", or "Pajak 11%".
+- Tax is printed under two different names in Indonesia and BOTH belong in the tax field:
+  "PPN" is the national VAT, usually 11%. "PB", "PB1", "PBJT" or "Pajak Restoran" is the local
+  restaurant tax, usually 10%. A receipt prints one of them, and occasionally both.
+  These are ordinary, expected labels. Do not record them in confidence_notes as if something
+  were unclear — a note there is reserved for numbers you genuinely could not read.
+- Tax may also be labeled "Pajak" or "Pajak 11%".
 - Service charge may be labeled "Service", "Svc", or "Service Charge".
 - Discount may be labeled "Diskon", "Disc", or "Potongan". Report it as a positive number representing the amount subtracted.
 - A rounding line may be labeled "Pembulatan". Report it exactly as printed, it can be negative.
