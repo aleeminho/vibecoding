@@ -1,0 +1,24 @@
+{
+  /**
+   * Typechecks the test files, which run under Bun rather than in a browser.
+   * Keeping this separate from tsconfig.app.json means `bun:test` resolves here
+   * without leaking Bun and Node globals into the app's type environment.
+   */
+  "extends": "@tsconfig/svelte/tsconfig.json",
+  "compilerOptions": {
+    "target": "es2023",
+    "module": "esnext",
+    "types": ["bun"],
+    "noEmit": true,
+    "moduleDetection": "force",
+    "allowJs": true,
+    /**
+     * The test script imports the Edge Function's prompt module, and Deno
+     * requires an explicit `.ts` extension on relative imports. Bun accepts
+     * both, so the extensions are written once and this flag keeps TypeScript
+     * happy rather than maintaining two import styles.
+     */
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.test.ts", "scripts/**/*.ts"]
+}

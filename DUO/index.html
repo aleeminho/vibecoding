@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <!--
+      Installing to the home screen is not cosmetic here. As a plain Safari tab,
+      iOS can evict a site's storage after a week without a visit — which for
+      this app means being signed out and having to log back in. Installed, the
+      session sticks.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <!--
+      No webfonts. Apple ships SF Pro with the OS and exposes it as
+      -apple-system, so loading a Google font was fighting the platform: on an
+      iPhone the system face is both the expected look and the one that renders
+      correctly at every size. It also removes two round trips to a third party
+      before the first paint, which matters on restaurant wifi.
+    -->
+
+    <!--
+      Mobile first: this is a PWA used on a phone at a restaurant table, not a
+      desktop app. viewport-fit=cover lets the layout reach the safe areas on a
+      notched iPhone; maximum-scale is left alone so pinch to zoom on a receipt
+      photo keeps working, which matters because zooming the photo is how the
+      operator checks a misread digit (section 11).
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0b0f19" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DUO" />
+    <meta name="description" content="Split bill otomatis dari foto struk" />
+
+    <title>DUO — Split Bill</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
