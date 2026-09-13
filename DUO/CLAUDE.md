@@ -1,7 +1,7 @@
 # DUO — split-bill PWA
 
-Photograph a receipt, assign items to people, get a per-person nota you can
-share as a PDF. Indonesian UI, one operator per account, a handful of friends
+Photograph a receipt, assign items to people, send the group a nota they can
+read and pay from. Indonesian UI, one operator per account, a handful of friends
 per bill. **Live at <https://splitfair.xyz>.**
 
 Read this before touching anything. It is the stuff that cost real time to
@@ -90,8 +90,10 @@ and a dark document is worse there.
   session.** `bills` is owner-scoped, so a reader with no account sees no rows —
   the RPC is the one door through, granted to anon on purpose, with the bill id
   as the credential, which is the same bet `payment_page` makes on `pay_token`.
-  Read it defensively for the same reason as everything else: if the migration
-  did not run, the function is missing and the whole page is an error.
+  **It is the one read with no defensive retry**, unlike the rule above: a
+  function's shape is fixed when it is created, so a column it names that does
+  not exist is a migration that did not run and should say so rather than
+  half-work.
 - **Every payment link is on that page, so they all travel together again.** One
   message to the group carries every Pay button in it. The operator knows the
   trade-off — the amount check at the other end is what catches a mis-tap.
@@ -116,12 +118,6 @@ and a dark document is worse there.
 - **`sum(integer)` returns `bigint`; `sum(bigint)` returns `numeric`.** So
   `create or replace view` refuses a definition that changes a column's type —
   `SQLSTATE 42P16`. Drop the view first.
-- **There is no PDF any more, and `pdf.ts` has not been told.** The writer,
-  `ttf.ts`, `nota-font.ts` and their tests are still in the tree and still pass,
-  and nothing the app ships calls any of them — the nota became a link and the
-  print path went with it. So a green `bun run test` says nothing about the nota,
-  and those green tests are not coverage of anything live. Delete the four files
-  and `public/fonts/plex-serif-600.ttf` when convenient.
 
 ---
 
