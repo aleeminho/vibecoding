@@ -33,12 +33,7 @@
 
 import { readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
-import { GoogleGenAI } from '@google/genai'
-import {
-  EXTRACTION_SCHEMA,
-  MODEL,
-  PROMPT,
-} from '../supabase/functions/extract-receipt/prompt.ts'
+import { MODEL, PROMPT } from '../supabase/functions/extract-receipt/prompt.ts'
 import { normalizeExtraction, stripCodeFence } from '../src/lib/normalize.ts'
 import { checkGate1, checkGate2, computeSplit } from '../src/lib/split.ts'
 import type { AssignedItem } from '../src/lib/types.ts'
@@ -125,13 +120,13 @@ if (!path) {
   fail('Kasih path foto struk-nya. Contoh: bun run test:extract receipt.jpg')
 }
 
-const apiKey = process.env.GEMINI_API_KEY
+const apiKey = process.env.DEEPSEEK_API_KEY
 if (!apiKey) {
   fail(
-    'GEMINI_API_KEY kosong.\n' +
+    'DEEPSEEK_API_KEY kosong.\n' +
       '        Isi di .env.local, satu baris:\n' +
-      '          GEMINI_API_KEY=...\n\n' +
-      '        Key dari aistudio.google.com (Google AI Studio).\n\n' +
+      '          DEEPSEEK_API_KEY=...\n\n' +
+      '        Key dari platform.deepseek.com -> API keys.\n\n' +
       '        Kalau lu udah isi tapi masih muncul ini, pastiin lu jalanin dari\n' +
       '        root project (bun otomatis baca .env.local dari folder kerja).',
   )
@@ -170,68 +165,95 @@ const name = basename(path)
 const fixture = FIXTURES[name]
 
 console.log(`\nFoto    : ${name}`)
-console.log(`Model   : ${MODEL} (Gemini)`)
+console.log(`Model   : ${MODEL} (DeepSeek)`)
 if (fixture) console.log(`Fixture : ${fixture.note}`)
 else console.log('Fixture : (nggak ada patokan buat file ini, cuma cek jalur + gate)')
 console.log(`Ukuran  : ${(bytes.length / 1024).toFixed(0)} KB\n`)
-
-const ai = new GoogleGenAI({ apiKey })
 
 console.log('Manggil model...')
 const started = Date.now()
 
 /**
- * The API's own error message is the actionable part, so print that rather than
- * a stack trace. Wrapping it in a function also keeps the response type
- * inferred, which an explicit annotation on an overloaded method gets wrong.
+ * One call, mirroring the Edge Function's request block field for field.
+ *
+ * It is duplicated rather than imported because the function is a Deno module
+ * with a `Deno.serve` call at the bottom; importing it would start a server.
+ * The parts that matter — the model id, the prompt and therefore the schema —
+ * all come from prompt.ts, so the two cannot disagree about the contract. Only
+ * the transport is written twice.
  */
-async function callModel() {
+async function callModel(): Promise<string> {
+  let res: Response
   try {
-    return await ai.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { inlineData: { mimeType: mediaType, data: image } },
-            { text: PROMPT },
-          ],
-        },
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: EXTRACTION_SCHEMA,
-        maxOutputTokens: 8192,
-      },
+    res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'image_url', image_url: { url: `data:${mediaType};base64,${image}` } },
+              { type: 'text', text: PROMPT },
+            ],
+          },
+        ],
+        response_format: { type: 'json_object' },
+        // Reasoning tokens count against this. Too small and the model returns
+        // 200 with an empty string, which reads as success.
+        max_tokens: 8192,
+      }),
+      signal: AbortSignal.timeout(120_000),
     })
   } catch (err) {
-    const e = err as { status?: number; message?: string }
-    console.error('\n  FAIL  Request ke Gemini API ditolak.')
-    if (e.status) console.error(`        HTTP ${e.status}`)
-    if (e.message) console.error(`        ${e.message}`)
-    if (e.status === 403) {
-      console.error(
-        '\n        Key salah, atau Generative Language API belum diaktifkan\n' +
-          '        di project Google itu.',
-      )
+    console.error('\n  FAIL  Nggak bisa nyambung ke DeepSeek.')
+    console.error(`        ${(err as Error).message}\n`)
+    process.exit(1)
+  }
+
+  const raw = await res.text()
+
+  if (!res.ok) {
+    console.error('\n  FAIL  Request ke DeepSeek ditolak.')
+    console.error(`        HTTP ${res.status}`)
+    console.error(`        ${raw.slice(0, 400)}`)
+    if (res.status === 401) {
+      console.error('\n        Key salah, dicabut, atau saldonya habis.')
     }
     console.error('')
     process.exit(1)
   }
+
+  const body = JSON.parse(raw) as {
+    choices?: { message?: { content?: string }; finish_reason?: string }[]
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+  }
+
+  const choice = body.choices?.[0]
+  if (choice?.finish_reason === 'length') fail('Output kepotong (max_tokens).')
+
+  const content = choice?.message?.content
+  if (!content) {
+    fail(
+      'Model balikin 200 tapi teksnya kosong.\n' +
+        '        Ini khas model reasoning: token-nya kepake buat mikir dulu,\n' +
+        '        jadi nggak sisa buat nulis jawabannya. Naikin max_tokens.',
+    )
+  }
+
+  if (body.usage) {
+    console.log(
+      `Token   : ${body.usage.prompt_tokens} masuk, ${body.usage.completion_tokens} keluar`,
+    )
+  }
+
+  return content
 }
 
-const response = await callModel()
+const text = await callModel()
 const elapsed = ((Date.now() - started) / 1000).toFixed(1)
 console.log(`Selesai dalam ${elapsed}s\n`)
-
-const finish = response.candidates?.[0]?.finishReason
-if (finish === 'SAFETY' || finish === 'PROHIBITED_CONTENT' || finish === 'RECITATION') {
-  fail('Model menolak memproses gambar ini.')
-}
-if (finish === 'MAX_TOKENS') fail('Output kepotong (maxOutputTokens).')
-
-const text = response.text
-if (!text) fail('Model nggak balikin teks.')
 
 console.log('--- Teks mentah dari model ---')
 console.log(
@@ -357,12 +379,6 @@ if (fixture) {
     }
   }
   ok(`semua ${expectedNames.length} nama item ketemu`)
-}
-
-if (response.usageMetadata) {
-  console.log('\n--- Pemakaian token ---')
-  console.log(`  input  : ${response.usageMetadata.promptTokenCount}`)
-  console.log(`  output : ${response.usageMetadata.candidatesTokenCount}`)
 }
 
 console.log(`\n  LULUS — ${elapsed}s\n`)

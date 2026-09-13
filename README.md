@@ -40,7 +40,7 @@ dan `bun run test:extract` langsung dapat nilainya.
 |---|---|
 | `VITE_SUPABASE_URL` | Supabase dashboard → Settings → API |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | idem, yang berawalan `sb_publishable_` |
-| `GEMINI_API_KEY` | aistudio.google.com (Google AI Studio) |
+| `DEEPSEEK_API_KEY` | platform.deepseek.com → API keys |
 
 ### Kenapa aman nyampur dua jenis key di satu file
 
@@ -49,14 +49,14 @@ Bedanya **awalan `VITE_`**, dan itu bukan kosmetik:
 - **`VITE_...`** → Vite nge-inject ke bundle browser. Kedua key Supabase emang
   dirancang publik; yang melindungi data adalah row level security, bukan
   kerahasiaan key-nya.
-- **Tanpa `VITE_`** (kayak `GEMINI_API_KEY`) → **nggak pernah masuk bundle.**
+- **Tanpa `VITE_`** (kayak `DEEPSEEK_API_KEY`) → **nggak pernah masuk bundle.**
 
 Yang terakhir itu udah gue verifikasi, bukan asumsi: nilai canary ditaruh di
 `.env.local` sebagai var non-`VITE_`, `bun run build`, lalu `dist/` di-grep —
 **nggak ketemu**. Sementara publishable key ketemu, yang berarti grep-nya emang
 jalan dan hasilnya bukan false negative.
 
-> **Jangan pernah kasih awalan `VITE_` ke `GEMINI_API_KEY`.** Begitu dikasih,
+> **Jangan pernah kasih awalan `VITE_` ke `DEEPSEEK_API_KEY`.** Begitu dikasih,
 > dia ikut ke bundle dan siapa pun yang buka devtools bisa nyolong.
 >
 > Dan jangan pernah taruh secret key Supabase (`sb_secret_...`) atau
@@ -213,7 +213,7 @@ sebagai assertion yang gagal, bukan sebagai angka salah yang keliatan masuk akal
 Pakai key yang sama dengan yang di `.env.local` — tinggal copy nilainya:
 
 ```bash
-bunx supabase secrets set GEMINI_API_KEY=...
+bunx supabase secrets set DEEPSEEK_API_KEY=...
 bunx supabase functions deploy extract-receipt
 ```
 

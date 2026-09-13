@@ -1,15 +1,16 @@
 /**
  * Turn whatever the model returned into a trustworthy `Extraction`.
  *
- * This module was born when the app ran on DeepSeek, which had no schema
+ * This module was born when the app first ran on DeepSeek, which had no schema
  * enforcement at all: the prompt described the shape and the model was asked
- * nicely. It is now on Gemini, which does enforce a schema at the API level, so
- * this is no longer the only line of defence — but it stays, and it stays
- * tested, for two reasons:
+ * nicely. Gemini came next and did enforce a schema at the API level, which
+ * briefly made this a backstop. The app is now on DeepSeek again, which has no
+ * such mode — so this is once more the ONLY structural defence between the
+ * model's answer and the database.
  *
- *   1. It is cheap. The cost is a few microseconds on one call per receipt.
- *   2. The provider has changed twice already in this project's short life.
- *      Anything that makes the app resilient to that is worth its weight.
+ * That is a promotion, not a formality. The unit tests below are no longer
+ * reassurance about a path that mostly cannot be reached; they are the thing
+ * standing between a malformed answer and a wrong bill.
  *
  * It is not the same job as the gates in split.ts. The gates check whether the
  * receipt's numbers make sense. This checks whether the object is even shaped
@@ -172,9 +173,10 @@ export function normalizeExtraction(raw: unknown): Extraction {
 /**
  * Strip a markdown code fence if the model wrapped its JSON in one.
  *
- * Gemini's responseSchema should make bare JSON a guarantee rather than a hope,
- * but a fence costs nothing to tolerate and a failed parse costs a whole
- * capture. Kept from the DeepSeek detour, where it was load bearing. Only the
+ * DeepSeek's `json_object` mode guarantees valid JSON but says nothing about
+ * whether the model wrapped it in a fence anyway — that mode constrains the
+ * content of the answer, not the model's habit of annotating it. A fence costs
+ * nothing to tolerate and a failed parse costs a whole capture. Only the
  * outermost fence is removed.
  */
 export function stripCodeFence(text: string): string {

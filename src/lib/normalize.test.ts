@@ -1,11 +1,11 @@
 /**
  * Tests for the normalizer.
  *
- * This module was born as the replacement for API-level schema enforcement,
- * during the DeepSeek detour where there was none. Gemini has since restored
- * that guarantee, so the normalizer is now defence in depth rather than the
- * only line — and it is still tested this thoroughly for exactly that reason:
- * the provider has changed twice in this project's short life.
+ * The normalizer was born as the replacement for API-level schema enforcement,
+ * because the provider at the time had none. Gemini briefly restored that
+ * guarantee and made this a backstop. The app is back on DeepSeek, which has no
+ * schema mode — so these tests are once more the only thing standing between a
+ * malformed model answer and a wrong amount owed by a real person.
  *
  * The tests that matter most are the ugly ones: a missing field, a number sent
  * as a formatted string, a code fence, a wrong sign. Each of those would

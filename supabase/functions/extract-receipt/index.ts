@@ -16,12 +16,31 @@
  * therefore never corrupt a bill — at worst it returns text the client rejects.
  *
  * Deploy:
- *   supabase secrets set GEMINI_API_KEY=...
+ *   supabase secrets set DEEPSEEK_API_KEY=...
  *   supabase functions deploy extract-receipt
  */
 
-import { GoogleGenAI } from 'npm:@google/genai'
-import { EXTRACTION_SCHEMA, MODEL, PROMPT } from './prompt.ts'
+import { MODEL, PROMPT } from './prompt.ts'
+
+/**
+ * A receipt is dense small text read off a phone photo at an angle, and the
+ * model spends tokens thinking before it writes any of them.
+ *
+ * This is not a value to trim. `deepseek-flash` is a reasoning model and its
+ * reasoning tokens count against the cap, so a cap that looks generous for the
+ * JSON alone can be consumed entirely by the thinking — returning HTTP 200,
+ * `finish_reason: "stop"`, and an empty string. Measured on a trivial receipt:
+ * ~90-160 reasoning tokens for two fields, so a full bill is a few thousand.
+ */
+const MAX_TOKENS = 8192
+
+/**
+ * How long to wait before giving up. Reasoning makes this slower than a plain
+ * completion; a receipt that takes longer than this is not coming back.
+ */
+const TIMEOUT_MS = 90_000
+
+const API_URL = 'https://api.deepseek.com/chat/completions'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -98,12 +117,12 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'Harus login dulu.' }, 401)
   }
 
-  const apiKey = Deno.env.get('GEMINI_API_KEY')
+  const apiKey = Deno.env.get('DEEPSEEK_API_KEY')
   if (!apiKey) {
     return json(
       {
         error:
-          'GEMINI_API_KEY belum di-set di Edge Function secrets. Jalankan: supabase secrets set GEMINI_API_KEY=...',
+          'DEEPSEEK_API_KEY belum di-set di Edge Function secrets. Jalankan: supabase secrets set DEEPSEEK_API_KEY=...',
       },
       500,
     )
@@ -125,76 +144,104 @@ Deno.serve(async (req: Request) => {
     )
   }
 
-  const ai = new GoogleGenAI({ apiKey })
-
+  let response: Response
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            // Image first, instruction second. The other order works too, but
-            // this is the convention for vision models and it is what the
-            // receipt fixtures were validated against.
-            { inlineData: { mimeType: mediaType, data: image } },
-            { text: PROMPT },
-          ],
-        },
-      ],
-      config: {
-        // API-level schema enforcement. The model cannot return a missing
-        // field, a decimal, or a markdown fence — which is the guarantee the
-        // DeepSeek detour lost and this restores.
-        responseMimeType: 'application/json',
-        responseSchema: EXTRACTION_SCHEMA,
-
-        // A receipt is dense small text read off a phone photo at an angle.
-        // The default cap is generous but this is not a place to save tokens.
-        maxOutputTokens: 8192,
+    response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
       },
-    })
-
-    const finish = response.candidates?.[0]?.finishReason
-    if (finish === 'SAFETY' || finish === 'PROHIBITED_CONTENT' || finish === 'RECITATION') {
-      return json({ error: 'Model menolak memproses gambar ini.' }, 422)
-    }
-    if (finish === 'MAX_TOKENS') {
-      return json(
-        { error: 'Output kepotong (maxOutputTokens). Struknya kemungkinan terlalu panjang.' },
-        502,
-      )
-    }
-
-    // `text` is a property on the current SDK, not a method. It is undefined
-    // rather than throwing when there are no candidates at all.
-    const text = response.text
-    if (!text) {
-      return json({ error: 'Model tidak mengembalikan teks sama sekali.' }, 502)
-    }
-
-    // The raw text goes back as-is. Stripping fences, parsing and validating the
-    // shape all happen on the client, in one tested place.
-    return json({
-      text,
-      model: MODEL,
-      usage: response.usageMetadata
-        ? {
-            input_tokens: response.usageMetadata.promptTokenCount,
-            output_tokens: response.usageMetadata.candidatesTokenCount,
-          }
-        : null,
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: 'user',
+            content: [
+              // Image first, instruction second. The other order works too, but
+              // this is the convention for vision models and it is what the
+              // receipt fixtures were validated against.
+              { type: 'image_url', image_url: { url: `data:${mediaType};base64,${image}` } },
+              { type: 'text', text: PROMPT },
+            ],
+          },
+        ],
+        // Valid JSON, guaranteed. Its SHAPE is not — this provider has no
+        // json_schema mode ("This response_format type is unavailable now" on
+        // both models), which is why the schema is in the prompt and why
+        // normalize.ts is load bearing rather than a backstop.
+        response_format: { type: 'json_object' },
+        max_tokens: MAX_TOKENS,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     })
   } catch (err) {
-    const e = err as { status?: number; message?: string }
-    const status = e.status ?? 502
-    // A 400 from Gemini is almost always a bad request shape rather than a bad
-    // key; 403 is the one that means the key is missing, wrong, or not enabled
-    // for this API. Naming that saves a confusing round of guessing.
-    const hint =
-      status === 403
-        ? ' (key salah, atau Generative Language API belum diaktifkan di project Google itu)'
-        : ''
-    return json({ error: `Gemini API error: ${e.message ?? String(err)}${hint}` }, status)
+    const name = (err as Error).name
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      return json({ error: 'Model nggak jawab dalam 90 detik. Coba lagi.' }, 504)
+    }
+    return json({ error: `Nggak bisa nyambung ke DeepSeek: ${(err as Error).message}` }, 502)
   }
+
+  const raw = await response.text()
+
+  if (!response.ok) {
+    // 401 is the one worth naming: it means the key itself, and it is the exact
+    // failure that made this provider unusable the first time round.
+    const hint =
+      response.status === 401
+        ? ' (key DeepSeek salah, dicabut, atau saldonya habis)'
+        : response.status === 402
+          ? ' (saldo DeepSeek habis)'
+          : ''
+    return json(
+      { error: `DeepSeek API error ${response.status}: ${raw.slice(0, 300)}${hint}` },
+      response.status === 401 || response.status === 402 ? 502 : response.status,
+    )
+  }
+
+  let body: {
+    choices?: { message?: { content?: string }; finish_reason?: string }[]
+    usage?: { prompt_tokens?: number; completion_tokens?: number }
+  }
+  try {
+    body = JSON.parse(raw)
+  } catch {
+    return json({ error: `Jawaban DeepSeek bukan JSON: ${raw.slice(0, 300)}` }, 502)
+  }
+
+  const choice = body.choices?.[0]
+
+  if (choice?.finish_reason === 'length') {
+    return json(
+      { error: 'Output kepotong (max_tokens). Struknya kemungkinan terlalu panjang.' },
+      502,
+    )
+  }
+
+  const text = choice?.message?.content
+
+  // Empty content with a 200 is the failure mode this model actually produces:
+  // reasoning tokens ate the whole budget, so the call "succeeded" with nothing
+  // in it. Reported as what it is rather than passed downstream as an empty
+  // string for the parser to choke on.
+  if (!text) {
+    return json(
+      {
+        error:
+          'Model nggak nulis apa-apa (token-nya kepake buat reasoning). Coba lagi, atau naikin max_tokens.',
+      },
+      502,
+    )
+  }
+
+  // The raw text goes back as-is. Stripping fences, parsing and validating the
+  // shape all happen on the client, in one tested place.
+  return json({
+    text,
+    model: MODEL,
+    usage: body.usage
+      ? { input_tokens: body.usage.prompt_tokens, output_tokens: body.usage.completion_tokens }
+      : null,
+  })
 })
