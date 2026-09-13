@@ -1,0 +1,688 @@
+<script lang="ts">
+  /**
+   * Review and Assign. Spec section 11.
+   *
+   * The screen the whole app exists to produce, and deliberately the largest
+   * piece of UI: it exists because the model is allowed to be wrong and a human
+   * has to decide it is right.
+   *
+   * Three rules from the spec shape it:
+   *
+   *   1. The photo is reachable the whole time. A reviewer who cannot see the
+   *      evidence cannot review anything.
+   *   2. Every extracted value is editable. Reviewing without the ability to
+   *      correct is not reviewing.
+   *   3. The commit is disabled until the gates pass, and says which one is
+   *      failing.
+   *
+   * On layout, which has been through several answers. The constant is that
+   * ASSIGNING is the only actual work here; everything else is checking. An
+   * item gets its own card, because an item is the unit of work and a card is
+   * somewhere to mark the ones nobody has claimed yet. The bill's own numbers
+   * stay folded behind the summary row, because they are right almost every
+   * time.
+   */
+  import { onMount } from 'svelte'
+  import MoneyInput from '../components/MoneyInput.svelte'
+  import { draft } from '../lib/draft.svelte'
+  import { rupiah, formatDate } from '../lib/format'
+  import { checkGates, computeSplit } from '../lib/split'
+  import { commitBill, findOwnerId, listKnownPeople, nextRefCode, uploadReceipt } from '../lib/api'
+  import type { KnownPerson } from '../lib/api'
+  import type { Extraction, GateReport } from '../lib/types'
+
+  let { onDone }: { onDone: () => void } = $props()
+
+  const NO_BILL: GateReport = {
+    passed: false,
+    failures: [{ gate: 0, message: 'Belum ada struk.' }],
+  }
+
+  let ext = $derived(draft.extraction)
+  let items = $derived(draft.items)
+  let roster = $derived(draft.roster)
+
+  /** Gate 0 lets subtotal be null: when the receipt does not print one, the items are the truth. */
+  let subtotal = $derived(
+    ext?.subtotal ?? items.reduce((acc, item) => acc + item.line_total, 0),
+  )
+
+  let gates = $derived(ext ? checkGates({ ...ext, subtotal }, items, roster) : NO_BILL)
+
+  let split = $derived.by(() => {
+    if (!ext || !gates.passed) return null
+    try {
+      return computeSplit(items, subtotal, ext.discount, ext.tax, ext.service_charge, ext.total, roster)
+    } catch (err) {
+      return { error: (err as Error).message }
+    }
+  })
+
+  let shares = $derived(split && 'participants' in split ? split.participants : null)
+  let splitError = $derived(split && 'error' in split ? split.error : null)
+  let shareSum = $derived(shares?.reduce((acc, p) => acc + p.amount_owed, 0) ?? 0)
+  let gap = $derived(ext ? ext.total - shareSum : 0)
+
+  /**
+   * Failures worth repeating in the commit bar: the ones that mean something is
+   * actually incorrect. An empty roster and an unassigned item are work not yet
+   * done, and for those the button carries the next step instead.
+   */
+  let blockers = $derived(gates.failures.filter((failure) => !failure.pending))
+  let unassigned = $derived(items.filter((item) => item.assigned_to.length === 0))
+
+  let known = $state<KnownPerson[]>([])
+  let suggestions = $derived(known.filter((k) => !roster.includes(k.person)))
+
+  let openItem = $state<number | null>(null)
+  let newPerson = $state('')
+  let photoOpen = $state(false)
+  let numbersOpen = $state(false)
+
+  let committing = $state(false)
+  let commitError = $state<string | null>(null)
+  let committed = $state<string | null>(null)
+
+  /**
+   * What the operator should do next, written on the button itself. A disabled
+   * button reading "Belum bisa disimpan" says someone is stuck without saying
+   * where; the next step is strictly more useful than the current problem.
+   */
+  let commitLabel = $derived.by(() => {
+    if (committing) return 'Menyimpan…'
+    if (splitError) return 'Angka belum balance'
+    if (blockers.length > 0) return 'Ada yang perlu dibenerin'
+    if (roster.length === 0) return 'Tambahin orang dulu'
+    if (unassigned.length > 0) return `Bagi ${unassigned.length} item lagi`
+    return 'Simpan'
+  })
+
+  onMount(async () => {
+    try {
+      known = await listKnownPeople()
+    } catch {
+      known = []
+    }
+  })
+
+  function addPerson(event: SubmitEvent) {
+    event.preventDefault()
+    draft.addPerson(newPerson)
+    newPerson = ''
+  }
+
+  function patchHeader(patch: Partial<Extraction>) {
+    draft.updateHeader(patch)
+  }
+
+  async function commit() {
+    if (!ext || !shares || !gates.passed || committing) return
+
+    committing = true
+    commitError = null
+
+    try {
+      const ownerId = await findOwnerId()
+      const refCode = await nextRefCode(ext.date!)
+
+      let receiptPath: string | null = null
+      if (draft.photo) {
+        const blob = await fetch(draft.photo.dataUrl).then((r) => r.blob())
+        receiptPath = await uploadReceipt(ownerId, refCode, blob)
+      }
+
+      await commitBill({
+        refCode,
+        place: ext.place!,
+        billDate: ext.date!,
+        subtotal,
+        discount: ext.discount,
+        tax: ext.tax,
+        serviceCharge: ext.service_charge,
+        roundingAdjustment: ext.rounding_adjustment,
+        total: ext.total,
+        items,
+        participants: shares,
+        receiptPath,
+        notes: draft.notes.trim() || null,
+        extraction: ext,
+      })
+
+      committed = refCode
+    } catch (err) {
+      commitError = (err as Error).message
+    } finally {
+      committing = false
+    }
+  }
+
+  function finish() {
+    draft.reset()
+    onDone()
+  }
+</script>
+
+{#if committed}
+  <div class="done">
+    <div class="done-mark">✓</div>
+    <h2>Tersimpan</h2>
+    <p class="dim num">{committed}</p>
+    <button class="primary full" onclick={finish}>Selesai</button>
+  </div>
+{:else if !ext}
+  <p class="empty dim">Nggak ada struk yang lagi diproses.</p>
+{:else}
+  <div class="screen">
+    {#if ext.confidence_notes}
+      <div class="group">
+        <div class="list tint-warn">
+          <div class="row notice-row">
+            <span class="warn">⚠</span>
+            <span class="notice-text">{ext.confidence_notes}</span>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- The bill itself. One row, and a way in to correct it. -->
+    <div class="group">
+      <div class="list">
+        <button class="row tappable" onclick={() => (numbersOpen = !numbersOpen)}>
+          {#if draft.photo}
+            <img class="thumb" src={draft.photo.dataUrl} alt="" />
+          {/if}
+          <div class="stack">
+            <span class="strong">{ext.place ?? 'Tanpa nama'}</span>
+            <span class="dim small">
+              {ext.date ? formatDate(ext.date) : 'Tanggal belum diisi'} · {rupiah(ext.total)}
+            </span>
+          </div>
+          <span class="chevron"></span>
+        </button>
+
+        {#if numbersOpen}
+          <div class="fields">
+            <label>
+              <span class="field-label">Tempat</span>
+              <input
+                type="text"
+                value={ext.place ?? ''}
+                oninput={(e) => patchHeader({ place: e.currentTarget.value })}
+              />
+            </label>
+            <label>
+              <span class="field-label">Tanggal</span>
+              <input
+                type="date"
+                value={ext.date ?? ''}
+                oninput={(e) => patchHeader({ date: e.currentTarget.value })}
+              />
+            </label>
+
+            <div class="grid">
+              <MoneyInput label="Subtotal" value={subtotal} onchange={(v) => patchHeader({ subtotal: v })} />
+              <MoneyInput label="Diskon" value={ext.discount} onchange={(v) => patchHeader({ discount: v })} />
+              <MoneyInput label="PPN" value={ext.tax} onchange={(v) => patchHeader({ tax: v })} />
+              <MoneyInput label="Service" value={ext.service_charge} onchange={(v) => patchHeader({ service_charge: v })} />
+              <MoneyInput label="Pembulatan" value={ext.rounding_adjustment} onchange={(v) => patchHeader({ rounding_adjustment: v })} />
+              <MoneyInput label="Total" value={ext.total} onchange={(v) => patchHeader({ total: v })} />
+            </div>
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    {#if photoOpen && draft.photo}
+      <div class="group">
+        <img class="photo-full" src={draft.photo.dataUrl} alt="Struk" />
+        <button class="plain full" onclick={() => (photoOpen = false)}>Tutup foto</button>
+      </div>
+    {:else if draft.photo}
+      <div class="group">
+        <div class="list">
+          <button class="row tappable" onclick={() => (photoOpen = true)}>
+            <span>Lihat foto struk</span>
+            <span class="chevron"></span>
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- The work. Everything above is checking; this is doing. -->
+    <h3 class="group-title">Bagi ke siapa</h3>
+    <div class="group">
+      <div class="list" class:tint-ok={unassigned.length === 0} class:tint-warn={unassigned.length > 0}>
+        <div class="row">
+          {#if unassigned.length === 0}
+            <span class="ok">Semua {items.length} item udah dibagi</span>
+          {:else}
+            <span class="warn">{unassigned.length} dari {items.length} item belum dibagi</span>
+          {/if}
+        </div>
+      </div>
+    </div>
+
+    <!--
+      One card per item, which is how the original design laid this out.
+
+      It is not only cosmetic: an item is the unit of work here, and giving each
+      one its own surface means the unassigned ones can be marked with a left
+      accent bar and found by scanning down the left edge instead of read one by
+      one. A single list of rows gives nowhere to put that.
+    -->
+    <div class="items">
+      {#each items as item (item.position)}
+        {@const isOpen = openItem === item.position}
+        {@const empty = item.assigned_to.length === 0}
+        <div class="list item" class:unassigned={empty}>
+          <button class="row tappable" onclick={() => (openItem = isOpen ? null : item.position)}>
+            <div class="stack">
+              <span class="strong">{item.name}</span>
+              {#if empty}
+                <span class="warn small">Belum dibagi</span>
+              {:else}
+                <span class="small assignees">
+                  {item.assigned_to.join(', ')}{#if item.assigned_to.length > 1}<span
+                      class="faint"
+                    >
+                      · dibagi {item.assigned_to.length}</span
+                    >{/if}
+                </span>
+              {/if}
+            </div>
+            <span class="row-value num">{rupiah(item.line_total)}</span>
+            <span class="chevron"></span>
+          </button>
+
+          {#if isOpen}
+            <div class="fields">
+              <div class="grid-2">
+                <label>
+                  <span class="field-label">Nama</span>
+                  <input
+                    type="text"
+                    value={item.name}
+                    oninput={(e) => draft.updateItem(item.position, { name: e.currentTarget.value })}
+                  />
+                </label>
+                <MoneyInput
+                  value={item.line_total}
+                  onchange={(v) => draft.updateItem(item.position, { line_total: v })}
+                />
+              </div>
+
+              <div class="picks">
+                {#each roster as person (person)}
+                  <button
+                    class="pick"
+                    class:on={item.assigned_to.includes(person)}
+                    onclick={() => draft.toggleAssignee(item.position, person)}
+                  >
+                    {person}
+                  </button>
+                {/each}
+                {#if roster.length === 0}
+                  <span class="faint small">Tambahin orangnya dulu di bawah.</span>
+                {/if}
+              </div>
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+
+    <h3 class="group-title">Orang</h3>
+    <div class="group">
+      <div class="list">
+        {#if roster.length > 0}
+          <div class="row wrap">
+            {#each roster as person (person)}
+              <button class="pick on" onclick={() => draft.removePerson(person)}>
+                {person}<span class="x">×</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+
+        <form class="row add" onsubmit={addPerson}>
+          <input type="text" placeholder="Nama" autocomplete="off" bind:value={newPerson} />
+          <button class="tinted" type="submit" disabled={!newPerson.trim()}>Tambah</button>
+        </form>
+
+        {#if suggestions.length > 0}
+          <div class="row wrap suggest">
+            <span class="field-label full-width">Sering bareng</span>
+            {#each suggestions as person (person.person)}
+              <button class="pick" onclick={() => draft.addPerson(person.person)}>
+                {person.person}<span class="faint count">{person.bill_count}×</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+
+    {#if shares}
+      <h3 class="group-title">Hasil</h3>
+      <div class="group">
+        <div class="list">
+          {#each shares as share (share.person)}
+            <div class="row share">
+              <div class="stack">
+                <span class="strong">{share.person}</span>
+                <span class="faint small num">
+                  {rupiah(share.item_subtotal)}
+                  {#if share.discount_share > 0}− {rupiah(share.discount_share)}{/if}
+                  + {rupiah(share.tax_share)} + {rupiah(share.service_share)}
+                </span>
+              </div>
+              <span class="row-value strong num">{rupiah(share.amount_owed)}</span>
+            </div>
+          {/each}
+          <div class="row">
+            <span class={gap === 0 ? 'ok' : 'error'}>
+              {gap === 0 ? 'Pas — sama dengan total struk' : 'Selisih'}
+            </span>
+            <span class="row-value num">{gap === 0 ? rupiah(ext.total) : rupiah(gap)}</span>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <div class="group">
+      <div class="list">
+        <div class="row">
+          <input
+            class="bare"
+            type="text"
+            placeholder="Catatan (opsional)"
+            value={draft.notes}
+            oninput={(e) => (draft.notes = e.currentTarget.value)}
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    Above the tab bar, not under it: the tab bar is sticky to the same edge and
+    comes later in the DOM, so without the offset it paints over the commit
+    button — the most important control on the screen, invisible, with nothing
+    to indicate it is there.
+  -->
+  <footer class="commit-bar">
+    {#if splitError}
+      <p class="blocker error">{splitError}</p>
+    {/if}
+    {#each blockers as failure, i (i)}
+      <p class="blocker error">{failure.message}</p>
+    {/each}
+    {#if commitError}
+      <p class="blocker error">{commitError}</p>
+    {/if}
+
+    <button
+      class="primary full"
+      disabled={!gates.passed || !!splitError || committing}
+      onclick={commit}
+    >
+      {commitLabel}
+    </button>
+  </footer>
+{/if}
+
+<style>
+  .screen {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    padding-bottom: 8px;
+  }
+
+  .group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* ---- rows ---- */
+
+  .strong {
+    font-weight: 600;
+  }
+
+  .small {
+    font-size: var(--text-sm);
+  }
+
+  .row.wrap {
+    flex-wrap: wrap;
+  }
+
+  /* One card per item, with a gap between them. */
+  .items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 16px;
+  }
+
+  .item {
+    position: relative;
+  }
+
+  /*
+   * An unassigned item gets an accent bar down its left edge.
+   *
+   * Drawn rather than set as a border-left, because a border on a rounded
+   * rectangle tapers into the corners and reads as a rendering mistake. Inset
+   * from the top and bottom, it reads as a deliberate marker.
+   */
+  .item.unassigned::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 16px;
+    bottom: 16px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--brand);
+  }
+
+  .thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 6px;
+    object-fit: cover;
+    object-position: top;
+    background: #000;
+    flex-shrink: 0;
+  }
+
+  .notice-row {
+    align-items: flex-start;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .notice-text {
+    font-size: var(--text-sm);
+    color: var(--warn);
+  }
+
+  .assignees {
+    color: var(--brand-light);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .photo-full {
+    width: 100%;
+    max-height: 70dvh;
+    object-fit: contain;
+    border-radius: var(--radius);
+    background: #000;
+  }
+
+  /* ---- inline editors ---- */
+
+  .fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 16px 16px;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .field-label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--label-2);
+    margin-bottom: 6px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 120px;
+    gap: 12px;
+  }
+
+  .full-width {
+    width: 100%;
+  }
+
+  /* ---- person picker ---- */
+
+  .picks,
+  .suggest {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .suggest {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pick {
+    min-height: 34px;
+    border-radius: 999px;
+    padding: 0 14px;
+    font-size: var(--text-sm);
+    background: rgba(255, 255, 255, 0.09);
+    color: var(--label);
+  }
+
+  .pick:active:not(:disabled) {
+    opacity: 0.7;
+  }
+
+  .pick.on {
+    background: var(--brand);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .x {
+    opacity: 0.75;
+    margin-left: 6px;
+  }
+
+  .count {
+    margin-left: 6px;
+    font-size: 12px;
+  }
+
+  /* ---- add person ---- */
+
+  .add {
+    display: flex;
+    gap: 8px;
+  }
+
+  .add button {
+    flex-shrink: 0;
+  }
+
+  /* A field with no chrome, for a row that is itself the input. */
+  .bare {
+    background: none;
+    padding: 0;
+    min-height: auto;
+    border-radius: 0;
+  }
+
+  .bare:focus {
+    outline: none;
+  }
+
+  /* ---- commit bar ---- */
+
+  /*
+   * A flat bar that stacks directly on top of the flat tab bar.
+   *
+   * `--tab-space` is the room the tab bar occupies, so the two never overlap —
+   * the failure mode that once put the commit button underneath the nav with
+   * nothing to indicate it was there.
+   */
+  .commit-bar {
+    position: sticky;
+    bottom: var(--tab-space);
+    z-index: 9;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 10px 16px;
+    /* The page colour, not the card colour. At --surface it was the exact same
+       shade as the item cards behind it, so it read as one more card floating
+       in the middle of the list rather than as a bar welded above the tab bar.
+       Matching the header and the tab bar makes all three read as chrome. */
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .blocker {
+    font-size: var(--text-sm);
+    color: var(--red);
+  }
+
+  .full {
+    width: 100%;
+  }
+
+  /* ---- done ---- */
+
+  .done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 64px 16px;
+    text-align: center;
+  }
+
+  .done-mark {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #12241d;
+    color: var(--green);
+    font-size: 32px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+  }
+
+  .empty {
+    padding: 24px 16px;
+  }
+</style>
