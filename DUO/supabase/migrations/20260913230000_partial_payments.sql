@@ -111,7 +111,21 @@ grant execute on function public.payment_page(uuid) to anon, authenticated;
 -- screen is where the two get reconciled.
 -- -----------------------------------------------------------------------------
 
-create or replace view public.v_outstanding
+-- Dropped, not replaced, and the reason is not stylistic.
+--
+-- `create or replace view` refuses to change a column's type. The old
+-- `sum(amount_owed)` summed an integer, which Postgres returns as bigint; the
+-- new one subtracts `sum(amount_read)`, and summing a bigint returns NUMERIC.
+-- Same numbers, different type, and the first push died on it:
+--
+--   cannot change data type of view column "outstanding" from bigint to
+--   numeric (SQLSTATE 42P16)
+--
+-- Dropping takes the type question away entirely: a fresh view declares its own
+-- columns instead of being reconciled against the old ones.
+drop view if exists public.v_outstanding;
+
+create view public.v_outstanding
   with (security_invoker = true)
 as
   select p.person,
