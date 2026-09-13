@@ -53,9 +53,7 @@
   <div class="hero">
     <div class="mark">D</div>
     <h1 class="hero-title">Masuk ke DUO</h1>
-    <p class="hero-sub">
-      Sekali masuk, sesinya kesimpen — nggak perlu login lagi di HP yang sama.
-    </p>
+    <p class="hero-sub">Split the bill. Not the friendship.</p>
   </div>
 
   <form class="form" onsubmit={submit}>
