@@ -96,6 +96,17 @@ chat, and a dark document is worse in both.
 - **`CommitBill` is the one path that creates a bill.** Widening its argument
   list means dropping and recreating it in a migration. QRIS and `paid_by_person`
   are deliberately written as separate updates *after* the commit instead.
+- **`commit_bill` returns the ref code, not the bill id** — it ends with
+  `return p_ref_code`. Both are strings, so using one for the other is a Postgres
+  error (`22P02 invalid input syntax for type uuid`) and not a compile one. It
+  shipped once: the ref code went into a `uuid` column and every save with an
+  organiser marked failed. `commitBill` now returns `void` — the caller already
+  has the ref code — so `const billId = await commitBill(...)` is a type error
+  rather than a bug. Use `findBillId` for an id.
+- **A follow-up write must never make a saved bill look unsaved.** `commit()`
+  sets `committed` as soon as `commitBill` returns, then does the organiser
+  writes in their own try/catch. Otherwise the operator sees a failure, saves
+  again, and has two bills.
 - **`sum(integer)` returns `bigint`; `sum(bigint)` returns `numeric`.** So
   `create or replace view` refuses a definition that changes a column's type —
   `SQLSTATE 42P16`. Drop the view first.

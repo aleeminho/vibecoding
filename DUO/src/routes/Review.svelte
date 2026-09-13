@@ -30,6 +30,7 @@
   import {
     commitBill,
     findOwnerId,
+    findBillId,
     findSimilarBills,
     listKnownPeople,
     setPaidBy,
@@ -266,7 +267,7 @@
         receiptPath = await uploadReceipt(ownerId, refCode, blob)
       }
 
-      const billId = await commitBill({
+      await commitBill({
         refCode,
         place: ext.place!,
         billDate: ext.date!,
@@ -291,16 +292,31 @@
         },
       })
 
+      // Saved. Everything after this point is a follow-up write, and the screen
+      // must not say the bill failed if one of them does — the operator would
+      // save again and end up with two of them.
+      committed = refCode
+
       // Written after the bill exists, rather than through commit_bill — the
       // same reasoning as the QRIS. A failure here leaves a bill whose organiser
       // looks unpaid, which the Tagihan screen can fix by hand; a failure inside
       // commit_bill would leave no bill at all.
       if (paidBy) {
-        await setShareStatus(billId, paidBy, true)
-        await setPaidBy(billId, paidBy)
+        try {
+          // commit_bill returns the ref code, not the id, and bill_id is a uuid
+          // column. Passing the code straight through is a Postgres type error,
+          // not a compile one — which is exactly how it shipped and failed on
+          // every save with an organiser marked.
+          const billId = await findBillId(refCode)
+          await setShareStatus(billId, paidBy, true)
+          await setPaidBy(billId, paidBy)
+        } catch (err) {
+          commitError =
+            `Tagihannya tersimpan, tapi gagal nandain "${paidBy}" sebagai yang ` +
+            `bayar ke vendor: ${(err as Error).message} Buka tagihannya di ` +
+            `Tagihan dan tick namanya sendiri.`
+        }
       }
-
-      committed = refCode
     } catch (err) {
       commitError = (err as Error).message
     } finally {

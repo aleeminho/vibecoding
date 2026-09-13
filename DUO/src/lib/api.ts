@@ -393,6 +393,31 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
 }
 
 /**
+ * The bill id behind a reference code.
+ *
+ * Needed because `commit_bill` hands back the ref code and the post-commit
+ * writes need a uuid. The lookup is exact — `ref_code` is unique, which is what
+ * stops two commits racing for the same number — so this cannot pick the wrong
+ * bill.
+ *
+ * A separate call rather than widening `commit_bill`'s return, for the same
+ * reason the QRIS and the organiser marker are written after the commit: that
+ * function is the one path that creates a bill, and changing its signature
+ * means dropping and recreating it, where being wrong stops bills being saved
+ * at all.
+ */
+export async function findBillId(refCode: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('bills')
+    .select('id')
+    .eq('ref_code', refCode)
+    .single()
+
+  if (error) throw new Error(error.message)
+  return (data as { id: string }).id
+}
+
+/**
  * Record who settled with the vendor.
  *
  * A separate call after the commit, like the QRIS and for the same reason:
@@ -592,13 +617,27 @@ export interface CommitInput {
  * The gates run again server side. That is not redundant: the client can be
  * buggy or stale, and these are the invariants that decide what real people
  * owe each other.
+ *
+ * **Returns nothing, and that is deliberate.** `commit_bill` ends with
+ * `return p_ref_code` — the reference code, not the bill id — and it used to be
+ * handed straight through as `Promise<string>`. Both values are strings, so
+ * using one where the other belongs was a Postgres type error the compiler
+ * could not see, and it shipped: the ref code was passed to a `uuid` column and
+ * every save with an organiser marked failed with `invalid input syntax for
+ * type uuid`.
+ *
+ * The caller already has the reference code — it generated it and passed it in
+ * — so the return value was redundant as well as misleading. Dropping it makes
+ * `const billId = await commitBill(...)` a type error rather than a bug, which
+ * is a better fix than a comment nobody reads. Use `findBillId` when an id is
+ * what you actually need.
  */
-export async function commitBill(input: CommitInput): Promise<string> {
+export async function commitBill(input: CommitInput): Promise<void> {
   const assignments = input.items.flatMap((item) =>
     item.assigned_to.map((person) => ({ item_position: item.position, person })),
   )
 
-  const { data, error } = await supabase.rpc('commit_bill', {
+  const { error } = await supabase.rpc('commit_bill', {
     p_ref_code: input.refCode,
     p_place: input.place,
     p_bill_date: input.billDate,
@@ -625,7 +664,6 @@ export async function commitBill(input: CommitInput): Promise<string> {
   })
 
   if (error) throw new Error(error.message)
-  return data as string
 }
 
 // ---------------------------------------------------------------------------
