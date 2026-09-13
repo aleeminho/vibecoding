@@ -148,3 +148,23 @@ except these, all deliberate:
 `.env.local` is gitignored; keys go there or into Supabase secrets. **Never give
 a key a `VITE_` prefix** — that puts it in the browser bundle. Never ask for a
 key in chat.
+
+---
+
+## Keep this file current — it is part of the change
+
+The point of this file is that a new terminal continues without being briefed. A
+version describing the project as it was three weeks ago is worse than none,
+because it is confidently wrong.
+
+So when something moves, move it here in the same change:
+
+- A PRD criterion gets met → it comes out of the unmet list.
+- A trap costs real time → write it down while it is fresh.
+- Guidance goes stale → **delete it.** A comment saying "not built yet" on a
+  feature that now exists is the most misleading thing this file can hold.
+
+**This is maintenance, not a changelog.** What does not belong: what the code
+already says, what git history already records, or a list of what changed today.
+Every line here is loaded into every session, so each one is a cost paid on
+every message.
