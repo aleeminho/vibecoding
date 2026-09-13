@@ -63,6 +63,8 @@ interface Page {
   bill_date: string
   ref_code: string
   amount_owed: number
+  /** Everything already paid on this share that reached the right account. */
+  amount_paid: number
   status: string
   bank_name: string | null
   account_number: string | null
@@ -179,8 +181,30 @@ Deno.serve(async (req: Request) => {
 
   // ---- decide ------------------------------------------------------------
 
-  const { verdict, note } = judge(read, {
-    amountOwed: page.amount_owed,
+  /*
+   * What is still due, not what was owed at the start.
+   *
+   * This is what makes an instalment work. The second half of a part payment
+   * is the transfer that finishes the job, and comparing it against the
+   * original amount would call it short forever — the share would sit at
+   * "kurang Rp 77.050" no matter how much arrived.
+   *
+   * `amount_paid` only counts payments that reached the right account, so the
+   * remainder this produces is the real one rather than a running total of
+   * whatever was uploaded.
+   */
+  const due = Math.max(0, page.amount_owed - page.amount_paid)
+
+  // Everything is already in, but the share was never marked settled — the
+  // operator left it for review, or a proof arrived and the status write
+  // failed. Either way there is nothing left to pay, and taking more money
+  // would be the wrong answer.
+  if (due === 0) {
+    return json({ verdict: 'already_paid', person: page.person, amount: page.amount_owed })
+  }
+
+  const { verdict, recipientOk, note } = judge(read, {
+    amountDue: due,
     accountHolder: page.account_holder,
     accountNumber: page.account_number,
   })
@@ -215,6 +239,10 @@ Deno.serve(async (req: Request) => {
       amount_read: read.amount,
       recipient_read: read.recipient_name ?? read.recipient_account,
       recipient_expected: page.account_holder ?? page.account_number ?? '',
+      // The field the running total is summed on. A `mismatch` cannot stand in
+      // for it: that word covers both an instalment and a transfer to a
+      // stranger, and only one of those should reduce what someone owes.
+      recipient_ok: recipientOk,
       verdict,
       note,
       image_path: imagePath,
@@ -245,11 +273,20 @@ Deno.serve(async (req: Request) => {
 
   // The payer is told the outcome, not the operator's note. "Kurang Rp 27.050"
   // is useful to them; a verdict word and a mismatch log are not.
+  //
+  // `remaining` is what is left after this transfer, which is the number a
+  // part-payer needs and the one the page did not have before. Null once the
+  // share is settled, because "sisa Rp 0" reads like a demand for nothing
+  // rather than like being done.
+  const paidNow = page.amount_paid + (recipientOk === true && read.amount ? read.amount : 0)
+  const remaining = Math.max(0, page.amount_owed - paidNow)
+
   return json({
     verdict,
     person: page.person,
-    expected: page.amount_owed,
+    expected: due,
     read: read.amount,
+    remaining: verdict === 'matched' || remaining === 0 ? null : remaining,
     message:
       verdict === 'matched'
         ? 'Lunas. Makasih!'

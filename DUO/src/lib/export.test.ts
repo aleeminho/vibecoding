@@ -57,6 +57,7 @@ const bill: ExportBill = {
   shares: [
     {
       pay_token: null,
+      amount_paid: 0,
       person: 'Budi',
       discount_share: 2817,
       tax_share: 3718,
@@ -68,6 +69,7 @@ const bill: ExportBill = {
     },
     {
       pay_token: null,
+      amount_paid: 0,
       person: 'Sarah',
       discount_share: 2183,
       tax_share: 2882,

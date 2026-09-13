@@ -25,17 +25,25 @@
   import { formatDate, rupiah } from '../lib/format'
   import {
     deleteBill,
+    findOwnerId,
     listBills,
     listFlaggedPayments,
     listOutstanding,
+    setBillPayment,
     setBillStatus,
     setShareStatus,
+    qrisUrl,
+    uploadQris,
+    shareRemaining,
+    shareState,
     signedReceiptUrl,
     type BillWithShares,
     type FlaggedPayment,
+    type PaymentMethod,
     type Outstanding,
   } from '../lib/api'
   import { isDemo } from '../lib/demo'
+  import { prepareReceiptImage } from '../lib/image'
 
   let outstanding = $state<Outstanding[]>([])
   let bills = $state<BillWithShares[]>([])
@@ -192,6 +200,96 @@
     }
   }
 
+  // ---- how a bill can be paid -------------------------------------------
+
+  const PAY_METHODS: { value: PaymentMethod; label: string }[] = [
+    { value: 'bank', label: 'Transfer' },
+    { value: 'qris', label: 'QRIS' },
+    { value: 'both', label: 'Dua-duanya' },
+  ]
+
+  let payOpen = $state<string | null>(null)
+
+  /**
+   * What the payer page will actually show.
+   *
+   * Says "QRIS" only when there is a code to show. A method set to qris with no
+   * upload is a bill whose payer page offers nothing, and the label is the one
+   * place that mismatch can be noticed before somebody opens the link and finds
+   * an empty page.
+   */
+  function methodLabel(bill: BillWithShares): string {
+    const hasCode = Boolean(bill.qris_path)
+    if (bill.payment_method === 'qris') {
+      return hasCode ? 'QRIS aja' : 'QRIS — tapi kodenya belum diupload'
+    }
+    if (bill.payment_method === 'both') {
+      return hasCode ? 'Transfer sama QRIS' : 'Transfer — kodenya belum diupload'
+    }
+    return 'Transfer bank aja'
+  }
+
+  async function chooseMethod(bill: BillWithShares, method: PaymentMethod) {
+    busy = bill.id
+    // Optimistic, like the paid tick: the tap means the choice is made, and the
+    // segmented control should move under the thumb rather than after a round
+    // trip.
+    bills = bills.map((b) => (b.id === bill.id ? { ...b, payment_method: method } : b))
+    try {
+      await setBillPayment(bill.id, { method })
+    } catch (err) {
+      bills = bills.map((b) => (b.id === bill.id ? { ...b, payment_method: bill.payment_method } : b))
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
+  /**
+   * Attach a QRIS image to a bill that already exists.
+   *
+   * Uploaded before the row is updated, so a failed upload leaves the bill
+   * exactly as it was rather than pointing at an object that is not there.
+   */
+  async function attachQris(bill: BillWithShares, event: Event) {
+    const input = event.currentTarget as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (!file) return
+
+    busy = bill.id
+    try {
+      const ownerId = await findOwnerId()
+      const prepared = await prepareReceiptImage(file)
+      const blob = await fetch(prepared.dataUrl).then((r) => r.blob())
+
+      const path = await uploadQris(ownerId, blob)
+      // A first upload switches the bill to offering it, because uploading a
+      // code and then having nothing change is a confusing thing for a tap to
+      // do. Changing it back is one tap away in the segmented control.
+      const method = bill.payment_method === 'bank' ? 'both' : bill.payment_method
+      await setBillPayment(bill.id, { qrisPath: path, method })
+      await load({ silent: true })
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
+  async function removeQris(bill: BillWithShares) {
+    if (!window.confirm('Hapus kode QRIS dari tagihan ini?')) return
+    busy = bill.id
+    try {
+      await setBillPayment(bill.id, { qrisPath: null, method: 'bank' })
+      await load({ silent: true })
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
   function allPaid(bill: BillWithShares): boolean {
     return bill.shares.every((share) => share.status === 'lunas')
   }
@@ -200,7 +298,10 @@
     await load()
     // In demo mode the first bill is opened automatically, because the expanded
     // state is otherwise only reachable by tapping and a screenshot cannot tap.
-    if (import.meta.env.DEV && isDemo() && bills.length > 0) open = bills[0].id
+    if (import.meta.env.DEV && isDemo() && bills.length > 0) {
+      open = bills[0].id
+      payOpen = bills[0].id
+    }
   })
 </script>
 
@@ -232,13 +333,22 @@
       <div class="group">
         <div class="list">
           {#each outstanding as row (row.person)}
-            <div class="row">
+            <!--
+              The total is the question; "which bills is that made of" is the
+              next one, and it has an answer. Making the row the way in is what
+              stops the name being a dead end.
+            -->
+            <button
+              class="row tappable"
+              onclick={() => (location.hash = `#/orang?p=${encodeURIComponent(row.person)}`)}
+            >
               <div class="stack">
                 <span class="strong">{row.person}</span>
                 <span class="faint small">{row.bills} tagihan</span>
               </div>
               <span class="row-value num owed">{rupiah(row.outstanding)}</span>
-            </div>
+              <span class="chevron"></span>
+            </button>
           {/each}
         </div>
       </div>
@@ -278,7 +388,17 @@
                 {/if}
               </p>
 
-              {#if p.note}<p class="proof-note">{p.note}</p>{/if}
+              <!--
+                Only when it adds something. The line above already states the
+                amount and its remainder, so the note is redundant on a plain
+                short transfer — printing both says "kurang Rp 27.050" twice in
+                two phrasings. It earns its place when the amount is not the
+                problem: a transfer to the wrong account, or one that could not
+                be read at all.
+              -->
+              {#if p.note && (p.amount_read === null || p.recipient_ok !== true)}
+                <p class="proof-note">{p.note}</p>
+              {/if}
 
               <div class="proof-actions">
                 <button class="plain" onclick={() => openReceipt(p.image_path)}>Lihat bukti</button>
@@ -331,17 +451,46 @@
 
           {#if isOpen}
             {#each bill.shares as share (share.person)}
+              <!--
+                The tick is the stored flag, not the arithmetic. It is what the
+                tap toggles, and it means one thing: the operator says this is
+                settled. `.partial` is the arithmetic disagreeing with it, and
+                that gets said in words rather than by half-filling a checkbox,
+                which would read as a control in an in-between state.
+              -->
               {@const paid = share.status === 'lunas'}
+              {@const state = shareState(share)}
+              {@const remaining = shareRemaining(share)}
               <button
                 class="row tappable pay"
                 class:paid
+                class:partial={state === 'sebagian'}
                 aria-pressed={paid}
-                aria-label="{share.person}: {paid ? 'sudah lunas' : 'belum lunas'}"
+                aria-label="{share.person}: {state === 'lunas'
+                  ? 'sudah lunas'
+                  : state === 'sebagian'
+                    ? `kurang ${rupiah(remaining)}`
+                    : 'belum lunas'}"
                 onclick={() => toggleShare(bill, share.person, !paid)}
               >
                 <span class="check" aria-hidden="true"></span>
-                <span class="strong" class:faint={paid}>{share.person}</span>
-                <span class="row-value num" class:faint={paid}>{rupiah(share.amount_owed)}</span>
+                <span class="stack">
+                  <span class="strong" class:faint={paid}>{share.person}</span>
+                  {#if state === 'sebagian'}
+                    <!--
+                      The original amount is kept beside what has landed, not
+                      replaced by it. "Kurang 27.050" on its own is a number
+                      with no denominator, and the first question anyone asks
+                      is "out of how much?".
+                    -->
+                    <span class="faint small">
+                      sudah {rupiah(share.amount_paid)} dari {rupiah(share.amount_owed)}
+                    </span>
+                  {/if}
+                </span>
+                <span class="row-value num" class:faint={paid}>
+                  {rupiah(state === 'sebagian' ? remaining : share.amount_owed)}
+                </span>
               </button>
             {/each}
 
@@ -368,6 +517,61 @@
               {/if}
               <button class="plain" onclick={() => openNota(bill)}>Nota &amp; WA</button>
             </div>
+
+            <!--
+              How this bill can be paid. Collapsed behind a disclosure rather
+              than always shown, because most bills keep whatever the last one
+              was and a control that is always open is a control that gets
+              scrolled past.
+            -->
+            <button class="row tappable" onclick={() => (payOpen = payOpen === bill.id ? null : bill.id)}>
+              <div class="stack">
+                <span class="strong">Cara bayar</span>
+                <span class="faint small">{methodLabel(bill)}</span>
+              </div>
+              <span class="chevron" class:up={payOpen === bill.id}></span>
+            </button>
+
+            {#if payOpen === bill.id}
+              <div class="row pay-choice">
+                <span class="dim small">Yang ditampilin ke yang bayar</span>
+                <div class="segments">
+                  {#each PAY_METHODS as option (option.value)}
+                    <button
+                      class="segment"
+                      class:on={bill.payment_method === option.value}
+                      disabled={busy === bill.id}
+                      onclick={() => chooseMethod(bill, option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  {/each}
+                </div>
+              </div>
+
+              <div class="row actions">
+                <label class="plain qris-pick">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    disabled={busy === bill.id}
+                    onchange={(e) => attachQris(bill, e)}
+                  />
+                  <span>{busy === bill.id ? '…' : bill.qris_path ? 'Ganti QRIS' : 'Upload QRIS'}</span>
+                </label>
+                {#if bill.qris_path}
+                  <button class="plain destructive-text" disabled={busy === bill.id} onclick={() => removeQris(bill)}>
+                    Hapus QRIS
+                  </button>
+                {/if}
+              </div>
+
+              {#if bill.qris_path}
+                <div class="row qris-preview">
+                  <img src={qrisUrl(bill.qris_path)} alt="QRIS tagihan ini" />
+                </div>
+              {/if}
+            {/if}
 
             <div class="row actions">
               <button
@@ -518,12 +722,25 @@
 
   /* The whole row is the target, not a 51px switch in the corner — this gets
      tapped one-handed, standing up, on a phone. */
+  /* `.strong` only. Putting `nowrap` on `.stack` as well — which is what the
+     first version of this did — clips the "sudah X dari Y" line mid-number
+     with no ellipsis, because the overflow is hidden one level above where
+     the truncation is declared. The name truncates; the caption wraps. */
   .row.pay .strong {
     flex: 1;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A part-paid row is neither settled nor untouched, and the amount shown is
+     the remainder — a different number from every other row on the screen. The
+     accent is what stops it being read as the original amount by someone
+     scanning the column. */
+  .row.pay.partial .row-value {
+    color: var(--brand-light);
+    font-weight: 600;
   }
 
   /* ---- proofs needing a decision ---- */
@@ -569,6 +786,59 @@
   .proof-note {
     font-size: var(--text-xs);
     color: var(--label-3);
+  }
+
+  /* ---- how a bill can be paid ---- */
+
+  .pay-choice {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+
+  /*
+   * Three options, one row, no wrapping. A select would be smaller but this is
+   * a choice between three things the operator picks at a glance, and three
+   * tappable targets show the alternatives where a dropdown hides two of them.
+   */
+  .segments {
+    display: flex;
+    gap: 6px;
+  }
+
+  .segment {
+    flex: 1;
+    min-height: 38px;
+    padding: 0 8px;
+    font-size: var(--text-sm);
+    background: var(--surface-2);
+    border-color: transparent;
+  }
+
+  .segment.on {
+    background: var(--brand-tint);
+    border-color: rgba(208, 74, 2, 0.32);
+    color: var(--brand-light);
+    font-weight: 600;
+  }
+
+  /* A file input cannot be styled, so the label is the button and the input is
+     hidden — the same trick the payer page uses. */
+  .qris-pick input {
+    display: none;
+  }
+
+  .qris-preview {
+    justify-content: center;
+    padding-bottom: 14px;
+  }
+
+  .qris-preview img {
+    width: 140px;
+    padding: 8px;
+    background: #fff;
+    border-radius: 10px;
   }
 
   .proof-actions {

@@ -30,12 +30,13 @@
   import {
     commitBill,
     findOwnerId,
+    findSimilarBills,
     listKnownPeople,
     nextRefCode,
     normaliseAccountNumber,
     uploadReceipt,
   } from '../lib/api'
-  import type { Destination, KnownPerson } from '../lib/api'
+  import type { Destination, DuplicateCandidate, KnownPerson } from '../lib/api'
   import type { Extraction, GateReport, RoundingMode } from '../lib/types'
 
   let { onDone }: { onDone: () => void } = $props()
@@ -188,11 +189,34 @@
     return 'Simpan'
   })
 
+  /**
+   * Bills that look like the one being saved.
+   *
+   * Checked once, when the scan lands — not on every keystroke in the place
+   * field. The question is "have I already scanned this?", and it is a question
+   * about the scan rather than about the edits that came after it.
+   *
+   * A warning, never a block. The operator is looking at the receipt and the
+   * model is looking at a name and a number; between the two of them the
+   * operator is the one who knows. So this says what it found and gets out of
+   * the way — including when the check itself fails, which leaves `duplicate`
+   * empty and commits exactly as it would have.
+   */
+  let duplicate = $state<DuplicateCandidate[]>([])
+
   onMount(async () => {
     try {
       known = await listKnownPeople()
     } catch {
       known = []
+    }
+
+    if (ext?.place && ext.date && ext.total != null) {
+      try {
+        duplicate = await findSimilarBills(ext.place, ext.date, ext.total)
+      } catch {
+        duplicate = []
+      }
     }
   })
 
@@ -283,6 +307,29 @@
           <div class="row notice-row">
             <span class="warn">⚠</span>
             <span class="notice-text">{ext.confidence_notes}</span>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!--
+      The duplicate warning, before the save rather than after it. It names the
+      bill it found, because the honest thing to show is the evidence and not a
+      verdict — the operator recognises their own receipt in a second, and a
+      "possible duplicate" with no detail is a dialog people learn to dismiss.
+    -->
+    {#if duplicate.length > 0}
+      <div class="group">
+        <div class="list tint-warn">
+          <div class="row notice-row">
+            <span class="warn">⚠</span>
+            <span class="notice-text">
+              Struk ini kayak yang udah pernah dicatat:
+              {#each duplicate as d, i (d.id)}
+                {#if i > 0}, {/if}<strong>{d.place}</strong>
+                {formatDate(d.bill_date)} <span class="num">{d.ref_code}</span>{/each}.
+              Kalau memang beda, simpan aja.
+            </span>
           </div>
         </div>
       </div>

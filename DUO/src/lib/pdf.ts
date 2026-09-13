@@ -299,7 +299,16 @@ export function buildNotaPdf(bill: NotaBill, breakdown: PersonBreakdown[]): Blob
     const blockHeight = 52 + person.items.length * 13 + person.components.length * 13
     line(0, blockHeight)
 
-    const mark = person.status === 'lunas' ? '  ·  sudah bayar' : ''
+    // Beside the name rather than in the money column. The column has to keep
+    // adding up to the bill total in the reconciliation at the foot, and a
+    // remainder there would break it — the figure stays the person's share of
+    // the split, and what has landed is a note about it.
+    const mark =
+      person.status === 'lunas'
+        ? '  ·  sudah bayar'
+        : person.amount_paid > 0
+          ? `  ·  udah masuk ${rupiahDigits(person.amount_paid)}`
+          : ''
     pdf.text(`${person.person}${mark}`, left, pdf.cursor, { size: 11, font: 'sans-bold' })
     pdf.text(rupiahDigits(person.total), right, pdf.cursor, {
       size: 11,

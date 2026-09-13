@@ -17,16 +17,34 @@
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah } from '../lib/format'
-  import { paymentPage, submitProof, type PaymentPageInfo, type ProofResult } from '../lib/api'
+  import {
+    paymentPage,
+    qrisUrl,
+    submitProof,
+    type PaymentPageInfo,
+    type ProofResult,
+  } from '../lib/api'
   import { prepareReceiptImage } from '../lib/image'
 
   const token = new URLSearchParams(location.hash.split('?')[1] ?? '').get('t') ?? ''
+
 
   let info = $state<PaymentPageInfo | null>(null)
   let status = $state<'loading' | 'ready' | 'missing' | 'error'>('loading')
   let error = $state('')
   let busy = $state(false)
   let result = $state<ProofResult | null>(null)
+  /**
+   * What to offer, from the bill's own setting rather than from what happens to
+   * be present. A bill can carry a QRIS and still ask for a transfer, and
+   * showing both whenever both exist would overrule the operator's choice.
+   *
+   * The path check is a second condition, not a substitute: the method can say
+   * `qris` while the upload failed, and an `<img>` pointing at nothing is worse
+   * than no code at all.
+   */
+  let showQris = $derived(Boolean(info?.qris_path) && info?.payment_method !== 'bank')
+  let showBank = $derived(info?.payment_method !== 'qris')
 
   onMount(async () => {
     if (!token) {
@@ -56,8 +74,19 @@
       // data and over the function's cap.
       const prepared = await prepareReceiptImage(file)
       result = await submitProof(token, prepared.base64, 'image/jpeg')
-      if (result.verdict === 'matched' || result.verdict === 'already_paid') {
-        status = 'ready'
+
+      // Re-read rather than patching the local copy. A part payment that was
+      // read and recorded changes the amount still due, and this page is where
+      // that number is read off to decide what to transfer — leaving the old
+      // one on screen would ask for money that has already arrived.
+      //
+      // Failing here is not worth an error: the proof is already in and the
+      // verdict is already right. A stale header is a smaller problem than a
+      // message telling someone their successful upload failed.
+      try {
+        info = (await paymentPage(token)) ?? info
+      } catch {
+        // Keep what is on screen.
       }
     } catch (err) {
       error = (err as Error).message
@@ -80,10 +109,22 @@
   {:else if status === 'error'}
     <p class="msg">{error}</p>
   {:else if info}
+    <!--
+      The big number is what is still due, not what the bill started at. This
+      is the page someone opens to decide how much to transfer, and showing
+      them the original amount after they have already sent half of it asks
+      for the money twice.
+    -->
+    {@const sisa = Math.max(0, info.amount_owed - info.amount_paid)}
     <header class="head">
       <p class="who">{info.person}</p>
       <p class="meta">{info.place} · {formatDate(info.bill_date)}</p>
-      <p class="amount">{rupiah(info.amount_owed)}</p>
+      <p class="amount">{rupiah(sisa)}</p>
+      {#if info.amount_paid > 0}
+        <p class="part">
+          Dari {rupiah(info.amount_owed)} · udah masuk {rupiah(info.amount_paid)}
+        </p>
+      {/if}
     </header>
 
     {#if result?.verdict === 'matched'}
@@ -97,9 +138,22 @@
         <p class="done-body">Tagihan ini udah kelar sebelumnya.</p>
       </div>
     {:else}
-      {#if info.bank_name && info.account_number}
+      {#if showQris}
+        <!--
+          The code first when it is offered, because scanning is the easier of
+          the two and the one most people reach for. Sized to be scannable from
+          another phone held over this one, on white with a quiet margin — a
+          quiet zone is part of how a QR code works, not padding.
+        -->
+        <div class="qris">
+          <img src={qrisUrl(info.qris_path!)} alt="Kode QRIS" />
+          <p class="qris-hint">Scan pakai m-banking atau e-wallet apa aja.</p>
+        </div>
+      {/if}
+
+      {#if showBank && info.bank_name && info.account_number}
         <div class="dest">
-          <span class="dest-label">Transfer ke</span>
+          <span class="dest-label">{showQris ? 'Atau transfer ke' : 'Transfer ke'}</span>
           <span class="dest-value">
             {info.bank_name} {info.account_number}{#if info.account_holder}
               · {info.account_holder}{/if}
@@ -196,6 +250,42 @@
     font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--accent);
+  }
+
+  /* Only present once something has landed, so it never explains a number that
+     did not need explaining. */
+  .part {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--soft);
+  }
+
+  .qris {
+    margin-top: 1.5rem;
+    text-align: center;
+  }
+
+  /*
+   * White behind the code even on a page that is already white, and a margin
+   * on all four sides. That margin is the quiet zone a scanner needs to find
+   * the code's edges; cropping it is the commonest way to make a QR that reads
+   * fine on screen and fails on a phone camera.
+   */
+  .qris img {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin: 0 auto;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+  }
+
+  .qris-hint {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: var(--soft);
   }
 
   .dest {

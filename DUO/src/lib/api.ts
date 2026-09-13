@@ -14,6 +14,7 @@
  */
 
 import { supabase } from './supabase'
+import { looksLikeSamePlace } from './duplicate'
 import { normalizeExtraction, stripCodeFence } from './normalize'
 import {
   DEMO_AUDIT,
@@ -128,6 +129,55 @@ export async function uploadReceipt(
   return path
 }
 
+/**
+ * Upload a static QRIS image and return its object path.
+ *
+ * A fresh random name every time rather than reusing one. The bucket is public
+ * — it has to be, the payer has no session — so the path is the only thing
+ * standing between a code and anyone who wants to enumerate codes. Ref codes
+ * are sequential and would be walkable; a uuid is not.
+ */
+export async function uploadQris(ownerId: string, blob: Blob): Promise<string> {
+  const path = `${ownerId}/${crypto.randomUUID()}.jpg`
+
+  const { error } = await supabase.storage.from('qris').upload(path, blob, {
+    contentType: 'image/jpeg',
+    upsert: false,
+  })
+  if (error) throw new Error(`Upload QRIS gagal: ${error.message}`)
+
+  return path
+}
+
+/** The public URL of a QRIS code. The bucket is public, so there is nothing to sign. */
+export function qrisUrl(path: string): string {
+  // In a demo the paths are fixtures rather than objects, so they resolve
+  // against the dev server — otherwise every screenshot of this page would
+  // show a broken image and say nothing about the layout.
+  if (import.meta.env.DEV && isDemo()) return `/${path}`
+  return supabase.storage.from('qris').getPublicUrl(path).data.publicUrl
+}
+
+/**
+ * Set how a bill can be paid.
+ *
+ * A separate call from the commit, and that is deliberate rather than lazy:
+ * commit_bill is the one path that creates a bill, and widening it would mean
+ * dropping and recreating it — a change that stops bills being saved at all if
+ * it is wrong. A bill's payment options are not part of what it is, and this
+ * way an existing bill can be given a code without being recreated.
+ */
+export async function setBillPayment(
+  billId: string,
+  patch: { qrisPath?: string | null; method: PaymentMethod },
+): Promise<void> {
+  const row: Record<string, unknown> = { payment_method: patch.method }
+  if (patch.qrisPath !== undefined) row.qris_path = patch.qrisPath
+
+  const { error } = await supabase.from('bills').update(row).eq('id', billId)
+  if (error) throw new Error(error.message)
+}
+
 export interface KnownPerson {
   person: string
   bill_count: number
@@ -168,8 +218,40 @@ export async function listOutstanding(): Promise<Outstanding[]> {
 export interface BillShare {
   person: string
   amount_owed: number
+  /**
+   * Everything that has reached the right account, summed over the proofs
+   * uploaded for this share.
+   *
+   * Derived from the payments rather than stored, so it cannot disagree with
+   * the evidence behind it. `status` is a separate claim — "the operator says
+   * this is settled" — which is why a share can be fully covered and still
+   * read `belum lunas` until someone looks.
+   *
+   * Only payments whose recipient matched count. A transfer to the wrong
+   * account paid nobody, however much it was for.
+   */
+  amount_paid: number
   status: 'belum lunas' | 'lunas'
   paid_date: string | null
+}
+
+/** What is still owed on a share, never negative. */
+export function shareRemaining(share: BillShare): number {
+  return Math.max(0, share.amount_owed - share.amount_paid)
+}
+
+/**
+ * `belum lunas` / `sebagian` / `lunas`, derived.
+ *
+ * The stored status wins when it says settled, because that is the operator
+ * overruling the arithmetic — they saw the cash, or they are writing it off. It
+ * is never allowed to say less than the arithmetic does, though: a share whose
+ * instalments cover it does not read as unpaid just because nobody ticked it.
+ */
+export function shareState(share: BillShare): 'belum lunas' | 'sebagian' | 'lunas' {
+  if (share.status === 'lunas') return 'lunas'
+  if (share.amount_paid <= 0) return 'belum lunas'
+  return share.amount_paid >= share.amount_owed ? 'lunas' : 'sebagian'
 }
 
 export interface BillWithShares {
@@ -183,8 +265,19 @@ export interface BillWithShares {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  /** Object path in the `qris` bucket, or null when the bill has no code. */
+  qris_path: string | null
+  payment_method: PaymentMethod
   shares: BillShare[]
 }
+
+/**
+ * Which ways a bill offers to be paid.
+ *
+ * Stored rather than worked out from whether a QRIS exists, because "I have a
+ * code but this one should go to my account" is a real thing to want.
+ */
+export type PaymentMethod = 'bank' | 'qris' | 'both'
 
 /**
  * Recent bills with their per-person shares, newest first.
@@ -200,7 +293,7 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
   const { data, error } = await supabase
     .from('bills')
     .select(
-      'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, bill_participants(person, amount_owed, status, paid_date)',
+      'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, qris_path, payment_method, bill_participants(person, amount_owed, status, paid_date, payments(amount_read, recipient_ok))',
     )
     // Deleted bills are hidden, not gone. Every read path filters here rather
     // than relying on the caller to remember.
@@ -214,11 +307,86 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
   // The embedded resource arrives under its table name. Reshaping it here keeps
   // the rest of the app from knowing about PostgREST's nesting convention.
   return (data ?? []).map((row) => {
-    const { bill_participants, ...bill } = row as Record<string, unknown> & {
-      bill_participants?: BillShare[]
+    // Omit, not `BillShare &`: the raw row has no amount_paid — that field only
+    // exists after the reduction below, and a type that claims otherwise is the
+    // one thing that would let a caller read it before it is computed.
+    type RawShare = Omit<BillShare, 'amount_paid'> & {
+      payments?: { amount_read: number | null; recipient_ok: boolean | null }[]
     }
-    return { ...(bill as unknown as BillWithShares), shares: bill_participants ?? [] }
+    const { bill_participants, ...bill } = row as Record<string, unknown> & {
+      bill_participants?: RawShare[]
+    }
+    return {
+      ...(bill as unknown as BillWithShares),
+      shares: (bill_participants ?? []).map(({ payments, ...share }) => ({
+        ...share,
+        amount_paid: (payments ?? []).reduce(
+          (sum, p) => sum + (p.recipient_ok === true && p.amount_read ? p.amount_read : 0),
+          0,
+        ),
+      })),
+    }
   })
+}
+
+export interface DuplicateCandidate {
+  id: string
+  ref_code: string
+  place: string
+  bill_date: string
+  total: number
+}
+
+/**
+ * Bills that might already be this one.
+ *
+ * The query is deliberately narrow — same total, within a day either side —
+ * and the judgement about the place happens in `looksLikeSamePlace`, where it
+ * can be tested. Doing the name comparison in SQL would mean a pattern that
+ * only exists in a query string, with no test that can reach it.
+ *
+ * The date window is ±1 day rather than exactly the same day: a late dinner
+ * gets scanned after midnight often enough that "same day" would miss the
+ * duplicate it exists to catch.
+ *
+ * Returns candidates, not a verdict. What to do with one is a warning on a
+ * screen the operator is already reading.
+ */
+export async function findSimilarBills(
+  place: string,
+  billDate: string,
+  total: number,
+): Promise<DuplicateCandidate[]> {
+  if (import.meta.env.DEV && isDemo()) {
+    return DEMO_BILLS.filter(
+      (b) => b.total === total && looksLikeSamePlace(b.place, place),
+    ).map((b) => ({
+      id: b.id,
+      ref_code: b.ref_code,
+      place: b.place,
+      bill_date: b.bill_date,
+      total: b.total,
+    }))
+  }
+
+  const day = 24 * 60 * 60 * 1000
+  const from = new Date(`${billDate}T00:00:00Z`)
+  const before = new Date(from.getTime() - day).toISOString().slice(0, 10)
+  const after = new Date(from.getTime() + day).toISOString().slice(0, 10)
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select('id, ref_code, place, bill_date, total')
+    .eq('total', total)
+    .gte('bill_date', before)
+    .lte('bill_date', after)
+    .is('deleted_at', null)
+
+  if (error) throw new Error(error.message)
+
+  return ((data ?? []) as DuplicateCandidate[]).filter((b) =>
+    looksLikeSamePlace(b.place, place),
+  )
 }
 
 /**
@@ -489,7 +657,7 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  */
 const EXPORT_SELECT = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
-   bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`
+   bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date, payments(amount_read, recipient_ok))`
 
 type ExportRow = {
   total: number
@@ -506,7 +674,9 @@ type ExportRow = {
     line_total: number
     bill_item_assignees: { bill_participants: { person: string } | null }[]
   }[]
-  bill_participants: ExportBill['shares']
+  bill_participants: (Omit<ExportBill['shares'][number], 'amount_paid'> & {
+    payments: { amount_read: number | null; recipient_ok: boolean | null }[] | null
+  })[]
 }
 
 function mapExportBill(bill: ExportRow): ExportBill {
@@ -528,9 +698,15 @@ function mapExportBill(bill: ExportRow): ExportBill {
           .map((a) => a.bill_participants?.person)
           .filter((p): p is string => typeof p === 'string'),
       })),
-    shares: (bill.bill_participants ?? []).map((s) => ({
+    shares: (bill.bill_participants ?? []).map(({ payments, ...s }) => ({
       ...s,
       rounding_share: s.rounding_share ?? 0,
+      // Summed here for the same reason listBills sums it there: the running
+      // total is derived from the proofs, never stored beside them.
+      amount_paid: (payments ?? []).reduce(
+        (sum, p) => sum + (p.recipient_ok === true && p.amount_read ? p.amount_read : 0),
+        0,
+      ),
     })),
   }
 }
@@ -604,10 +780,15 @@ export interface PaymentPageInfo {
   bill_date: string
   ref_code: string
   amount_owed: number
+  /** Already in, from proofs that reached the right account. */
+  amount_paid: number
   status: string
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  /** Object path in the `qris` bucket, or null when the bill has no code. */
+  qris_path: string | null
+  payment_method: PaymentMethod
 }
 
 export async function paymentPage(token: string): Promise<PaymentPageInfo | null> {
@@ -621,8 +802,11 @@ export async function paymentPage(token: string): Promise<PaymentPageInfo | null
 export interface ProofResult {
   verdict: 'matched' | 'mismatch' | 'unclear' | 'already_paid'
   person: string
+  /** What was still due when this proof was judged, not the original amount. */
   expected?: number
   read?: number | null
+  /** What is left after this transfer. Null once the share is settled. */
+  remaining?: number | null
   message: string
   error?: string
 }
@@ -638,6 +822,12 @@ export interface FlaggedPayment {
   amount_read: number | null
   recipient_read: string | null
   recipient_expected: string
+  /**
+   * Whether the money reached the right account, or null when the proof did
+   * not say. The queue needs this to tell a short transfer from a transfer to
+   * a stranger — they arrive as the same verdict and mean opposite things.
+   */
+  recipient_ok: boolean | null
   verdict: 'mismatch' | 'unclear'
   note: string | null
   image_path: string
@@ -662,7 +852,7 @@ export async function listFlaggedPayments(): Promise<FlaggedPayment[]> {
   const { data, error } = await supabase
     .from('payments')
     .select(
-      'id, amount_read, recipient_read, recipient_expected, verdict, note, image_path, created_at, bill_participants(person, amount_owed, status, bill_id, bills(place, ref_code))',
+      'id, amount_read, recipient_read, recipient_expected, recipient_ok, verdict, note, image_path, created_at, bill_participants(person, amount_owed, status, bill_id, bills(place, ref_code))',
     )
     // RLS already limits this to the caller's own bills, so there is no owner
     // predicate here to get wrong.
@@ -677,6 +867,7 @@ export async function listFlaggedPayments(): Promise<FlaggedPayment[]> {
     amount_read: number | null
     recipient_read: string | null
     recipient_expected: string
+    recipient_ok: boolean | null
     verdict: 'mismatch' | 'unclear'
     note: string | null
     image_path: string
@@ -713,6 +904,7 @@ export async function listFlaggedPayments(): Promise<FlaggedPayment[]> {
       amount_read: p.amount_read,
       recipient_read: p.recipient_read,
       recipient_expected: p.recipient_expected,
+      recipient_ok: p.recipient_ok,
       verdict: p.verdict,
       note: p.note,
       image_path: p.image_path,
@@ -765,6 +957,8 @@ export interface SettleUpEntry {
   bill_date: string
   person: string
   amount_owed: number
+  /** Part of this share already settled by a proof of payment. */
+  amount_paid: number
 }
 
 /** Every unpaid share at bill granularity, so a total can show its sources. */

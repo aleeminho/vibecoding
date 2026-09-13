@@ -62,11 +62,16 @@ export const DEMO_BILLS: BillWithShares[] = [
     account_number: '1234567890',
     account_holder: 'Alee',
     notes: 'Nongkrong sore',
+    qris_path: 'demo/qris.png',
+    payment_method: 'both',
     shares: [
-      { person: 'Budi', amount_owed: 127050, status: 'belum lunas', paid_date: null },
-      { person: 'Sarah', amount_owed: 98175, status: 'belum lunas', paid_date: null },
-      { person: 'Andi', amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
-      { person: 'Dewi', amount_owed: 109725, status: 'belum lunas', paid_date: null },
+      // Budi paid half and is the fixture for a part payment: Rp 100.000 in
+      // against Rp 127.050 owed, none of it marked settled by hand, so the
+      // remaining Rp 27.050 has to come from the arithmetic.
+      { person: 'Budi', amount_paid: 100000, amount_owed: 127050, status: 'belum lunas', paid_date: null },
+      { person: 'Sarah', amount_paid: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', amount_paid: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
+      { person: 'Dewi', amount_paid: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
     ],
   },
   {
@@ -80,9 +85,11 @@ export const DEMO_BILLS: BillWithShares[] = [
     account_number: '1234567890',
     account_holder: 'Alee',
     notes: null,
+    qris_path: null,
+    payment_method: 'bank',
     shares: [
-      { person: 'Budi', amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
-      { person: 'Sarah', amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Budi', amount_paid: 42760, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Sarah', amount_paid: 33140, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
     ],
   },
   {
@@ -96,10 +103,12 @@ export const DEMO_BILLS: BillWithShares[] = [
     account_number: '081234567890',
     account_holder: 'Alee',
     notes: 'Traktiran Andi',
+    qris_path: null,
+    payment_method: 'bank',
     shares: [
-      { person: 'Budi', amount_owed: 78000, status: 'belum lunas', paid_date: null },
-      { person: 'Andi', amount_owed: 156000, status: 'lunas', paid_date: '2026-05-31' },
-      { person: 'Rina', amount_owed: 78000, status: 'belum lunas', paid_date: null },
+      { person: 'Budi', amount_paid: 0, amount_owed: 78000, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', amount_paid: 156000, amount_owed: 156000, status: 'lunas', paid_date: '2026-05-31' },
+      { person: 'Rina', amount_paid: 0, amount_owed: 78000, status: 'belum lunas', paid_date: null },
     ],
   },
   {
@@ -113,9 +122,11 @@ export const DEMO_BILLS: BillWithShares[] = [
     account_number: '1234567890',
     account_holder: 'Alee',
     notes: null,
+    qris_path: null,
+    payment_method: 'bank',
     shares: [
-      { person: 'Sarah', amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
-      { person: 'Dewi', amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
+      { person: 'Sarah', amount_paid: 47250, amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
+      { person: 'Dewi', amount_paid: 47250, amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
     ],
   },
 ]
@@ -138,19 +149,22 @@ export const DEMO_MONTHLY = [
   { month: '2026-05-01', person: 'Dewi', total: 47250, bills: 1 },
 ]
 
+// Net of what has landed. Budi owes 205.050 across two bills, but 100.000 of
+// the Lucky Cat one is already in, so the number that matters is 105.050 —
+// which is the whole point of netting instalments off the headline figure.
 export const DEMO_OUTSTANDING = [
-  { person: 'Budi', outstanding: 205050, bills: 2 },
+  { person: 'Budi', outstanding: 105050, bills: 2 },
   { person: 'Sarah', outstanding: 98175, bills: 1 },
   { person: 'Dewi', outstanding: 109725, bills: 1 },
   { person: 'Rina', outstanding: 78000, bills: 1 },
 ]
 
 export const DEMO_SETTLE_UP: SettleUpEntry[] = [
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Budi', amount_owed: 127050 },
-  { bill_id: 'demo-2', ref_code: 'BILL_20260614_001', place: 'Warung Bu Siti', bill_date: '2026-06-14', person: 'Budi', amount_owed: 78000 },
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Sarah', amount_owed: 98175 },
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Dewi', amount_owed: 109725 },
-  { bill_id: 'demo-3', ref_code: 'BILL_20260530_001', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000 },
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Budi', amount_owed: 127050, amount_paid: 100000 },
+  { bill_id: 'demo-2', ref_code: 'BILL_20260614_001', place: 'Warung Bu Siti', bill_date: '2026-06-14', person: 'Budi', amount_owed: 78000, amount_paid: 0 },
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Sarah', amount_owed: 98175, amount_paid: 0 },
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Dewi', amount_owed: 109725, amount_paid: 0 },
+  { bill_id: 'demo-3', ref_code: 'BILL_20260530_001', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000, amount_paid: 0 },
 ]
 
 export const DEMO_AUDIT: AuditEntry[] = [
@@ -181,8 +195,8 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { name: 'Kentang Goreng Gede', qty: 1, line_total: 30000, assigned_to: ['Sarah'] },
     ],
     shares: [
-      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000001', discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
-      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000002', discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000001', amount_paid: 42760, discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000002', amount_paid: 33140, discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
     ],
   },
   {
@@ -208,10 +222,10 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
       { name: 'Aqua Reflections Natural', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
     ],
     shares: [
-      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000003', discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
-      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000004', discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
-      { person: 'Andi', pay_token: '00000000-0000-4000-8000-000000000005', discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
-      { person: 'Dewi', pay_token: '00000000-0000-4000-8000-000000000006', discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
+      { person: 'Budi', pay_token: '00000000-0000-4000-8000-000000000003', amount_paid: 100000, discount_share: 0, tax_share: 11550, service_share: 5500, rounding_share: 0, amount_owed: 127050, status: 'belum lunas', paid_date: null },
+      { person: 'Sarah', pay_token: '00000000-0000-4000-8000-000000000004', amount_paid: 0, discount_share: 0, tax_share: 8925, service_share: 4250, rounding_share: 0, amount_owed: 98175, status: 'belum lunas', paid_date: null },
+      { person: 'Andi', pay_token: '00000000-0000-4000-8000-000000000005', amount_paid: 0, discount_share: 0, tax_share: 11025, service_share: 5250, rounding_share: 0, amount_owed: 121275, status: 'lunas', paid_date: '2026-07-02' },
+      { person: 'Dewi', pay_token: '00000000-0000-4000-8000-000000000006', amount_paid: 0, discount_share: 0, tax_share: 9975, service_share: 4750, rounding_share: 0, amount_owed: 109725, status: 'belum lunas', paid_date: null },
     ],
   },
 ]
@@ -235,10 +249,22 @@ export function demoPaymentPage(token: string): PaymentPageInfo | null {
       bill_date: bill.bill_date,
       ref_code: bill.ref_code,
       amount_owed: share.amount_owed,
+      // Summed from the proofs already in the fixtures, so the demo cannot
+      // disagree with itself: a proof that did not reach the right account
+      // counts for nothing here for the same reason it counts for nothing in
+      // the database.
+      amount_paid: DEMO_FLAGGED.filter(
+        (p) => p.ref_code === bill.ref_code && p.person === share.person && p.recipient_ok === true,
+      ).reduce((sum, p) => sum + (p.amount_read ?? 0), 0),
       status: share.status,
       bank_name: bill.bank_name,
       account_number: bill.account_number,
       account_holder: bill.account_holder,
+      // From the same bill the rest of this row comes from, so the payer page
+      // in the demo shows what the real one would.
+      qris_path: DEMO_BILLS.find((b) => b.ref_code === bill.ref_code)?.qris_path ?? null,
+      payment_method:
+        DEMO_BILLS.find((b) => b.ref_code === bill.ref_code)?.payment_method ?? 'bank',
     }
   }
   return null
@@ -263,8 +289,9 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     amount_read: 100000,
     recipient_read: 'BCA 1234567890',
     recipient_expected: 'BCA 1234567890',
+    recipient_ok: true,
     verdict: 'mismatch',
-    note: null,
+    note: 'Kurang Rp 27.050 — kebaca Rp 100.000, sisa Rp 127.050.',
     image_path: 'bukti/BILL_20260626_001/3f2a1b9c.jpg',
     created_at: '2026-07-02T11:20:00Z',
   },
@@ -275,11 +302,12 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     place: 'Lucky Cat Coffee & Kitchen',
     person: 'Dewi',
     amount_owed: 109725,
-    amount_read: 150000,
-    recipient_read: 'BCA 1234567890',
+    amount_read: 109725,
+    recipient_read: 'BCA 8899001122',
     recipient_expected: 'BCA 1234567890',
+    recipient_ok: false,
     verdict: 'mismatch',
-    note: null,
+    note: 'Nominalnya pas tapi rekeningnya beda.',
     image_path: 'bukti/BILL_20260626_001/9c4d2e7f.jpg',
     created_at: '2026-07-02T09:02:00Z',
   },
@@ -293,6 +321,7 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     amount_read: null,
     recipient_read: null,
     recipient_expected: 'GoPay 081234567890',
+    recipient_ok: null,
     verdict: 'unclear',
     note: 'Gambarnya kek buram, nominalnya nggak kebaca.',
     image_path: 'bukti/BILL_20260530_001/1a7f3b20.jpg',

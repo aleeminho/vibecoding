@@ -33,6 +33,9 @@
   let message = $state('')
   let copied = $state<string | null>(null)
 
+  /** What is still owed on one bill, after anything already paid. */
+  const sisa = (b: SettleUpEntry) => Math.max(0, b.amount_owed - b.amount_paid)
+
   async function load() {
     status = 'loading'
     try {
@@ -55,29 +58,79 @@
     return [...grouped.entries()].map(([person, bills]) => ({
       person,
       bills,
-      total: bills.reduce((acc, b) => acc + b.amount_owed, 0),
+      total: bills.reduce((acc, b) => acc + sisa(b), 0),
+      days: daysSinceOldest(bills),
     }))
   })
 
   let grandTotal = $derived(byPerson.reduce((acc, p) => acc + p.total, 0))
 
   /**
-   * A short breakdown to send someone who asks what they owe.
+   * How many days the oldest unpaid bill has been sitting.
    *
-   * Plain text rather than the full bill message: this is the chase, not the
-   * original share, and it has to read sensibly out of context.
+   * The oldest rather than the newest or an average: what makes a nudge
+   * reasonable is the one that has been outstanding longest, and averaging
+   * would let a large old debt hide behind a fresh one.
+   *
+   * Local midnight to local midnight, because "3 days" should mean three days
+   * to the person reading it, in their timezone, not 72 hours of UTC.
    */
-  function chaseText(person: string, bills: SettleUpEntry[], total: number): string {
-    const lines = [`Yang belum kelar, ${person}:`, '']
+  function daysSinceOldest(bills: SettleUpEntry[]): number {
+    const oldest = bills.reduce((min, b) => (b.bill_date < min ? b.bill_date : min), bills[0].bill_date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const days = Math.round(
+      (today.getTime() - new Date(`${oldest}T00:00:00`).getTime()) / 86_400_000,
+    )
+    return Math.max(0, days)
+  }
+
+  /**
+   * After how many days a chase turns into a reminder.
+   *
+   * Adjustable, and kept in localStorage rather than in the database. It is a
+   * preference about tone, not a fact about anyone's money — an extra table and
+   * a settings screen for one number would cost more than it explains, and it
+   * belongs to this device anyway.
+   */
+  const REMINDER_CHOICES = [1, 3, 7, 14]
+  let threshold = $state(Number(localStorage.getItem('duo:reminder-days')) || 3)
+
+  function setThreshold(days: number) {
+    threshold = days
+    localStorage.setItem('duo:reminder-days', String(days))
+  }
+
+  /**
+   * The message to send someone who owes money.
+   *
+   * Two versions on purpose, and the difference is tone rather than content —
+   * both state the same amounts. Before the threshold it is a chase, which
+   * assumes the other person simply has not got to it. After, it is a reminder,
+   * which is softer because by then the silence has gone on long enough that
+   * the likely reason is that they forgot, and a firmer message would cost more
+   * than the money is worth.
+   */
+  function messageFor(person: string, bills: SettleUpEntry[], total: number, overdue: boolean): string {
+    const lines = overdue
+      ? [`Halo ${person}, ngingetin pelan-pelan ya 🙏`, '']
+      : [`Yang belum kelar, ${person}:`, '']
+
     for (const b of bills) {
-      lines.push(`${b.place} (${formatDate(b.bill_date)}) — ${rupiah(b.amount_owed)}`)
+      const amount = sisa(b)
+      lines.push(
+        `${b.place} (${formatDate(b.bill_date)}) — ${rupiah(amount)}` +
+          (b.amount_paid > 0 ? ` (dari ${rupiah(b.amount_owed)}, udah masuk ${rupiah(b.amount_paid)})` : ''),
+      )
     }
+
     lines.push('', `Total ${rupiah(total)}`)
+    if (overdue) lines.push('', 'Kalau udah transfer, kabarin aja ya — nanti gua cek.')
     return lines.join('\n')
   }
 
-  async function copyChase(person: string, bills: SettleUpEntry[], total: number) {
-    copied = (await copyText(chaseText(person, bills, total))) ? person : null
+  async function copyChase(person: string, bills: SettleUpEntry[], total: number, overdue: boolean) {
+    copied = (await copyText(messageFor(person, bills, total, overdue))) ? person : null
     setTimeout(() => (copied = null), 2000)
   }
 
@@ -111,11 +164,35 @@
           <span class="strong">Total belum masuk</span>
           <span class="row-value strong num">{rupiah(grandTotal)}</span>
         </div>
+        <div class="row">
+          <span class="dim small">Ingetin kalau udah lewat</span>
+          <span class="row-value">
+            <select
+              class="days"
+              value={threshold}
+              onchange={(e) => setThreshold(Number(e.currentTarget.value))}
+              aria-label="Batas hari sebelum diingetin"
+            >
+              {#each REMINDER_CHOICES as days (days)}
+                <option value={days}>{days} hari</option>
+              {/each}
+            </select>
+          </span>
+        </div>
       </div>
     </div>
 
     {#each byPerson as person (person.person)}
-      <h3 class="group-title">{person.person}</h3>
+      {@const overdue = person.days >= threshold}
+      <h3 class="group-title">
+        <button
+          class="who"
+          onclick={() => (location.hash = `#/orang?p=${encodeURIComponent(person.person)}`)}
+        >
+          {person.person}
+        </button>
+        {#if overdue}<span class="due">lewat {person.days} hari</span>{/if}
+      </h3>
       <div class="group">
         <div class="list">
           {#each person.bills as bill (bill.bill_id)}
@@ -124,9 +201,19 @@
                 <span>{bill.place}</span>
                 <span class="faint small num">
                   {formatDate(bill.bill_date)} · {bill.ref_code}
+                  <!--
+                    A part-paid bill shows both numbers, because the amount on
+                    the right is now the remainder and a row that says
+                    "Rp 27.050" about a Rp 127.050 dinner needs the context.
+                  -->
+                  {#if bill.amount_paid > 0}
+                    · udah masuk {rupiah(bill.amount_paid)}
+                  {/if}
                 </span>
               </div>
-              <span class="row-value num">{rupiah(bill.amount_owed)}</span>
+              <span class="row-value num" class:partial={bill.amount_paid > 0}>
+                {rupiah(sisa(bill))}
+              </span>
             </div>
           {/each}
 
@@ -138,9 +225,13 @@
           <div class="row actions">
             <button
               class="plain"
-              onclick={() => copyChase(person.person, person.bills, person.total)}
+              onclick={() => copyChase(person.person, person.bills, person.total, overdue)}
             >
-              {copied === person.person ? 'Tersalin ✓' : 'Copy buat nagih'}
+              {copied === person.person
+                ? 'Tersalin ✓'
+                : overdue
+                  ? 'Copy teks reminder'
+                  : 'Copy buat nagih'}
             </button>
           </div>
         </div>
@@ -176,5 +267,59 @@
 
   .actions {
     justify-content: flex-end;
+  }
+
+  /* The remainder, on a bill that has had something paid against it. Marked,
+     because it is a different quantity from every other figure in the column. */
+  .row-value.partial {
+    color: var(--brand-light);
+    font-weight: 600;
+  }
+
+  /* The name is a link, but it has to keep reading as the section heading it
+     sits in — the global button style would give it a card, a border and a
+     44px hit area, none of which belong in a group title. */
+  .who {
+    min-height: 0;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .who:active {
+    opacity: 0.55;
+    transform: none;
+  }
+
+  /* Beside the name rather than on a line of its own: this is a note about who
+     to chase, not a heading for a section. */
+  .due {
+    margin-left: 8px;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--warn);
+  }
+
+  /*
+   * Sized down from the global control style. A full-height input in a list row
+   * would set the row's height and make one settings line twice as tall as
+   * every bill around it.
+   */
+  .days {
+    width: auto;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: var(--text-sm);
   }
 </style>

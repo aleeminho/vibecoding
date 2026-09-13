@@ -184,7 +184,20 @@
         <div class="who-head">
           <h2>
             {person.person}
-            {#if person.status === 'lunas'}<span class="paid">sudah bayar</span>{/if}
+            <!--
+              A note beside the name, not a different figure in the column.
+              The amount stays the person's share of the split, because the
+              footer reconciles the column against the bill total — swap it for
+              a remainder and the arithmetic on the page stops adding up, which
+              is the one thing this document cannot afford. What has been paid
+              is a fact about the debt, and the settle-up screen is where the
+              debt is tracked.
+            -->
+            {#if person.status === 'lunas'}
+              <span class="paid">sudah bayar</span>
+            {:else if person.amount_paid > 0}
+              <span class="paid">udah masuk {rupiah(person.amount_paid)}</span>
+            {/if}
           </h2>
           <span class="fig strong">{rupiahDigits(person.total)}</span>
         </div>

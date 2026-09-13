@@ -27,8 +27,18 @@
   import Preview from './routes/Preview.svelte'
   import Nota from './routes/Nota.svelte'
   import Bayar from './routes/Bayar.svelte'
+  import Orang from './routes/Orang.svelte'
 
-  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview' | 'nota' | 'bayar'
+  type Route =
+    | 'bills'
+    | 'capture'
+    | 'settle'
+    | 'report'
+    | 'review'
+    | 'preview'
+    | 'nota'
+    | 'bayar'
+    | 'orang'
 
   /** Routes that are a document rather than a screen: no chrome, white page. */
   const PAPER: Route[] = ['nota', 'bayar']
@@ -69,7 +79,17 @@
     // silently falls back to the default route — which looks like the query
     // param was ignored rather than like a routing bug.
     const raw = location.hash.replace(/^#\/?/, '').split('?')[0]
-    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview', 'nota', 'bayar']
+    const known: Route[] = [
+      'bills',
+      'capture',
+      'settle',
+      'report',
+      'review',
+      'preview',
+      'nota',
+      'bayar',
+      'orang',
+    ]
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
   }
 
@@ -119,6 +139,7 @@
     preview: 'Preview',
     nota: 'Nota',
     bayar: 'Bayar',
+    orang: 'Orang',
   }
 
   onMount(() => {
@@ -196,7 +217,14 @@
     <main><SignIn /></main>
   {:else}
     <main>
-      <h1 class="page-title">{TITLES[route]}</h1>
+      <!--
+        The person screen writes its own title, because for that one the title
+        is a name rather than a word — "Orang" above "Budi" says the same thing
+        twice.
+      -->
+      {#if route !== 'orang'}
+        <h1 class="page-title">{TITLES[route]}</h1>
+      {/if}
       {#if route === 'bills'}
         <Bills />
       {:else if route === 'capture'}
@@ -205,6 +233,8 @@
         <Settle />
       {:else if route === 'review'}
         <Review onDone={() => go('bills')} />
+      {:else if route === 'orang'}
+        <Orang />
       {:else}
         <Report />
       {/if}

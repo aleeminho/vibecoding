@@ -22,7 +22,14 @@ export interface ReadProof {
 }
 
 export interface Expected {
-  amountOwed: number
+  /**
+   * What is still due, not what was owed at the start.
+   *
+   * The two differ the moment somebody pays in instalments: a second transfer
+   * of Rp 77.050 against a Rp 127.050 share is the amount that finishes the
+   * job, and comparing it against the original would call it short forever.
+   */
+  amountDue: number
   accountHolder: string | null
   accountNumber: string | null
 }
@@ -31,6 +38,16 @@ export type Verdict = 'matched' | 'mismatch' | 'unclear'
 
 export interface Judgement {
   verdict: Verdict
+  /**
+   * Whether the money reached the right account, or null when the proof does
+   * not say. Separate from the verdict, because the verdict answers "does this
+   * settle the share" and this answers "did the money arrive" — and a transfer
+   * of the wrong amount to the right account is a yes and a no at once.
+   *
+   * This is what the running total is summed on. A `mismatch` is far too blunt
+   * to sum on: it covers both an instalment and a transfer to a stranger.
+   */
+  recipientOk: boolean | null
   /** Human-readable, shown to the operator. Never shown to the payer as a verdict. */
   note: string
 }
@@ -98,40 +115,61 @@ export function judge(read: ReadProof, expected: Expected): Judgement {
   if (statusLooksFailed(read.status_text)) {
     return {
       verdict: 'mismatch',
+      // Deliberately null rather than true: a failed transfer moved no money,
+      // so whatever account it names must not add to a running total.
+      recipientOk: null,
       note: `Buktinya kedeteksi belum berhasil (${read.status_text}).`,
-    }
-  }
-
-  if (read.amount === null || !Number.isFinite(read.amount)) {
-    return { verdict: 'unclear', note: 'Nominalnya nggak kebaca dari gambar.' }
-  }
-
-  if (read.amount !== expected.amountOwed) {
-    const diff = expected.amountOwed - read.amount
-    return {
-      verdict: 'mismatch',
-      note:
-        diff > 0
-          ? `Kurang Rp ${diff.toLocaleString('id-ID')} — kebaca Rp ${read.amount.toLocaleString('id-ID')}, harusnya Rp ${expected.amountOwed.toLocaleString('id-ID')}.`
-          : `Lebih Rp ${Math.abs(diff).toLocaleString('id-ID')} — kebaca Rp ${read.amount.toLocaleString('id-ID')}, harusnya Rp ${expected.amountOwed.toLocaleString('id-ID')}.`,
     }
   }
 
   const recipient = recipientMatches(read, expected)
 
+  // The recipient is checked before the amount, and this is the one ordering
+  // decision in here that changes an answer rather than a message. A transfer
+  // of the wrong amount to someone else is not an instalment — it is money
+  // that paid a stranger, and reporting it as "kurang Rp 20.000" would invite
+  // the operator to accept it.
+  if (recipient === false) {
+    return {
+      verdict: 'mismatch',
+      recipientOk: false,
+      note: `Penerimanya beda (${read.recipient_name ?? '?'}). Kemungkinan salah rekening.`,
+    }
+  }
+
+  if (read.amount === null || !Number.isFinite(read.amount)) {
+    return {
+      verdict: 'unclear',
+      recipientOk: recipient,
+      note: 'Nominalnya nggak kebaca dari gambar.',
+    }
+  }
+
+  if (read.amount !== expected.amountDue) {
+    const diff = expected.amountDue - read.amount
+    const money = (n: number) => n.toLocaleString('id-ID')
+
+    // Short is the instalment case, and the wording says so instead of calling
+    // it an error. "Kurang" is still the honest word — it is short — but the
+    // note names the sisa rather than only the gap, because the question the
+    // payer has next is how much is left.
+    return {
+      verdict: 'mismatch',
+      recipientOk: recipient,
+      note:
+        diff > 0
+          ? `Kurang Rp ${money(diff)} — kebaca Rp ${money(read.amount)}, sisa Rp ${money(expected.amountDue)}.`
+          : `Lebih Rp ${money(Math.abs(diff))} — kebaca Rp ${money(read.amount)}, sisa Rp ${money(expected.amountDue)}.`,
+    }
+  }
+
   if (recipient === null) {
     return {
       verdict: 'unclear',
+      recipientOk: null,
       note: 'Nominalnya pas, tapi penerimanya nggak kebaca — perlu dicek manual.',
     }
   }
 
-  if (!recipient) {
-    return {
-      verdict: 'mismatch',
-      note: `Nominalnya pas, tapi penerimanya beda (${read.recipient_name ?? '?'}). Kemungkinan salah rekening.`,
-    }
-  }
-
-  return { verdict: 'matched', note: 'Nominal dan penerima cocok.' }
+  return { verdict: 'matched', recipientOk: true, note: 'Nominal dan penerima cocok.' }
 }

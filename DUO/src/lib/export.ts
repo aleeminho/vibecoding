@@ -87,6 +87,8 @@ export interface ExportBill {
      * whole group, and a token in it would let anyone mark anyone paid.
      */
     pay_token: string | null
+    /** Part of this share already settled by a proof of payment. */
+    amount_paid: number
     discount_share: number
     tax_share: number
     service_share: number
@@ -181,6 +183,14 @@ export interface PersonBreakdown {
   extra: number
   total: number
   status: string
+  /**
+   * What has already landed against this share.
+   *
+   * On the document because a nota is re-sent as often as it is first sent,
+   * and one that still demands the full amount from somebody who has paid half
+   * is worse than no document at all.
+   */
+  amount_paid: number
   paid_date: string | null
 }
 
@@ -268,6 +278,7 @@ export function allocateBill(bill: ExportBill): PersonBreakdown[] {
       extra,
       total: share.amount_owed,
       status: share.status,
+      amount_paid: share.amount_paid,
       paid_date: share.paid_date,
     })
   }
