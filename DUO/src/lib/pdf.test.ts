@@ -174,6 +174,35 @@ describe('pdf writer', () => {
       expect(s.match(/\/Subtype \/Link/g)?.length).toBe(1)
     })
 
+    /*
+     * Where the URL is drawn as text. Not the first place the URL appears in
+     * the file: the annotation carries it too, and the page dictionary is
+     * written before the content stream, so a plain `indexOf` finds the
+     * annotation and every assertion after it is about the wrong bytes.
+     */
+    const drawnAt = (s: string) =>
+      s.indexOf(`(https://splitfair.xyz/#/bayar?t=${TOKEN}) Tj`)
+
+    test('the link sits in that person own block, not in a section at the foot', async () => {
+      // Under their items, so the document says whose credential it is by
+      // position. Collected at the foot it was a row of small print that had to
+      // be read across to find your own name.
+      const s = await withLinks(unpaid({}))
+      const at = drawnAt(s)
+      expect(at).toBeGreaterThan(s.indexOf('(Sarah)'))
+      expect(at).toBeLessThan(s.indexOf('cocok dengan total struk'))
+    })
+
+    test('the link is set in the accent the bill total is set in', async () => {
+      // Which is what makes it read as something to press rather than as a line
+      // of small print. Asserted on the operator holding the URL rather than on
+      // the row, because the label beside it stays quiet on purpose.
+      const s = await withLinks(unpaid({}))
+      const at = drawnAt(s)
+      const op = s.slice(s.lastIndexOf('BT ', at), s.indexOf('Tj ET', at))
+      expect(op).toContain('0.816 0.29 0.008 rg')
+    })
+
     test('a settled share gets no link, even with a token', async () => {
       // Handing somebody a payment link for a bill they have already paid is a
       // good way to be paid twice.
@@ -207,24 +236,29 @@ describe('pdf writer', () => {
       expect(y1).toBeLessThan(y2)
     })
 
-    test('the widest deployment still fits beside the longest name', () => {
-      // The name is left-aligned at the margin and the URL is right-aligned,
-      // so the two collide silently once they are wider than the column
-      // together — and there is nothing in the output that says so. GitHub
-      // Pages is the longest of the three places this is served from, and a
-      // twenty-character Indonesian name is not unusual.
+    test('the widest deployment still fits beside the label', () => {
+      // The label is left-aligned and the URL is right-aligned, so the two
+      // collide silently once they are wider than the column together — and
+      // there is nothing in the output that says so. GitHub Pages is the
+      // longest of the three places this is served from.
+      //
+      // This asserted against a twenty-character name back when the row carried
+      // one. The row moved into the person's block and the left-hand text became
+      // a fixed label, which is narrower — so the check is slack now, and slack
+      // in the safe direction. It stays because the URL is what grows.
       const COLUMN = 595.28 - 48 - 48
-      const longestName = 'Muhammad Alifikri Wijaya'.slice(0, 20)
-      const pagesUrl = 'https://aleeminho.github.io/vibecoding/#/bayar?t=00000000-0000-4000-8000-000000000000'
+      const LABEL_INDENT = 12
+      const pagesUrl =
+        'https://aleeminho.github.io/vibecoding/#/bayar?t=00000000-0000-4000-8000-000000000000'
 
       // Helvetica is proportional and this writer has no metrics table for it,
-      // so the name is estimated at about half its length in points at 9.5pt —
+      // so the label is estimated at about half its length in points at 9pt —
       // deliberately generous, because the point of the check is to catch a
       // collision with room to spare rather than to be exact.
-      const nameWidth = longestName.length * 5
+      const labelWidth = 'Link bayar'.length * 5 + LABEL_INDENT
       const urlWidth = textWidth(pagesUrl, 7.5)
 
-      expect(nameWidth + urlWidth).toBeLessThan(COLUMN)
+      expect(labelWidth + urlWidth).toBeLessThan(COLUMN)
     })
 
     test('the vendor payer gets no link, even while their share reads unpaid', async () => {

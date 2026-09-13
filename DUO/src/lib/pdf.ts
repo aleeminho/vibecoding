@@ -538,9 +538,51 @@ export function buildNotaPdf(
   pdf.rule(left, pdf.cursor, right, INK, 1.6)
   line(22)
 
+  /*
+   * Each person's payment link, under their own items rather than collected at
+   * the foot.
+   *
+   * The link is the credential — whoever holds it can mark that share paid —
+   * and putting it in the block it belongs to means the document says whose it
+   * is by position instead of by a row of small print at the bottom that has to
+   * be read across. It is also where the screen has always put it.
+   *
+   * Resolved before the loop rather than inside it, because a block's height
+   * has to account for its link before the block is drawn or a page break lands
+   * through somebody's items.
+   *
+   * `is_payer` is excluded as a rule rather than as a consequence. Their share
+   * being settled is the mechanism; not handing them a link is the intent, and
+   * the two are written by separate calls. If the marker landed and the status
+   * write did not, the document would otherwise tell somebody they paid the
+   * vendor and then ask them to pay.
+   *
+   * The trade-off, stated where it is made rather than left implicit: these are
+   * credentials and the document they are printed on goes to the whole group.
+   * A mis-tap is possible. What catches it is the amount check at the other end
+   * — paying Rp 98.175 against a page expecting Rp 127.050 settles nothing and
+   * lands in the review queue instead. Two people owing the exact same amount
+   * is the case that gets through, and it is rare enough to accept.
+   */
+  const payLink = new Map<string, string>()
+  if (baseUrl) {
+    for (const share of bill.shares) {
+      if (
+        share.person !== bill.paid_by_person &&
+        share.status !== 'lunas' &&
+        share.pay_token &&
+        share.amount_paid < share.amount_owed
+      ) {
+        payLink.set(share.person, `${baseUrl}#/bayar?t=${share.pay_token}`)
+      }
+    }
+  }
+
   // ---- one block per person ----
   for (const person of breakdown) {
-    const blockHeight = 52 + person.items.length * 13 + person.components.length * 13
+    const link = payLink.get(person.person)
+    const blockHeight =
+      52 + person.items.length * 13 + person.components.length * 13 + (link ? 19 : 0)
     line(0, blockHeight)
 
     // Beside the name rather than in the money column. The column has to keep
@@ -598,6 +640,27 @@ export function buildNotaPdf(
         })
         line(13)
       }
+    }
+
+    if (link) {
+      line(5)
+      pdf.text('Link bayar', left + 12, pdf.cursor, { size: 9, color: SOFT })
+      // The rectangle covers the whole row, not just the URL. A 7.5pt run of
+      // monospace is a small target under a thumb, and there is no reason to
+      // make somebody aim at it when the name beside it is part of the same
+      // thing.
+      pdf.link(left, pdf.cursor - 4, right - left, 15, link)
+      // The same accent as the bill's total, which is what makes it read as
+      // something to press rather than as a line of small print. It is the only
+      // other place in the document that colour is spent, and both are things
+      // you act on rather than read.
+      pdf.text(link, right, pdf.cursor, {
+        size: 7.5,
+        font: 'mono',
+        color: ACCENT,
+        align: 'right',
+      })
+      line(14)
     }
 
     line(14)
@@ -698,52 +761,6 @@ export function buildNotaPdf(
     // showed — and the payment links did, landing straight on the account
     // number. Found in a render, not in the bytes.
     line(42)
-  }
-
-  // ---- payment links ----
-  //
-  // One per person who still owes, in the document rather than sent one at a
-  // time, so the whole group gets a link they can tap without the operator
-  // sending four separate messages.
-  //
-  // The trade-off, stated where it is made rather than left implicit: these
-  // are credentials and they are all in one file that goes to everybody. A
-  // mis-tap is possible. What catches it is the amount check at the other end
-  // — paying Rp 98.175 against a page expecting Rp 127.050 settles nothing
-  // and lands in the review queue instead. Two people owing the exact same
-  // amount is the case that gets through, and it is rare enough to accept.
-  //
-  // `is_payer` is excluded as a rule rather than as a consequence. Their share
-  // being settled is the mechanism; not handing them a link is the intent, and
-  // the two are written by separate calls. If the marker landed and the status
-  // write did not, the document would otherwise tell somebody they paid the
-  // vendor and then ask them to pay.
-  const owed = bill.shares.filter(
-    (s) =>
-      s.person !== bill.paid_by_person &&
-      s.status !== 'lunas' &&
-      s.pay_token &&
-      s.amount_paid < s.amount_owed,
-  )
-
-  if (owed.length > 0 && baseUrl) {
-    // The header and every row, so a page break lands before the section
-    // rather than through the middle of it.
-    line(0, 34 + owed.length * 17)
-    pdf.text('Link bayar', left, pdf.cursor, { size: 8.5, font: 'sans-bold', color: SOFT })
-    line(18)
-
-    for (const share of owed) {
-      const url = `${baseUrl}#/bayar?t=${share.pay_token}`
-      // The rectangle covers the whole row, not just the URL. A 7.5pt run of
-      // monospace is a small target under a thumb, and there is no reason to
-      // make someone aim at it when the name beside it is part of the same
-      // thing.
-      pdf.link(left, pdf.cursor - 4, right - left, 15, url)
-      pdf.text(share.person, left, pdf.cursor, { size: 9.5 })
-      pdf.text(url, right, pdf.cursor, { size: 7.5, font: 'mono', color: SOFT, align: 'right' })
-      line(17)
-    }
   }
 
   return pdf.build()
