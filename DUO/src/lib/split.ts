@@ -13,6 +13,7 @@ import type {
   GateFailure,
   GateReport,
   ParticipantShare,
+  RoundingMode,
   SplitResult,
 } from './types'
 
@@ -57,6 +58,7 @@ export function computeSplit(
   serviceCharge: number,
   total: number,
   roster: string[] = [],
+  rounding: RoundingMode = 0,
 ): SplitResult {
   if (subtotal <= 0) {
     throw new Error('subtotal must be positive; cannot allocate shares against zero')
@@ -89,6 +91,7 @@ export function computeSplit(
       tax_share,
       service_share,
       amount_owed: item_subtotal - discount_share + tax_share + service_share,
+      rounding_share: 0,
     }
   })
 
@@ -131,6 +134,51 @@ export function computeSplit(
     throw new Error(
       `gate 4 failed: shares sum to ${finalSum}, bill total is ${total}. This is a bug in computeSplit.`,
     )
+  }
+
+  /*
+   * Optional rounding to a round number of rupiah.
+   *
+   * Applied AFTER the reconciliation above rather than folded into it, and that
+   * ordering is the whole point. The residual bound a few lines up exists to
+   * catch inputs that do not reconcile at all, and it is only meaningful while
+   * the only thing being absorbed is sub-rupiah float noise. Rounding to 500
+   * moves up to 250 rupiah per person by design, so folding it in would force
+   * that bound open and quietly disable the check that catches a misread
+   * receipt.
+   *
+   * The difference the rounding introduces is not spread back across everyone —
+   * that would undo the rounding it just applied. It lands on one person, and
+   * is recorded per person in `rounding_share` so the books still add up and
+   * the shift is visible rather than buried in someone's total.
+   */
+  if (rounding > 0) {
+    const before = participants.map((p) => p.amount_owed)
+
+    for (const p of participants) {
+      p.amount_owed = Math.round(p.amount_owed / rounding) * rounding
+    }
+
+    const drift = total - participants.reduce((acc, p) => acc + p.amount_owed, 0)
+
+    if (drift !== 0 && participants.length > 0) {
+      let highest = 0
+      for (let i = 1; i < participants.length; i++) {
+        if (participants[i].amount_owed > participants[highest].amount_owed) highest = i
+      }
+      participants[highest].amount_owed += drift
+    }
+
+    participants.forEach((p, i) => {
+      p.rounding_share = p.amount_owed - before[i]
+    })
+
+    const roundedSum = participants.reduce((acc, p) => acc + p.amount_owed, 0)
+    if (roundedSum !== total) {
+      throw new Error(
+        `gate 4 failed after rounding: shares sum to ${roundedSum}, bill total is ${total}. This is a bug in computeSplit.`,
+      )
+    }
   }
 
   return { participants, residual, residual_applied_to }

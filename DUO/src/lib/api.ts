@@ -15,7 +15,17 @@
 
 import { supabase } from './supabase'
 import { normalizeExtraction, stripCodeFence } from './normalize'
-import { DEMO_BILLS, DEMO_MONTHLY, DEMO_OUTSTANDING, DEMO_PEOPLE, isDemo } from './demo'
+import {
+  DEMO_AUDIT,
+  DEMO_BILLS,
+  DEMO_EXPORT_BILLS,
+  DEMO_MONTHLY,
+  DEMO_OUTSTANDING,
+  DEMO_PEOPLE,
+  DEMO_SETTLE_UP,
+  isDemo,
+} from './demo'
+import type { ExportBill } from './export'
 import type { AssignedItem, Extraction, ParticipantShare } from './types'
 
 const BUCKET = 'receipts'
@@ -168,6 +178,9 @@ export interface BillWithShares {
   total: number
   receipt_path: string | null
   notes: string | null
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
   shares: BillShare[]
 }
 
@@ -185,8 +198,11 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
   const { data, error } = await supabase
     .from('bills')
     .select(
-      'id, ref_code, place, bill_date, total, receipt_path, notes, bill_participants(person, amount_owed, status, paid_date)',
+      'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, bill_participants(person, amount_owed, status, paid_date)',
     )
+    // Deleted bills are hidden, not gone. Every read path filters here rather
+    // than relying on the caller to remember.
+    .is('deleted_at', null)
     .order('bill_date', { ascending: false })
     .order('ref_code', { ascending: false })
     .limit(limit)
@@ -231,6 +247,14 @@ export async function setShareStatus(
     .eq('person', person)
 
   if (error) throw new Error(error.message)
+
+  // Logged here rather than at each call site, so a new screen that flips this
+  // cannot forget to record it. Marking someone paid is a statement about
+  // money, which is exactly the kind of change the trail exists for.
+  await logAudit(paid ? 'share.paid' : 'share.unpaid', {
+    billId,
+    detail: { person },
+  })
 }
 
 /**
@@ -276,6 +300,27 @@ export async function signedReceiptUrl(path: string, seconds = 3600): Promise<st
   return data.signedUrl
 }
 
+/**
+ * Where the money should go. Required on every new bill — a split nobody can
+ * pay is not finished — and stored per bill because one bill is one payment.
+ */
+export interface Destination {
+  bankName: string
+  accountNumber: string
+  accountHolder: string
+}
+
+/**
+ * Digits only, so the same account is written the same way every time.
+ *
+ * Bank apps print account numbers with dots, dashes and spaces depending on the
+ * bank, and a CSV where the same account appears three ways is a CSV you cannot
+ * group by. Stripping here means the database check can stay strict.
+ */
+export function normaliseAccountNumber(input: string): string {
+  return input.replace(/[^0-9]/g, '')
+}
+
 export interface CommitInput {
   refCode: string
   place: string
@@ -291,6 +336,7 @@ export interface CommitInput {
   receiptPath: string | null
   notes: string | null
   extraction: unknown
+  destination: Destination | null
 }
 
 /**
@@ -326,8 +372,196 @@ export async function commitBill(input: CommitInput): Promise<string> {
     p_receipt_path: input.receiptPath,
     p_notes: input.notes,
     p_extraction: input.extraction,
+    p_bank_name: input.destination?.bankName ?? null,
+    p_account_number: input.destination?.accountNumber ?? null,
+    p_account_holder: input.destination?.accountHolder ?? null,
   })
 
   if (error) throw new Error(error.message)
   return data as string
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail
+// ---------------------------------------------------------------------------
+
+export type AuditAction =
+  | 'bill.deleted'
+  | 'bill.restored'
+  | 'bill.amount_changed'
+  | 'share.paid'
+  | 'share.unpaid'
+
+/**
+ * Record what was done to a bill.
+ *
+ * Best effort on purpose. The log is a record of an action, not a condition of
+ * it: if writing the entry fails, refusing the delete would leave the operator
+ * unable to correct a mistake because an audit insert failed. The failure is
+ * surfaced in the console rather than swallowed, so it is not invisible.
+ */
+export async function logAudit(
+  action: AuditAction,
+  entry: { billId?: string | null; refCode?: string | null; detail?: unknown },
+): Promise<void> {
+  if (import.meta.env.DEV && isDemo()) return
+
+  try {
+    const { error } = await supabase.from('audit_log').insert({
+      action,
+      bill_id: entry.billId ?? null,
+      ref_code: entry.refCode ?? null,
+      detail: entry.detail ?? null,
+    })
+    if (error) console.warn('audit log write failed:', error.message)
+  } catch (err) {
+    console.warn('audit log write failed:', (err as Error).message)
+  }
+}
+
+export interface AuditEntry {
+  id: string
+  action: string
+  ref_code: string | null
+  detail: unknown
+  created_at: string
+}
+
+export async function listAuditLog(limit = 100): Promise<AuditEntry[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_AUDIT
+
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select('id, action, ref_code, detail, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw new Error(error.message)
+  return data as AuditEntry[]
+}
+
+// ---------------------------------------------------------------------------
+// Soft delete
+// ---------------------------------------------------------------------------
+
+/**
+ * Hide a bill.
+ *
+ * Soft, not hard. A deleted bill keeps every row, so a mis-tap is one update
+ * away from being undone, the month stays auditable, and nothing that
+ * references the bill has to cope with a hole. `deleted_at` is filtered by
+ * every view and by listBills.
+ */
+export async function deleteBill(billId: string, refCode: string): Promise<void> {
+  if (import.meta.env.DEV && isDemo()) return
+
+  const { error } = await supabase
+    .from('bills')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', billId)
+
+  if (error) throw new Error(error.message)
+  await logAudit('bill.deleted', { billId, refCode })
+}
+
+export async function restoreBill(billId: string, refCode: string): Promise<void> {
+  if (import.meta.env.DEV && isDemo()) return
+
+  const { error } = await supabase.from('bills').update({ deleted_at: null }).eq('id', billId)
+
+  if (error) throw new Error(error.message)
+  await logAudit('bill.restored', { billId, refCode })
+}
+
+// ---------------------------------------------------------------------------
+// Detailed export and settle up
+// ---------------------------------------------------------------------------
+
+/**
+ * Everything the detailed export needs for a date range, in one round trip.
+ *
+ * One nested query rather than a view, for the same reason listBills is: the
+ * row count is bounded by the range and the embedding is already there. The
+ * flattening into item-per-person rows happens in src/lib/export.ts, where it
+ * is unit tested — doing it in SQL would put arithmetic that has to be exact
+ * somewhere no test can reach.
+ */
+export async function listExportBills(from: string, to: string): Promise<ExportBill[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_EXPORT_BILLS
+
+  const { data, error } = await supabase
+    .from('bills')
+    .select(
+      `ref_code, bill_date, place, bank_name, account_number, account_holder,
+       bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
+       bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`,
+    )
+    .is('deleted_at', null)
+    .gte('bill_date', from)
+    .lte('bill_date', to)
+    .order('bill_date', { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  type Row = {
+    ref_code: string
+    bill_date: string
+    place: string
+    bank_name: string | null
+    account_number: string | null
+    account_holder: string | null
+    bill_items: {
+      position: number
+      name: string
+      qty: number
+      line_total: number
+      bill_item_assignees: { bill_participants: { person: string } | null }[]
+    }[]
+    bill_participants: ExportBill['shares']
+  }
+
+  return ((data ?? []) as unknown as Row[]).map((bill) => ({
+    ref_code: bill.ref_code,
+    bill_date: bill.bill_date,
+    place: bill.place,
+    bank_name: bill.bank_name,
+    account_number: bill.account_number,
+    account_holder: bill.account_holder,
+    items: (bill.bill_items ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        line_total: item.line_total,
+        assigned_to: (item.bill_item_assignees ?? [])
+          .map((a) => a.bill_participants?.person)
+          .filter((p): p is string => typeof p === 'string'),
+      })),
+    shares: (bill.bill_participants ?? []).map((s) => ({
+      ...s,
+      rounding_share: s.rounding_share ?? 0,
+    })),
+  }))
+}
+
+export interface SettleUpEntry {
+  bill_id: string
+  ref_code: string
+  place: string
+  bill_date: string
+  person: string
+  amount_owed: number
+}
+
+/** Every unpaid share at bill granularity, so a total can show its sources. */
+export async function listSettleUp(): Promise<SettleUpEntry[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_SETTLE_UP
+
+  const { data, error } = await supabase
+    .from('v_settle_up')
+    .select('*')
+    .order('person', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return data as SettleUpEntry[]
 }

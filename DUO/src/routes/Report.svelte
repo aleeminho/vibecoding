@@ -17,7 +17,14 @@
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah } from '../lib/format'
-  import { listMonthlySpend, listOutstanding, type MonthlyRow, type Outstanding } from '../lib/api'
+  import {
+    listExportBills,
+    listMonthlySpend,
+    listOutstanding,
+    type MonthlyRow,
+    type Outstanding,
+  } from '../lib/api'
+  import { buildExportRows, toCsv } from '../lib/export'
 
   let monthly = $state<MonthlyRow[]>([])
   let outstanding = $state<Outstanding[]>([])
@@ -67,10 +74,14 @@
     return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
   }
 
-  function download(filename: string, content: string) {
-    // A BOM, so Excel on Windows reads the file as UTF-8 rather than mangling
-    // any non-ASCII names. Amounts stay plain integers so they remain summable.
-    const blob = new Blob(['﻿', content], { type: 'text/csv;charset=utf-8' })
+  /**
+   * @param bom Prepended by default so Excel on Windows reads the file as UTF-8
+   *   rather than the system codepage. The detailed export passes false because
+   *   toCsv() already emits one, and two BOMs render as a stray character in
+   *   the first cell.
+   */
+  function download(filename: string, content: string, { bom = true } = {}) {
+    const blob = new Blob([bom ? '﻿' : '', content], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -89,6 +100,44 @@
       ['', 'TOTAL', monthTotal, ''],
     ]
     download(`duo-${month}.csv`, lines.map((r) => r.map(csvCell).join(',')).join('\r\n'))
+  }
+
+  /**
+   * The detailed export: one row per item per person for the selected month.
+   *
+   * The range is the month already on screen rather than a separate date picker.
+   * A second control for the same thing would be a way to export a month that is
+   * not the one you are looking at, which is never what anyone means.
+   */
+  let exporting = $state(false)
+  let exportNote = $state<string | null>(null)
+
+  async function exportDetail() {
+    exporting = true
+    exportNote = null
+    try {
+      const [y, m] = month.split('-').map(Number)
+      // Day 0 of the next month is the last day of this one, which handles
+      // February without a table of month lengths.
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+      const from = `${month}-01`
+      const to = `${month}-${String(last).padStart(2, '0')}`
+
+      const bills = await listExportBills(from, to)
+      const detail = buildExportRows(bills)
+
+      if (detail.length === 0) {
+        exportNote = 'Nggak ada tagihan di bulan ini.'
+        return
+      }
+
+      download(`duo-detail-${month}.csv`, toCsv(detail), { bom: false })
+      exportNote = `${detail.length} baris dari ${bills.length} tagihan.`
+    } catch (err) {
+      exportNote = (err as Error).message
+    } finally {
+      exporting = false
+    }
   }
 
   function exportOutstanding() {
@@ -181,14 +230,21 @@
     </div>
 
     <div class="group actions no-print">
+      <button class="tinted" onclick={exportDetail} disabled={exporting}>
+        {exporting ? 'Nyiapin…' : 'Export detail (per item)'}
+      </button>
       <button class="tinted" onclick={exportMonth} disabled={rows.length === 0}>
-        Export CSV bulan ini
+        Export rekap bulan ini
       </button>
       <button class="tinted" onclick={exportOutstanding} disabled={outstanding.length === 0}>
         Export CSV belum lunas
       </button>
       <button class="primary" onclick={() => window.print()}>Simpan PDF</button>
     </div>
+
+    {#if exportNote}
+      <p class="pad dim small">{exportNote}</p>
+    {/if}
   </div>
 {/if}
 

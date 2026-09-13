@@ -23,9 +23,10 @@
   import Capture from './routes/Capture.svelte'
   import Review from './routes/Review.svelte'
   import Report from './routes/Report.svelte'
+  import Settle from './routes/Settle.svelte'
   import Preview from './routes/Preview.svelte'
 
-  type Route = 'bills' | 'capture' | 'report' | 'review' | 'preview'
+  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview'
 
   /**
    * Tab icons as SVG source. Trusted constants, never user input — which is the
@@ -46,6 +47,11 @@
       icon: `<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1.5 1.5 0 0 0 1.25-.67l.6-.9A1.5 1.5 0 0 1 9.8 4.8h4.4a1.5 1.5 0 0 1 1.25.67l.6.9A1.5 1.5 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.3"/>`,
     },
     {
+      id: 'settle',
+      label: 'Tagih',
+      icon: `<path d="M4 8h12M13 5l3 3-3 3M20 16H8M11 13l-3 3 3 3" stroke-linecap="round" stroke-linejoin="round"/>`,
+    },
+    {
       id: 'report',
       label: 'Report',
       icon: `<path d="M5 19V11M12 19V5M19 19v-5" stroke-linecap="round"/>`,
@@ -58,7 +64,7 @@
     // silently falls back to the default route — which looks like the query
     // param was ignored rather than like a routing bug.
     const raw = location.hash.replace(/^#\/?/, '').split('?')[0]
-    const known: Route[] = ['bills', 'capture', 'report', 'review', 'preview']
+    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview']
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
   }
 
@@ -87,6 +93,7 @@
   const TITLES: Record<Route, string> = {
     bills: 'Tagihan',
     capture: 'Foto Struk',
+    settle: 'Yang Perlu Ditagih',
     report: 'Report',
     review: 'Bagi Rata',
     preview: 'Preview',
@@ -155,6 +162,8 @@
         <Bills />
       {:else if route === 'capture'}
         <Capture onReview={() => go('review')} />
+      {:else if route === 'settle'}
+        <Settle />
       {:else if route === 'review'}
         <Review onDone={() => go('bills')} />
       {:else}

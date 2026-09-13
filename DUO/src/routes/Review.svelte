@@ -27,9 +27,16 @@
   import { draft } from '../lib/draft.svelte'
   import { rupiah, formatDate } from '../lib/format'
   import { checkGates, computeSplit } from '../lib/split'
-  import { commitBill, findOwnerId, listKnownPeople, nextRefCode, uploadReceipt } from '../lib/api'
-  import type { KnownPerson } from '../lib/api'
-  import type { Extraction, GateReport } from '../lib/types'
+  import {
+    commitBill,
+    findOwnerId,
+    listKnownPeople,
+    nextRefCode,
+    normaliseAccountNumber,
+    uploadReceipt,
+  } from '../lib/api'
+  import type { Destination, KnownPerson } from '../lib/api'
+  import type { Extraction, GateReport, RoundingMode } from '../lib/types'
 
   let { onDone }: { onDone: () => void } = $props()
 
@@ -52,7 +59,16 @@
   let split = $derived.by(() => {
     if (!ext || !gates.passed) return null
     try {
-      return computeSplit(items, subtotal, ext.discount, ext.tax, ext.service_charge, ext.total, roster)
+      return computeSplit(
+        items,
+        subtotal,
+        ext.discount,
+        ext.tax,
+        ext.service_charge,
+        ext.total,
+        roster,
+        rounding,
+      )
     } catch (err) {
       return { error: (err as Error).message }
     }
@@ -79,6 +95,80 @@
   let photoOpen = $state(false)
   let numbersOpen = $state(false)
 
+  /**
+   * Where the money should go, remembered between bills.
+   *
+   * It is the operator's own account every time, so asking for it on every
+   * single bill would be a form to fill in for no reason. Kept in localStorage
+   * rather than on the bill, because it is a preference about this device, not
+   * a fact about the bill — and prefilling it means the field is almost always
+   * already right when the review screen opens.
+   */
+  const DEST_KEY = 'duo.lastDestination'
+
+  function loadDestination(): Destination {
+    try {
+      const raw = localStorage.getItem(DEST_KEY)
+      if (!raw) return { bankName: '', accountNumber: '', accountHolder: '' }
+      const parsed = JSON.parse(raw) as Partial<Destination>
+      return {
+        bankName: parsed.bankName ?? '',
+        accountNumber: parsed.accountNumber ?? '',
+        accountHolder: parsed.accountHolder ?? '',
+      }
+    } catch {
+      return { bankName: '', accountNumber: '', accountHolder: '' }
+    }
+  }
+
+  let destination = $state<Destination>(loadDestination())
+
+  /**
+   * How round each share has to be. Remembered like the destination, for the
+   * same reason: a group that rounds to 500 wants that every time, and asking
+   * again each bill is a decision nobody wants to make twice.
+   */
+  const ROUND_KEY = 'duo.rounding'
+
+  function loadRounding(): RoundingMode {
+    const raw = Number(localStorage.getItem(ROUND_KEY))
+    return raw === 100 || raw === 500 ? raw : 0
+  }
+
+  let rounding = $state<RoundingMode>(loadRounding())
+
+  function setRounding(mode: RoundingMode) {
+    rounding = mode
+    try {
+      localStorage.setItem(ROUND_KEY, String(mode))
+    } catch {
+      // see setDestination
+    }
+  }
+
+  function setDestination(patch: Partial<Destination>) {
+    destination = { ...destination, ...patch }
+    try {
+      localStorage.setItem(DEST_KEY, JSON.stringify(destination))
+    } catch {
+      // Private browsing with storage disabled. Not worth failing a bill over;
+      // the value is still in memory for this session.
+    }
+  }
+
+  /**
+   * Required before commit, per the PRD: a split nobody can pay is not
+   * finished. Checked client side where it can be explained, rather than left
+   * to the database where a failure arrives as a constraint name.
+   */
+  let destinationProblem = $derived.by(() => {
+    if (!destination.bankName.trim()) return 'Bank atau e-wallet belum diisi.'
+    if (!destination.accountHolder.trim()) return 'Nama penerima belum diisi.'
+    const digits = normaliseAccountNumber(destination.accountNumber)
+    if (digits.length < 6) return 'Nomor tujuan minimal 6 angka.'
+    return null
+  })
+
   let committing = $state(false)
   let commitError = $state<string | null>(null)
   let committed = $state<string | null>(null)
@@ -94,6 +184,7 @@
     if (blockers.length > 0) return 'Ada yang perlu dibenerin'
     if (roster.length === 0) return 'Tambahin orang dulu'
     if (unassigned.length > 0) return `Bagi ${unassigned.length} item lagi`
+    if (destinationProblem) return 'Isi rekening tujuan dulu'
     return 'Simpan'
   })
 
@@ -121,6 +212,11 @@
     committing = true
     commitError = null
 
+    if (destinationProblem) {
+      commitError = destinationProblem
+      return
+    }
+
     try {
       const ownerId = await findOwnerId()
       const refCode = await nextRefCode(ext.date!)
@@ -146,6 +242,14 @@
         receiptPath,
         notes: draft.notes.trim() || null,
         extraction: ext,
+        destination: {
+          bankName: destination.bankName.trim(),
+          // Normalised so the same account is written the same way on every
+          // bill. A CSV where one account appears three ways is a CSV you
+          // cannot group by.
+          accountNumber: normaliseAccountNumber(destination.accountNumber),
+          accountHolder: destination.accountHolder.trim(),
+        },
       })
 
       committed = refCode
@@ -362,18 +466,97 @@
       </div>
     </div>
 
+    <h3 class="group-title">Rekening tujuan</h3>
+    <div class="group">
+      <div class="list">
+        <label class="row">
+          <span class="key">Bank / e-wallet</span>
+          <input
+            class="inline"
+            type="text"
+            placeholder="BCA, GoPay, …"
+            value={destination.bankName}
+            oninput={(e) => setDestination({ bankName: e.currentTarget.value })}
+          />
+        </label>
+        <label class="row">
+          <span class="key">Nomor tujuan</span>
+          <input
+            class="inline num"
+            type="text"
+            inputmode="numeric"
+            placeholder="1234567890"
+            value={destination.accountNumber}
+            oninput={(e) => setDestination({ accountNumber: e.currentTarget.value })}
+          />
+        </label>
+        <label class="row">
+          <span class="key">Nama penerima</span>
+          <input
+            class="inline"
+            type="text"
+            placeholder="Nama di rekening"
+            value={destination.accountHolder}
+            oninput={(e) => setDestination({ accountHolder: e.currentTarget.value })}
+          />
+        </label>
+      </div>
+      {#if destinationProblem}
+        <p class="hint">{destinationProblem}</p>
+      {:else}
+        <p class="hint">Kesimpen, jadi bill berikutnya udah keisi otomatis.</p>
+      {/if}
+    </div>
+
     {#if shares}
       <h3 class="group-title">Hasil</h3>
       <div class="group">
         <div class="list">
+          <!--
+            The rounding rule. Shown with the result rather than hidden in a
+            settings screen, because it changes the numbers directly underneath
+            it and seeing that happen is the only way to judge whether the
+            trade is worth it.
+          -->
+          <div class="row rounding">
+            <span class="dim small">Bulatkan</span>
+            <div class="picks">
+              {#each [0, 100, 500] as const as mode (mode)}
+                <button
+                  class="pick"
+                  class:on={rounding === mode}
+                  onclick={() => setRounding(mode)}
+                >
+                  {mode === 0 ? 'Nggak' : mode}
+                </button>
+              {/each}
+            </div>
+          </div>
+
           {#each shares as share (share.person)}
             <div class="row share">
               <div class="stack">
                 <span class="strong">{share.person}</span>
-                <span class="faint small num">
-                  {rupiah(share.item_subtotal)}
-                  {#if share.discount_share > 0}− {rupiah(share.discount_share)}{/if}
-                  + {rupiah(share.tax_share)} + {rupiah(share.service_share)}
+                <!--
+                  Each amount is its own unbreakable unit, and the line wraps
+                  between them. Without this the breakdown wraps mid-number —
+                  "Rp 5.500" arriving as "Rp" / "5.500" — which reads as two
+                  numbers rather than as one that ran out of room.
+                -->
+                <span class="faint small num breakdown">
+                  <span class="term">{rupiah(share.item_subtotal)}</span>
+                  {#if share.discount_share > 0}
+                    <span class="term">− {rupiah(share.discount_share)}</span>
+                  {/if}
+                  <span class="term">+ {rupiah(share.tax_share)}</span>
+                  <span class="term">+ {rupiah(share.service_share)}</span>
+                  {#if share.rounding_share}
+                    <span class="term warn">
+                      {share.rounding_share > 0 ? '+' : '−'}{rupiah(
+                        Math.abs(share.rounding_share),
+                      )} pembulatan
+                    </span>
+                  {/if}
                 </span>
               </div>
               <span class="row-value strong num">{rupiah(share.amount_owed)}</span>
@@ -594,6 +777,59 @@
   .x {
     opacity: 0.75;
     margin-left: 6px;
+  }
+
+  /* ---- destination fields ---- */
+
+  /* The label column and the field on one row, the same shape the sign-in
+     screen uses. */
+  .key {
+    width: 116px;
+    flex-shrink: 0;
+    color: var(--label);
+    font-size: var(--text-sm);
+  }
+
+  .inline {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    min-height: auto;
+    text-align: right;
+    border-radius: 0;
+    font-size: var(--text-base);
+  }
+
+  .inline:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .row:focus-within {
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .hint {
+    padding: 0 16px;
+    font-size: var(--text-sm);
+    color: var(--label-2);
+  }
+
+  .rounding {
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  /* Amounts are atomic; the line breaks between them. */
+  .term {
+    white-space: nowrap;
+  }
+
+  .breakdown {
+    display: block;
   }
 
   .count {

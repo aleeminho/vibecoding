@@ -18,7 +18,8 @@
  * whole module is stripped from a production bundle.
  */
 
-import type { BillWithShares } from './api'
+import type { AuditEntry, BillWithShares, SettleUpEntry } from './api'
+import type { ExportBill } from './export'
 
 /**
  * True when the URL asks for fixture data. Only meaningful in a dev build.
@@ -51,6 +52,9 @@ export const DEMO_BILLS: BillWithShares[] = [
     bill_date: '2026-06-26',
     total: 456225,
     receipt_path: 'demo/BILL_20260626_001.jpg',
+    bank_name: 'BCA',
+    account_number: '1234567890',
+    account_holder: 'Alee',
     notes: 'Nongkrong sore',
     shares: [
       { person: 'Budi', amount_owed: 127050, status: 'belum lunas', paid_date: null },
@@ -66,6 +70,9 @@ export const DEMO_BILLS: BillWithShares[] = [
     bill_date: '2026-06-14',
     total: 75900,
     receipt_path: 'demo/BILL_20260614_001.jpg',
+    bank_name: 'BCA',
+    account_number: '1234567890',
+    account_holder: 'Alee',
     notes: null,
     shares: [
       { person: 'Budi', amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
@@ -79,6 +86,9 @@ export const DEMO_BILLS: BillWithShares[] = [
     bill_date: '2026-05-30',
     total: 312000,
     receipt_path: null,
+    bank_name: 'GoPay',
+    account_number: '081234567890',
+    account_holder: 'Alee',
     notes: 'Traktiran Andi',
     shares: [
       { person: 'Budi', amount_owed: 78000, status: 'belum lunas', paid_date: null },
@@ -93,6 +103,9 @@ export const DEMO_BILLS: BillWithShares[] = [
     bill_date: '2026-05-26',
     total: 94500,
     receipt_path: null,
+    bank_name: 'BCA',
+    account_number: '1234567890',
+    account_holder: 'Alee',
     notes: null,
     shares: [
       { person: 'Sarah', amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
@@ -124,4 +137,45 @@ export const DEMO_OUTSTANDING = [
   { person: 'Sarah', outstanding: 98175, bills: 1 },
   { person: 'Dewi', outstanding: 109725, bills: 1 },
   { person: 'Rina', outstanding: 78000, bills: 1 },
+]
+
+export const DEMO_SETTLE_UP: SettleUpEntry[] = [
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Budi', amount_owed: 127050 },
+  { bill_id: 'demo-2', ref_code: 'BILL_20260614_001', place: 'Warung Bu Siti', bill_date: '2026-06-14', person: 'Budi', amount_owed: 78000 },
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Sarah', amount_owed: 98175 },
+  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Dewi', amount_owed: 109725 },
+  { bill_id: 'demo-3', ref_code: 'BILL_20260530_001', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000 },
+]
+
+export const DEMO_AUDIT: AuditEntry[] = [
+  { id: 'a-1', action: 'share.paid', ref_code: 'BILL_20260626_001', detail: { person: 'Andi' }, created_at: '2026-07-02T11:20:00Z' },
+  { id: 'a-2', action: 'bill.amount_changed', ref_code: 'BILL_20260614_001', detail: { field: 'total', from: 75900, to: 75900 }, created_at: '2026-06-15T09:04:00Z' },
+  { id: 'a-3', action: 'share.paid', ref_code: 'BILL_20260614_001', detail: { person: 'Budi' }, created_at: '2026-06-15T08:31:00Z' },
+]
+
+/**
+ * The demo bill for the detailed export, with items as well as shares.
+ *
+ * The numbers here are the same ones computeSplit produces for this receipt, so
+ * the exported CSV can be checked against the worked example in the spec rather
+ * than against itself.
+ */
+export const DEMO_EXPORT_BILLS: ExportBill[] = [
+  {
+    ref_code: 'BILL_20260614_001',
+    bill_date: '2026-06-14',
+    place: 'Warung Bu Siti',
+    bank_name: 'BCA',
+    account_number: '1234567890',
+    account_holder: 'Alee',
+    items: [
+      { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
+      { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
+      { name: 'Kentang Goreng Gede', qty: 1, line_total: 30000, assigned_to: ['Sarah'] },
+    ],
+    shares: [
+      { person: 'Budi', discount_share: 2817, tax_share: 3718, service_share: 1859, rounding_share: 0, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
+      { person: 'Sarah', discount_share: 2183, tax_share: 2882, service_share: 1441, rounding_share: 0, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
+    ],
+  },
 ]

@@ -65,6 +65,7 @@ describe('computeSplit — the worked example', () => {
       tax_share: 3718,
       service_share: 1859,
       amount_owed: 42760,
+      rounding_share: 0,
     })
   })
 
@@ -76,6 +77,7 @@ describe('computeSplit — the worked example', () => {
       tax_share: 2882,
       service_share: 1441,
       amount_owed: 33140,
+      rounding_share: 0,
     })
   })
 
@@ -285,5 +287,89 @@ describe('checkGates — gate 0', () => {
     // subtotal is null but the items are complete, so gate 2 must not fire.
     const report = checkGates({ ...receipt, subtotal: null }, assignedItems, roster)
     expect(report.failures.some((f) => f.gate === 2)).toBe(false)
+  })
+})
+
+/**
+ * The rounding rule: round each share to a round number of rupiah, and put the
+ * difference on one person rather than spreading it back (which would undo the
+ * rounding it just applied).
+ *
+ * 100.000 split three ways is the case this exists for: it produces 33.333,
+ * which is a real number to owe and an absurd one to ask a friend to transfer.
+ */
+describe('rounding', () => {
+  const threeWays: AssignedItem[] = [
+    { position: 1, name: 'Sepiring', qty: 1, line_total: 100000, assigned_to: ['A', 'B', 'C'] },
+  ]
+  const people = ['A', 'B', 'C']
+
+  const split = (rounding: 0 | 100 | 500) =>
+    computeSplit(threeWays, 100000, 0, 0, 0, 100000, people, rounding)
+
+  test('is off by default, so nothing moves unless it was asked for', () => {
+    const result = split(0)
+    expect(result.participants.every((p) => p.rounding_share === 0)).toBe(true)
+    // 33333 x 3 is 99999, so one person carries the odd rupiah.
+    expect(result.participants.map((p) => p.amount_owed).sort()).toEqual([33333, 33333, 33334])
+  })
+
+  test('to 500 makes every share a multiple of 500', () => {
+    const result = split(500)
+    for (const p of result.participants) {
+      expect(p.amount_owed % 500).toBe(0)
+    }
+  })
+
+  test('to 100 makes every share a multiple of 100', () => {
+    const result = split(100)
+    for (const p of result.participants) {
+      expect(p.amount_owed % 100).toBe(0)
+    }
+  })
+
+  // The invariant the whole feature rests on. Rounding may move money between
+  // people, but it may not invent or destroy any, and gate 4 would reject the
+  // commit server side if this were ever violated.
+  test('the shares still add up to the printed total', () => {
+    for (const mode of [100, 500] as const) {
+      const result = split(mode)
+      const sum = result.participants.reduce((acc, p) => acc + p.amount_owed, 0)
+      expect(sum).toBe(100000)
+    }
+  })
+
+  // If this ever fails, the rounding is quietly changing the bill rather than
+  // redistributing it, which is the one thing it must never do.
+  test('the rounding shifts cancel out across the group', () => {
+    for (const mode of [100, 500] as const) {
+      const result = split(mode)
+      const netShift = result.participants.reduce((acc, p) => acc + (p.rounding_share ?? 0), 0)
+      expect(netShift).toBe(0)
+    }
+  })
+
+  test('the shift is recorded against the person who absorbed it, not hidden', () => {
+    const result = split(500)
+    const moved = result.participants.filter((p) => p.rounding_share !== 0)
+    expect(moved.length).toBeGreaterThan(0)
+
+    // Everyone's shift is at most half a step, because that is all rounding to
+    // the nearest 500 can move them. One person carries more than that, and
+    // that extra is the drift plain rounding left behind, deliberately placed
+    // rather than spread back (which would undo the rounding).
+    const shifts = result.participants.map((p) => Math.abs(p.rounding_share ?? 0))
+    expect(Math.max(...shifts)).toBeGreaterThan(250)
+    expect(shifts.filter((s) => s <= 250).length).toBe(result.participants.length - 1)
+  })
+
+  // The residual bound exists to catch a receipt whose numbers do not
+  // reconcile. Rounding had to be applied after that check, not inside it, or
+  // the bound would have had to be widened and the check would have stopped
+  // catching anything.
+  test('rounding does not blunt the check for genuinely broken numbers', () => {
+    expect(() => computeSplit(threeWays, 100000, 0, 0, 0, 900000, people, 500)).toThrow(
+      /gate 4 failed/,
+    )
   })
 })

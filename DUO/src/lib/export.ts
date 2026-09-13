@@ -1,0 +1,257 @@
+/**
+ * The detailed export: one row per item per person.
+ *
+ * The purpose is a table you can drop into Excel and pivot without cleaning
+ * anything first, which sets the hard requirement here — the rows for one
+ * person on one bill must add up to exactly what that person owes, to the
+ * rupiah. A single lost rupiah turns into a discrepancy somebody has to go and
+ * hunt down by hand, which is the work this export exists to remove.
+ *
+ * That is what `allocate` is for, and why nothing here uses plain division.
+ */
+
+/**
+ * Split an integer total across weights so the parts are whole numbers that add
+ * back up to the total exactly.
+ *
+ * Largest remainder: give everyone their floor, then hand the leftover rupiah
+ * out one at a time to whoever was rounded down hardest, ties broken by
+ * position so the result is stable rather than dependent on sort order.
+ * Rounding each part independently would be simpler and would lose rupiah.
+ *
+ * Handles a negative total, which happens for discount shares: the floors are
+ * still at or below the exact values, so the leftover is still non-negative and
+ * still less than the number of parts.
+ */
+export function allocate(total: number, weights: number[]): number[] {
+  const n = weights.length
+  if (n === 0) return []
+
+  const usable = weights.map((w) => (Number.isFinite(w) && w > 0 ? w : 0))
+  const totalWeight = usable.reduce((a, b) => a + b, 0)
+
+  if (totalWeight === 0) {
+    // No weight to go on — split as evenly as whole rupiah allows rather than
+    // dropping the whole amount on whoever happens to be first.
+    const base = Math.floor(total / n)
+    const out = new Array<number>(n).fill(base)
+    for (let i = 0; i < total - base * n; i++) out[i] += 1
+    return out
+  }
+
+  const exact = usable.map((w) => (total * w) / totalWeight)
+  const out = exact.map((x) => Math.floor(x))
+  let leftover = total - out.reduce((a, b) => a + b, 0)
+
+  const byRemainder = exact
+    .map((x, i) => ({ i, remainder: x - Math.floor(x) }))
+    .sort((a, b) => b.remainder - a.remainder || a.i - b.i)
+
+  for (let k = 0; k < byRemainder.length && leftover > 0; k++) {
+    out[byRemainder[k].i] += 1
+    leftover--
+  }
+
+  return out
+}
+
+/** One bill, with everything the export needs. Shaped to match the database. */
+export interface ExportBill {
+  ref_code: string
+  bill_date: string
+  place: string
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
+  items: {
+    name: string
+    qty: number
+    line_total: number
+    assigned_to: string[]
+  }[]
+  shares: {
+    person: string
+    discount_share: number
+    tax_share: number
+    service_share: number
+    rounding_share: number
+    amount_owed: number
+    status: string
+    paid_date: string | null
+  }[]
+}
+
+/** A row of the CSV, in the column order the PRD specifies. */
+export interface ExportRow {
+  ref_code: string
+  bill_date: string
+  merchant_name: string
+  item_name: string
+  item_qty: number
+  item_unit_price: number
+  item_subtotal: number
+  person_name: string
+  person_share_amount: number
+  payment_status: string
+  payment_method: string
+  bank_name: string
+  account_number: string
+  recipient_name: string
+  paid_at: string
+  proof_of_payment_url: string
+  validation_status: string
+  discrepancy_amount: string
+}
+
+export const EXPORT_COLUMNS: (keyof ExportRow)[] = [
+  'ref_code',
+  'bill_date',
+  'merchant_name',
+  'item_name',
+  'item_qty',
+  'item_unit_price',
+  'item_subtotal',
+  'person_name',
+  'person_share_amount',
+  'payment_status',
+  'payment_method',
+  'bank_name',
+  'account_number',
+  'recipient_name',
+  'paid_at',
+  'proof_of_payment_url',
+  'validation_status',
+  'discrepancy_amount',
+]
+
+/**
+ * Flatten bills into item-per-person rows.
+ *
+ * Every amount comes from what was committed, never recomputed from the items.
+ * Recomputing would look tidier and would be wrong: `amount_owed` is a snapshot
+ * that the operator may have corrected by hand on the review screen, and an
+ * export that quietly disagrees with the app is worse than no export.
+ *
+ * So the per-item figures are an *allocation* of the committed numbers, not a
+ * recalculation of them. Each person's share of an item is their slice of that
+ * item's line total; their tax, service, discount and rounding shares are then
+ * spread across their own rows in proportion to those slices. The last rupiah
+ * of each is placed by largest remainder, so the column adds up.
+ */
+export function buildExportRows(bills: ExportBill[]): ExportRow[] {
+  const rows: ExportRow[] = []
+
+  for (const bill of bills) {
+    const owed = new Map(bill.shares.map((s) => [s.person, s]))
+
+    // item index -> amount owed per person, and the running raw total per person
+    const perItem: { index: number; shares: Map<string, number> }[] = []
+    const rawByPerson = new Map<string, number>()
+
+    for (const [index, item] of bill.items.entries()) {
+      // A bill committed through commit_bill() cannot have an unassigned item —
+      // gate 3 rejects it — but a defensively skipped line is better than a
+      // crash on data that predates the gate.
+      const people = item.assigned_to.filter((p) => owed.has(p))
+      if (people.length === 0) continue
+
+      const parts = allocate(
+        item.line_total,
+        people.map(() => 1),
+      )
+      const shares = new Map<string, number>()
+      people.forEach((person, i) => {
+        shares.set(person, parts[i])
+        rawByPerson.set(person, (rawByPerson.get(person) ?? 0) + parts[i])
+      })
+      perItem.push({ index, shares })
+    }
+
+    // Per person, spread the charges that are not tied to a single item across
+    // that person's own rows, in proportion to how much of the bill they took.
+    //
+    // The amount to spread is derived from `amount_owed` rather than rebuilt
+    // from discount/tax/service/rounding. Those components are each rounded
+    // independently when the split is computed, so rebuilding the total from
+    // them can land a rupiah away from what was actually committed — and it is
+    // `amount_owed` that appears in the app, in the outstanding total, and on
+    // the bill. Taking it as the source of truth makes the column tie out by
+    // construction instead of by arithmetic that has to agree.
+    const extrasByPerson = new Map<string, number[]>()
+    for (const [person, share] of owed) {
+      const own = perItem.filter((it) => it.shares.has(person))
+      if (own.length === 0) continue
+
+      const extras = share.amount_owed - (rawByPerson.get(person) ?? 0)
+      const weights = own.map((it) => it.shares.get(person)!)
+      extrasByPerson.set(person, allocate(extras, weights))
+    }
+
+    // index the extras so the row loop can pick the right one per item
+    const extrasAt = new Map<string, Map<number, number>>()
+    for (const [person] of extrasByPerson) {
+      const own = perItem.filter((it) => it.shares.has(person))
+      const parts = extrasByPerson.get(person)!
+      extrasAt.set(person, new Map(own.map((it, i) => [it.index, parts[i]])))
+    }
+
+    for (const [index, item] of bill.items.entries()) {
+      const entry = perItem.find((it) => it.index === index)
+      if (!entry) continue
+
+      for (const [person, itemShare] of entry.shares) {
+        const share = owed.get(person)!
+        const extra = extrasAt.get(person)?.get(index) ?? 0
+
+        rows.push({
+          ref_code: bill.ref_code,
+          bill_date: bill.bill_date,
+          merchant_name: bill.place,
+          item_name: item.name,
+          item_qty: item.qty,
+          item_unit_price: item.qty > 0 ? Math.round(item.line_total / item.qty) : item.line_total,
+          // The item's own total on the bill, not this person's slice of it.
+          item_subtotal: item.line_total,
+          person_name: person,
+          // This person's slice, carrying their share of everything that is not
+          // tied to an item. Summed down a person's rows this equals amount_owed.
+          person_share_amount: itemShare + extra,
+          payment_status: share.status === 'lunas' ? 'paid' : 'unpaid',
+          payment_method: bill.account_number ? 'transfer' : '',
+          bank_name: bill.bank_name ?? '',
+          account_number: bill.account_number ?? '',
+          recipient_name: bill.account_holder ?? '',
+          paid_at: share.paid_date ?? '',
+          // Not built yet. Present because the column set is what the PRD asks
+          // for and what an existing spreadsheet will be pointed at; empty
+          // because there is nothing honest to put here until the payment link
+          // feature exists.
+          proof_of_payment_url: '',
+          validation_status: '',
+          discrepancy_amount: '',
+        })
+      }
+    }
+  }
+
+  return rows
+}
+
+/**
+ * RFC 4180 quoting, plus a BOM.
+ *
+ * The BOM is not decoration: Excel on Windows reads a CSV without one as the
+ * system codepage, so any non-ASCII name arrives as mojibake, and Indonesian
+ * names and menu items hit that immediately.
+ */
+export function toCsv(rows: ExportRow[]): string {
+  const escape = (value: unknown): string => {
+    const s = value === null || value === undefined ? '' : String(value)
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+
+  const header = EXPORT_COLUMNS.join(',')
+  const body = rows.map((row) => EXPORT_COLUMNS.map((c) => escape(row[c])).join(','))
+
+  return '﻿' + [header, ...body].join('\r\n') + '\r\n'
+}

@@ -39,6 +39,13 @@ export interface AssignedItem extends ExtractedItem {
 }
 
 /** What one person owes. This is what gets written to bill_participants. */
+/**
+ * How round a share has to be. 0 means no rounding at all, which is the
+ * default: a share of Rp 33.333 is awkward to ask a friend for, but silently
+ * changing someone's number is worse unless the operator asked for it.
+ */
+export type RoundingMode = 0 | 100 | 500
+
 export interface ParticipantShare {
   person: string
   item_subtotal: number
@@ -46,6 +53,13 @@ export interface ParticipantShare {
   tax_share: number
   service_share: number
   amount_owed: number
+  /**
+   * The rupiah moved onto this person by the rounding rule, relative to their
+   * exact share. Zero when rounding is off. Held separately from amount_owed so
+   * the shift is visible in the books instead of looking like a share that was
+   * simply computed that way.
+   */
+  rounding_share?: number
 }
 
 export interface SplitResult {

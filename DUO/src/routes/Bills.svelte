@@ -24,6 +24,7 @@
   import { onMount } from 'svelte'
   import { formatDate, rupiah } from '../lib/format'
   import {
+    deleteBill,
     listBills,
     listOutstanding,
     setBillStatus,
@@ -32,6 +33,7 @@
     type BillWithShares,
     type Outstanding,
   } from '../lib/api'
+  import { buildShareMessage, copyText, whatsappUrl } from '../lib/share'
   import { isDemo } from '../lib/demo'
 
   let outstanding = $state<Outstanding[]>([])
@@ -40,6 +42,8 @@
   let message = $state('')
   let open = $state<string | null>(null)
   let busy = $state<string | null>(null)
+  /** Bill id whose message was just copied, so the button can say so. */
+  let copied = $state<string | null>(null)
 
   /**
    * `silent` reloads without dropping the screen back to "Memuat…".
@@ -104,6 +108,64 @@
     busy = bill.id
     try {
       await setBillStatus(bill.id, paid)
+      await load({ silent: true })
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      busy = null
+    }
+  }
+
+  function messageFor(bill: BillWithShares): string {
+    return buildShareMessage({
+      ref_code: bill.ref_code,
+      place: bill.place,
+      bill_date: bill.bill_date,
+      total: bill.total,
+      bank_name: bill.bank_name,
+      account_number: bill.account_number,
+      account_holder: bill.account_holder,
+      shares: bill.shares.map((s) => ({
+        person: s.person,
+        amount_owed: s.amount_owed,
+        status: s.status,
+      })),
+    })
+  }
+
+  /**
+   * Copy the WhatsApp message and say so.
+   *
+   * The confirmation matters more than it looks: the clipboard write is
+   * invisible, and on a phone a tap that produces no feedback reads as a tap
+   * that did not register — so people tap again, and then paste twice.
+   */
+  async function shareBill(bill: BillWithShares) {
+    copied = (await copyText(messageFor(bill))) ? bill.id : null
+    setTimeout(() => (copied = null), 2000)
+  }
+
+  function openWhatsApp(bill: BillWithShares) {
+    window.open(whatsappUrl(messageFor(bill)), '_blank', 'noopener')
+  }
+
+  /**
+   * Delete, with a confirmation that says what is being deleted.
+   *
+   * A bare "Yakin?" trains people to tap through it. Naming the place, the date
+   * and the amount is what makes the dialog do its job — the mistake it is
+   * guarding against is deleting the wrong bill, not deleting a bill.
+   */
+  async function removeBill(bill: BillWithShares) {
+    const ok = window.confirm(
+      `Hapus tagihan ini?\n\n${bill.place}\n${formatDate(bill.bill_date)} · ${rupiah(bill.total)}\n\n` +
+        `Tagihannya disembunyikan, bukan dihapus permanen — datanya masih ada kalau salah.`,
+    )
+    if (!ok) return
+
+    busy = bill.id
+    try {
+      await deleteBill(bill.id, bill.ref_code)
       await load({ silent: true })
     } catch (err) {
       message = (err as Error).message
@@ -231,12 +293,29 @@
               {#if bill.notes}<span>· {bill.notes}</span>{/if}
             </div>
 
+            {#if bill.account_number}
+              <div class="row dest">
+                <span class="faint small">Transfer ke</span>
+                <span class="row-value small num">
+                  {bill.bank_name} {bill.account_number}
+                  {#if bill.account_holder}· {bill.account_holder}{/if}
+                </span>
+              </div>
+            {/if}
+
             <div class="row actions">
               {#if bill.receipt_path}
                 <button class="plain" onclick={() => openReceipt(bill.receipt_path!)}>
                   Lihat struk
                 </button>
               {/if}
+              <button class="plain" onclick={() => shareBill(bill)}>
+                {copied === bill.id ? 'Tersalin ✓' : 'Copy pesan WA'}
+              </button>
+              <button class="plain" onclick={() => openWhatsApp(bill)}>Buka WA</button>
+            </div>
+
+            <div class="row actions">
               <button
                 class="plain"
                 class:destructive-text={settled}
@@ -244,6 +323,13 @@
                 onclick={() => togglePaid(bill, !settled)}
               >
                 {busy === bill.id ? '…' : settled ? 'Batalkan semua' : 'Tandai semua lunas'}
+              </button>
+              <button
+                class="plain destructive-text"
+                disabled={busy === bill.id}
+                onclick={() => removeBill(bill)}
+              >
+                Hapus
               </button>
             </div>
           {/if}
@@ -294,6 +380,12 @@
   .actions {
     gap: 4px;
     justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .dest {
+    gap: 8px;
+    flex-wrap: wrap;
   }
 
   .destructive-text {
