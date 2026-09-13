@@ -58,6 +58,13 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # Pages serves from a subpath. Other targets (cPanel) build with the
+          # default "/", so this is set here rather than in vite.config.ts.
+          #
+          # No slashes: it is a segment, not a path. Slashes make Git Bash on
+          # Windows rewrite it into a Windows path, which builds fine and
+          # deploys broken.
+          BASE_PATH: vibecoding
         run: |
           # Fail loudly rather than deploying an app that cannot reach its own
           # database. Without these the build still succeeds and produces a
