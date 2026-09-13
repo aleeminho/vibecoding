@@ -150,6 +150,24 @@ export async function uploadQris(ownerId: string, blob: Blob): Promise<string> {
   return path
 }
 
+/**
+ * The QRIS code's bytes, for drawing into the nota PDF.
+ *
+ * Null rather than a throw when the object cannot be read — an offline phone is
+ * the ordinary reason, not a broken one, and the caller has a fallback. A PDF
+ * that refuses to build because a picture would not load is a worse document
+ * than one with a link in it.
+ */
+export async function fetchQrisBytes(path: string): Promise<Uint8Array | null> {
+  try {
+    const res = await fetch(qrisUrl(path))
+    if (!res.ok) return null
+    return new Uint8Array(await res.arrayBuffer())
+  } catch {
+    return null
+  }
+}
+
 /** The public URL of a QRIS code. The bucket is public, so there is nothing to sign. */
 export function qrisUrl(path: string): string {
   // In a demo the paths are fixtures rather than objects, so they resolve

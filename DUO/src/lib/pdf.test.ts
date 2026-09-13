@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { buildNotaPdf, Pdf, textWidth } from './pdf'
+import { buildNotaPdf, Pdf, textWidth, type QrisImage } from './pdf'
 import { allocateBill, type ExportBill } from './export'
 
 const bill: ExportBill = {
@@ -62,6 +62,27 @@ const bill: ExportBill = {
 async function bytes(billData: ExportBill): Promise<string> {
   const blob = buildNotaPdf(billData, allocateBill(billData))
   return Buffer.from(await blob.arrayBuffer()).toString('latin1')
+}
+
+/**
+ * A JPEG header for the writer to read — not a decodable image, and not meant
+ * to be. Only the SOF marker is parsed, so a real one would be a hundred
+ * kilobytes of fixture for the same three numbers.
+ *
+ * The bytes are deliberately free of 0x0a, so the xref line count in the test
+ * below cannot be inflated by a binary line that happens to look like an entry.
+ */
+function fakeJpeg(width: number, height: number): Uint8Array {
+  return Uint8Array.from([
+    0xff, 0xd8, // SOI
+    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, // APP0 with an empty payload
+    0xff, 0xc0, 0x00, 0x11, 0x08, // SOF0, 17-byte segment, 8 bits per channel
+    height >> 8, height & 0xff,
+    width >> 8, width & 0xff,
+    0x03, // three components, which is what the canvas encoder produces
+    0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, // component specs
+    0xff, 0xd9, // EOI
+  ])
 }
 
 describe('pdf writer', () => {
@@ -245,5 +266,98 @@ describe('pdf writer', () => {
       const end = Number(x) + textWidth(text, Number(size))
       expect(Math.abs(end - RIGHT)).toBeLessThan(0.5)
     }
+  })
+
+  /*
+   * The code, which is the one part of this document somebody acts on rather
+   * than reads. It is drawn rather than linked because the payer is often not
+   * the person holding the phone, and both failure modes here are quiet: an
+   * image object that is not referenced draws nothing, and one whose object
+   * number is wrong draws nothing in some readers and the whole file fails in
+   * others.
+   */
+  describe('the QRIS code', () => {
+    const URL = 'https://x.supabase.co/storage/v1/object/public/qris/u/a.jpg'
+    const attached: ExportBill = { ...bill, qris_path: 'u/a.jpg', payment_method: 'qris' }
+
+    const withQris = async (
+      patch: Partial<ExportBill> = {},
+      qris: QrisImage | null = { jpeg: fakeJpeg(240, 240), url: URL },
+    ): Promise<string> => {
+      const b: ExportBill = { ...attached, ...patch }
+      return Buffer.from(await buildNotaPdf(b, allocateBill(b), '', qris).arrayBuffer()).toString(
+        'latin1',
+      )
+    }
+
+    test('draws the code and names it in the page resources', async () => {
+      const s = await withQris()
+      expect(s).toContain('/Subtype /Image')
+      expect(s).toContain('/Filter /DCTDecode')
+      // The size comes off the SOF marker, and the dictionary has to carry the
+      // source pixels rather than the placement — a reader that took these as
+      // points would draw the code at a quarter of its size.
+      expect(s).toContain('/Width 240 /Height 240')
+      expect(s).toContain('/ColorSpace /DeviceRGB')
+      expect(s).toContain('/XObject << /Im1')
+      expect(s).toContain('/Im1 Do')
+    })
+
+    test('the image object does not disturb the xref', async () => {
+      const s = await withQris()
+      const xrefAt = s.indexOf('\nxref\n') + 1
+      expect(Number(s.match(/startxref\n(\d+)/)?.[1])).toBe(xrefAt)
+
+      // one free entry, plus catalog, pages, four fonts, page, content, image
+      const entries = [...s.slice(xrefAt).matchAll(/^(\d{10}) (\d{5}) [nf] $/gm)]
+      expect(entries.length).toBe(10)
+
+      entries.slice(1).forEach((entry, i) => {
+        expect(s.startsWith(`${i + 1} 0 obj`, Number(entry[1]))).toBe(true)
+      })
+      // Last, so that adding one cannot move a page or a content object.
+      expect(s.startsWith('9 0 obj', Number(entries[9][1]))).toBe(true)
+    })
+
+    test('a code that is not a JPEG falls back to a link rather than a blank box', async () => {
+      // The bytes a PNG screenshot would start with. The writer cannot embed
+      // it, and a silently-skipped image would leave the label with nothing
+      // under it.
+      const png: QrisImage = { jpeg: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d]), url: URL }
+      const s = await withQris({}, png)
+      expect(s).not.toContain('/Subtype /Image')
+      expect(s).toContain('/Subtype /Link')
+      expect(s).toContain(`(${URL})`)
+    })
+
+    test('an offline phone still produces a document that says how to pay', async () => {
+      const s = await withQris({}, { jpeg: null, url: URL })
+      expect(s).not.toContain('/Subtype /Image')
+      expect(s).toContain('Buka kode QR')
+    })
+
+    test('a qris-only bill prints no transfer box, even with an account number', async () => {
+      // The fixture has a BCA account number. Printing it would send somebody
+      // to a method the operator turned off.
+      const s = await withQris()
+      expect(s).toContain('Scan QRIS')
+      expect(s).not.toContain('Transfer ke')
+      expect(s).not.toContain('1234567890')
+    })
+
+    test('a bank-only bill prints the transfer box and no code', async () => {
+      // The bill can carry a code and still ask for a transfer — that is what
+      // `payment_method` is stored for rather than derived.
+      const s = await withQris({ payment_method: 'bank' })
+      expect(s).not.toContain('/Subtype /Image')
+      expect(s).not.toContain('Scan QRIS')
+      expect(s).toContain('Transfer ke')
+    })
+
+    test('offering both prints both', async () => {
+      const s = await withQris({ payment_method: 'both' })
+      expect(s).toContain('/Subtype /Image')
+      expect(s).toContain('Transfer ke')
+    })
   })
 })

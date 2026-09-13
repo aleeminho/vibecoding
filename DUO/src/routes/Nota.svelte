@@ -20,9 +20,9 @@
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
-  import { getExportBill } from '../lib/api'
+  import { fetchQrisBytes, getExportBill, qrisUrl } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
-  import { buildNotaPdf } from '../lib/pdf'
+  import { buildNotaPdf, type QrisImage } from '../lib/pdf'
   import { copyText } from '../lib/clipboard'
 
   /**
@@ -58,10 +58,23 @@
     note = null
 
     try {
+      // Fetched here rather than inside the writer, which stays pure and
+      // synchronous — this is the only part that can reach the network, and it
+      // returns null on failure rather than throwing, so an offline phone still
+      // produces a document.
+      const qris: QrisImage | null = offersQris(bill)
+        ? { jpeg: await fetchQrisBytes(bill.qris_path!), url: qrisUrl(bill.qris_path!) }
+        : null
+
       // The links in the document point back at wherever this page is being
       // served from, so the same PDF is correct on localhost, on Pages and on
       // the cPanel host without a build-time setting for each.
-      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`)
+      const blob = buildNotaPdf(
+        bill,
+        breakdown,
+        `${location.origin}${location.pathname}`,
+        qris,
+      )
       const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
 
       if (navigator.canShare?.({ files: [file] })) {
@@ -86,6 +99,20 @@
   }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
+
+  /**
+   * Whether this bill offers its QRIS code, seen from the document's side.
+   *
+   * Two facts, both required: the operator chose to offer it, and there is a
+   * code to offer. A method set to qris with nothing uploaded is a real state —
+   * the bills screen names it out loud — and it is not one the document should
+   * paper over by printing a transfer the operator turned off.
+   */
+  const offersQris = (b: NonNullable<typeof bill>) =>
+    Boolean(b.qris_path) && b.payment_method !== 'bank'
+
+  const offersBank = (b: NonNullable<typeof bill>) =>
+    Boolean(b.account_number) && b.payment_method !== 'qris'
 
   /**
    * The payer's link for one person, or null if they have no token yet.
@@ -304,7 +331,25 @@
         <span class="fig strong">{rupiahDigits(summed)}</span>
       </div>
 
-      {#if bill.account_number}
+      <!--
+        The code, on the page rather than behind a link.
+
+        The person paying is often not the person holding the phone — one
+        person reads their own name off the shared document and another scans
+        it — and a banking app wants an image in the gallery. A QR that is
+        already on the page is a screenshot away from both.
+      -->
+      {#if offersQris(bill)}
+        <div class="qris">
+          <span class="pay-label">Scan QRIS</span>
+          <img src={qrisUrl(bill.qris_path!)} alt="Kode QRIS tagihan ini" />
+          {#if bill.account_holder}
+            <span class="qris-holder">a.n. {bill.account_holder}</span>
+          {/if}
+        </div>
+      {/if}
+
+      {#if offersBank(bill)}
         <div class="pay">
           <span class="pay-label">Transfer ke</span>
           <span class="pay-value">
@@ -613,6 +658,36 @@
     font-size: 14px;
     font-weight: 600;
     text-align: right;
+  }
+
+  /*
+   * The QR sits under the label rather than beside it, and at a fixed size
+   * rather than a fluid one. A code that shrinks with the viewport is a code
+   * that stops scanning on exactly the device it is scanned from.
+   */
+  .qris {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 1rem;
+    padding: 12px 14px;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+  }
+
+  .qris img {
+    width: 180px;
+    height: 180px;
+    /* The code is black on white on a white card; the border is what keeps a
+       white quiet zone from bleeding into the page behind it. */
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+
+  .qris-holder {
+    font-size: 12px;
+    color: var(--soft);
   }
 
   .msg {
