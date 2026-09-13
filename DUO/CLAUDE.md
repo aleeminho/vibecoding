@@ -110,9 +110,12 @@ chat, and a dark document is worse in both.
 - **`sum(integer)` returns `bigint`; `sum(bigint)` returns `numeric`.** So
   `create or replace view` refuses a definition that changes a column's type —
   `SQLSTATE 42P16`. Drop the view first.
-- **The PDF writer is hand-rolled on purpose.** jsPDF is ~300KB against a ~340KB
-  bundle. Right-alignment works only because the money column is Courier (0.6em
-  advance), and `text()` **throws** if asked to right-align a proportional face.
+- **The PDF writer is hand-rolled on purpose.** jsPDF is ~300KB against a ~360KB
+  bundle. Helvetica is still unmeasurable, so `text()` **throws** rather than
+  left-aligning it — a figure that silently lands wrong is worse than a build
+  that stops. The embedded serif *is* measurable, because `ttf.ts` reads the
+  widths out of the font file, and that is what lets the amounts be right-aligned
+  in a proportional face at all.
 
 ---
 

@@ -2,19 +2,23 @@
  * A small PDF writer, just enough for the nota.
  *
  * Why this exists rather than a library: jsPDF is around 300KB, and this app's
- * whole bundle is 314KB. Nearly doubling it to draw one table on a phone over
- * mobile data is a bad trade, and the alternative — handing the document back
- * to the browser's print dialog — costs the one-tap share, which is the thing
- * being built.
+ * whole bundle is a little over 350KB. Nearly doubling it to draw one table on
+ * a phone over mobile data is a bad trade, and the alternative — handing the
+ * document back to the browser's print dialog — costs the one-tap share, which
+ * is the thing being built.
  *
- * What makes it small is a decision made elsewhere: the money column is already
- * monospaced. Courier's advance is exactly 0.6em per character, so right
- * alignment is arithmetic rather than a font metrics table. Words are left
- * aligned and need no measurement at all. That removes the only genuinely large
- * thing a PDF writer normally carries.
+ * What makes it small is that the figures are set in Courier. Every reader has
+ * it, its advance is exactly 0.6em, and so right alignment is arithmetic rather
+ * than a font metrics table — which is the genuinely large thing a PDF writer
+ * normally carries. Words are left aligned and need no measurement at all.
  *
- * Text uses the base-14 fonts every reader already has, so nothing is embedded
- * and the output is a few kilobytes of actual content.
+ * One face is embedded now: the serif the amounts are set in, because the only
+ * serif a reader already has is Times, and Times reads as a legal brief rather
+ * than as the amount somebody owes. `ttf.ts` reads that font's widths, which is
+ * what keeps right alignment exact in a proportional face. It goes in whole and
+ * Flate-compressed, about 70KB of the document; a subsetter would halve that
+ * for a few hundred lines of binary rewriting. Everything else is still base-14
+ * and still free.
  */
 
 import { FIRST_CHAR, LAST_CHAR, widthOf, type FontMetrics } from './ttf'
