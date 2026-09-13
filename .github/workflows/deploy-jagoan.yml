@@ -82,6 +82,16 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
+          # Plain FTP sends the password in clear text across the internet. The
+          # server advertises [TLS] in its banner, so explicit FTPS is available
+          # and there is no reason to keep doing that.
+          #
+          # `security: strict` is the default and is left alone on purpose: the
+          # server presents a valid Let's Encrypt certificate covering
+          # *.splitfair.xyz, so there is nothing to relax for. Turning it to
+          # "loose" would accept any certificate, which is the thing TLS is
+          # supposed to be preventing.
+          protocol: ftps
           local-dir: DUO/dist/
           # The FTP account is chrooted: inside its session "/" is already its
           # home directory, not the server root. Uploading to "/public_html/"
