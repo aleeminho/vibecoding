@@ -32,6 +32,8 @@
     findOwnerId,
     findSimilarBills,
     listKnownPeople,
+    setPaidBy,
+    setShareStatus,
     nextRefCode,
     normaliseAccountNumber,
     uploadReceipt,
@@ -204,6 +206,19 @@
    */
   let duplicate = $state<DuplicateCandidate[]>([])
 
+  /**
+   * Which participant settled with the vendor.
+   *
+   * A single name rather than a flag per person, so "two people both paid" is
+   * not a state that can be reached by tapping — it is not a state that exists.
+   *
+   * Their share is real and stays in the split: gate 4 requires the shares to
+   * sum to the bill total, and the operator ate. What changes is that it is not
+   * a debt, so it is written settled and never gets a payment link. Without
+   * this the operator is billed for their own dinner, by themselves.
+   */
+  let paidBy = $state<string | null>(null)
+
   onMount(async () => {
     try {
       known = await listKnownPeople()
@@ -251,7 +266,7 @@
         receiptPath = await uploadReceipt(ownerId, refCode, blob)
       }
 
-      await commitBill({
+      const billId = await commitBill({
         refCode,
         place: ext.place!,
         billDate: ext.date!,
@@ -275,6 +290,15 @@
           accountHolder: destination.accountHolder.trim(),
         },
       })
+
+      // Written after the bill exists, rather than through commit_bill — the
+      // same reasoning as the QRIS. A failure here leaves a bill whose organiser
+      // looks unpaid, which the Tagihan screen can fix by hand; a failure inside
+      // commit_bill would leave no bill at all.
+      if (paidBy) {
+        await setShareStatus(billId, paidBy, true)
+        await setPaidBy(billId, paidBy)
+      }
 
       committed = refCode
     } catch (err) {
@@ -481,6 +505,39 @@
         </div>
       {/each}
     </div>
+
+    <!--
+      Its own section rather than a mark on the roster chips, because a roster
+      chip already means something on tap: it removes that person. Two meanings
+      on one target is how somebody deletes a participant trying to say they
+      paid.
+    -->
+    {#if roster.length > 0}
+      <h3 class="group-title">Yang bayar ke vendor</h3>
+      <div class="group">
+        <div class="list">
+          <div class="row wrap">
+            {#each roster as person (person)}
+              <button
+                class="pick"
+                class:on={paidBy === person}
+                onclick={() => (paidBy = paidBy === person ? null : person)}
+              >
+                {person}
+              </button>
+            {/each}
+          </div>
+          <div class="row faint small">
+            {#if paidBy}
+              Share {paidBy} langsung kesimpen lunas dan nggak dapet link bayar.
+            {:else}
+              Belum ada yang ditandai — semua orang bakal ditagih, termasuk lu
+              kalau ikut makan.
+            {/if}
+          </div>
+        </div>
+      </div>
+    {/if}
 
     <h3 class="group-title">Orang</h3>
     <div class="group">

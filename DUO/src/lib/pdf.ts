@@ -276,6 +276,8 @@ export interface NotaBill {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  /** The participant who paid the vendor, or null if nobody was marked. */
+  paid_by_person: string | null
   /**
    * Just enough to print the payment links: who still owes, and their token.
    *
@@ -362,8 +364,14 @@ export function buildNotaPdf(
     // adding up to the bill total in the reconciliation at the foot, and a
     // remainder there would break it — the figure stays the person's share of
     // the split, and what has landed is a note about it.
-    const mark =
-      person.status === 'lunas'
+    //
+    // The payer is marked differently from someone who has paid, because it is
+    // a different fact: they are in the split only because their dinner is part
+    // of the bill, and their share was never a debt. "sudah bayar" would raise
+    // the question of who they paid.
+    const mark = person.is_payer
+      ? '  ·  yang bayar ke vendor'
+      : person.status === 'lunas'
         ? '  ·  sudah bayar'
         : person.amount_paid > 0
           ? `  ·  udah masuk ${rupiahDigits(person.amount_paid)}`
@@ -463,8 +471,18 @@ export function buildNotaPdf(
   // — paying Rp 98.175 against a page expecting Rp 127.050 settles nothing
   // and lands in the review queue instead. Two people owing the exact same
   // amount is the case that gets through, and it is rare enough to accept.
+  //
+  // `is_payer` is excluded as a rule rather than as a consequence. Their share
+  // being settled is the mechanism; not handing them a link is the intent, and
+  // the two are written by separate calls. If the marker landed and the status
+  // write did not, the document would otherwise tell somebody they paid the
+  // vendor and then ask them to pay.
   const owed = bill.shares.filter(
-    (s) => s.status !== 'lunas' && s.pay_token && s.amount_paid < s.amount_owed,
+    (s) =>
+      s.person !== bill.paid_by_person &&
+      s.status !== 'lunas' &&
+      s.pay_token &&
+      s.amount_paid < s.amount_owed,
   )
 
   if (owed.length > 0 && baseUrl) {

@@ -49,6 +49,7 @@ const bill: ExportBill = {
   bank_name: 'BCA',
   account_number: '1234567890',
   account_holder: 'Alee',
+  paid_by_person: null,
   items: [
     { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
     { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
@@ -170,6 +171,42 @@ describe('allocateBill', () => {
     // and the other half lands on the other person, not lost
     const sarah = allocateBill(bill).find((p) => p.person === 'Sarah')!
     expect(sarah.items.find((i) => i.name === 'Es Teh')!.amount).toBe(8000)
+  })
+
+  /*
+   * The organiser is in the split because they ate and the shares have to sum
+   * to the bill — but their share is not a debt to anyone, and the document has
+   * to say so rather than showing them as having paid for no stated reason.
+   */
+  describe('the organiser', () => {
+    test('marks their own row and no other', () => {
+      const withPayer: ExportBill = { ...bill, paid_by_person: 'Budi' }
+      const rows = allocateBill(withPayer)
+
+      expect(rows.find((p) => p.person === 'Budi')!.is_payer).toBe(true)
+      expect(rows.find((p) => p.person === 'Sarah')!.is_payer).toBe(false)
+    })
+
+    test('nobody is marked when the bill names no one', () => {
+      expect(allocateBill(bill).some((p) => p.is_payer)).toBe(false)
+    })
+
+    test('a name that is not in the split marks nobody', () => {
+      // What a stale name looks like — somebody was removed from the roster
+      // after the marker was set. Marking the wrong person would silently
+      // settle a real debt, so an unknown name has to mark nothing.
+      expect(allocateBill({ ...bill, paid_by_person: 'Tono' }).some((p) => p.is_payer)).toBe(false)
+    })
+
+    test('their share still counts toward the bill total', () => {
+      // The marker says the share is not owed; it does not say the share is
+      // not there. Dropping it would break the reconciliation at the foot.
+      const summed = allocateBill({ ...bill, paid_by_person: 'Budi' }).reduce(
+        (acc, p) => acc + p.total,
+        0,
+      )
+      expect(summed).toBe(75900)
+    })
   })
 
   test('the breakdown adds up to the bill total', () => {

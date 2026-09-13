@@ -21,6 +21,7 @@ const bill: ExportBill = {
   bank_name: 'BCA',
   account_number: '1234567890',
   account_holder: 'Alee',
+  paid_by_person: null,
   items: [
     { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
     { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
@@ -199,6 +200,20 @@ describe('pdf writer', () => {
       const urlWidth = textWidth(pagesUrl, 7.5)
 
       expect(nameWidth + urlWidth).toBeLessThan(COLUMN)
+    })
+
+    test('the vendor payer gets no link, even while their share reads unpaid', async () => {
+      // The rule, not the mechanism. Their share being settled is what normally
+      // keeps them out of this list, and that is written by a separate call —
+      // so if the marker landed and the status write did not, the document
+      // would tell somebody they paid the vendor and then ask them to pay.
+      const linked: ExportBill = {
+        ...unpaid({}),
+        paid_by_person: 'Sarah',
+      }
+      const s = await withLinks(linked)
+      expect(s).toContain('yang bayar ke vendor')
+      expect(s).not.toContain('/Subtype /Link')
     })
 
     test('an empty base URL prints nothing rather than a broken link', async () => {

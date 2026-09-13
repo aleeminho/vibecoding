@@ -64,6 +64,7 @@ export const DEMO_BILLS: BillWithShares[] = [
     notes: 'Nongkrong sore',
     qris_path: 'demo/qris.png',
     payment_method: 'both',
+    paid_by_person: null,
     shares: [
       // Budi paid half and is the fixture for a part payment: Rp 100.000 in
       // against Rp 127.050 owed, none of it marked settled by hand, so the
@@ -87,6 +88,7 @@ export const DEMO_BILLS: BillWithShares[] = [
     notes: null,
     qris_path: null,
     payment_method: 'bank',
+    paid_by_person: null,
     shares: [
       { person: 'Budi', amount_paid: 42760, amount_owed: 42760, status: 'lunas', paid_date: '2026-06-15' },
       { person: 'Sarah', amount_paid: 33140, amount_owed: 33140, status: 'lunas', paid_date: '2026-06-15' },
@@ -105,6 +107,11 @@ export const DEMO_BILLS: BillWithShares[] = [
     notes: 'Traktiran Andi',
     qris_path: null,
     payment_method: 'bank',
+    // Null everywhere in these fixtures, and that is not laziness: the demo
+    // operator is Alee, and Alee is not a participant on any demo bill, so a
+    // name here would be a state the app cannot actually produce. The case is
+    // covered by unit tests and by the render check instead.
+    paid_by_person: null,
     shares: [
       { person: 'Budi', amount_paid: 0, amount_owed: 78000, status: 'belum lunas', paid_date: null },
       { person: 'Andi', amount_paid: 156000, amount_owed: 156000, status: 'lunas', paid_date: '2026-05-31' },
@@ -124,6 +131,7 @@ export const DEMO_BILLS: BillWithShares[] = [
     notes: null,
     qris_path: null,
     payment_method: 'bank',
+    paid_by_person: null,
     shares: [
       { person: 'Sarah', amount_paid: 47250, amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
       { person: 'Dewi', amount_paid: 47250, amount_owed: 47250, status: 'lunas', paid_date: '2026-05-27' },
@@ -189,6 +197,7 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
     bank_name: 'BCA',
     account_number: '1234567890',
     account_holder: 'Alee',
+    paid_by_person: null,
     items: [
       { name: 'Nasi Goreng', qty: 1, line_total: 25000, assigned_to: ['Budi'] },
       { name: 'Es Teh', qty: 2, line_total: 16000, assigned_to: ['Budi', 'Sarah'] },
@@ -212,6 +221,7 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
     bank_name: 'BCA',
     account_number: '1234567890',
     account_holder: 'Alee',
+    paid_by_person: null,
     items: [
       { name: 'Long Black', qty: 1, line_total: 35000, assigned_to: ['Budi'] },
       { name: 'Ice Caramel Latte', qty: 1, line_total: 45000, assigned_to: ['Sarah'] },

@@ -102,10 +102,10 @@
   /**
    * Hand one person their link.
    *
-   * Sent one at a time on purpose. The link is the credential that lets someone
-   * mark a bill paid, so a copy that reaches the group is a copy that lets
-   * anyone mark anyone paid — which is why the PDF never carries them and this
-   * is a per-person action rather than a line in a shared document.
+   * The PDF carries these too, for the one-tap case. This is for sending one
+   * link to one person without the whole group seeing it — the link is the
+   * credential that lets somebody mark a share paid, so the two routes trade
+   * convenience against who ends up holding a copy.
    *
    * Three routes, in order of how good they are on a phone, and the third is
    * the one that matters. `navigator.share` opens the share sheet and gets the
@@ -221,7 +221,15 @@
               is a fact about the debt, and the settle-up screen is where the
               debt is tracked.
             -->
-            {#if person.status === 'lunas'}
+            {#if person.is_payer}
+              <!--
+                Said differently from "sudah bayar", because it is a different
+                fact. This person is in the split — the shares have to sum to
+                the bill — but their share was never a debt. Showing them as
+                having paid would invite the question "paid whom?".
+              -->
+              <span class="paid">yang bayar ke vendor</span>
+            {:else if person.status === 'lunas'}
               <span class="paid">sudah bayar</span>
             {:else if person.amount_paid > 0}
               <span class="paid">udah masuk {rupiah(person.amount_paid)}</span>
@@ -258,7 +266,7 @@
           absent from the PDF, so the document that goes to the group carries
           the arithmetic and none of the credentials.
         -->
-        {#if person.status !== 'lunas' && linkFor(person.person)}
+        {#if !person.is_payer && person.status !== 'lunas' && linkFor(person.person)}
           <div class="pay-link no-print">
             <button class="link" onclick={() => sendLink(person.person)}>
               {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}

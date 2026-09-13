@@ -268,6 +268,14 @@ export interface BillWithShares {
   /** Object path in the `qris` bucket, or null when the bill has no code. */
   qris_path: string | null
   payment_method: PaymentMethod
+  /**
+   * The participant who paid the vendor, or null if nobody was marked.
+   *
+   * Their share is not a debt, so it is committed settled and never gets a
+   * payment link. Read here so the screens can say *why* that person is not
+   * being charged, rather than showing them as having paid for no reason.
+   */
+  paid_by_person: string | null
   shares: BillShare[]
 }
 
@@ -295,7 +303,7 @@ export type PaymentMethod = 'bank' | 'qris' | 'both'
  * disagreeing about what a bill is.
  */
 const BILL_COLUMNS =
-  'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, qris_path, payment_method' as const
+  'id, ref_code, place, bill_date, total, receipt_path, notes, bank_name, account_number, account_holder, qris_path, payment_method, paid_by_person' as const
 
 /** A participant row as the database returns it, before the reduction below. */
 type RawShare = Omit<BillShare, 'amount_paid'> & {
@@ -381,6 +389,20 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
     }
     return { ...(bill as unknown as BillWithShares), shares: toShares(bill_participants) }
   })
+}
+
+/**
+ * Record who settled with the vendor.
+ *
+ * A separate call after the commit, like the QRIS and for the same reason:
+ * commit_bill is the one path that creates a bill, and widening it means
+ * dropping and recreating it.
+ */
+export async function setPaidBy(billId: string, person: string | null): Promise<void> {
+  if (import.meta.env.DEV && isDemo()) return
+
+  const { error } = await supabase.from('bills').update({ paid_by_person: person }).eq('id', billId)
+  if (error) throw new Error(error.message)
 }
 
 export interface DuplicateCandidate {
@@ -709,7 +731,7 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  * bill. Written twice they drifted the moment a column was added, which is
  * exactly what happened when `total` was introduced.
  */
-const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
+const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder, paid_by_person,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
    bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date`
 
@@ -724,6 +746,7 @@ type ExportRow = {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  paid_by_person: string | null
   bill_items: {
     position: number
     name: string
@@ -745,6 +768,7 @@ function mapExportBill(bill: ExportRow): ExportBill {
     bank_name: bill.bank_name,
     account_number: bill.account_number,
     account_holder: bill.account_holder,
+    paid_by_person: bill.paid_by_person ?? null,
     items: (bill.bill_items ?? [])
       .sort((a, b) => a.position - b.position)
       .map((item) => ({

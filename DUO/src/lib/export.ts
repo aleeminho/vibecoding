@@ -71,6 +71,8 @@ export interface ExportBill {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  /** The participant who paid the vendor, or null if nobody was marked. */
+  paid_by_person: string | null
   items: {
     name: string
     qty: number
@@ -191,6 +193,14 @@ export interface PersonBreakdown {
    * is worse than no document at all.
    */
   amount_paid: number
+  /**
+   * True for the one person who settled with the vendor.
+   *
+   * They are in the split because they ate and the shares have to sum to the
+   * bill, but their share is not a debt. The document says so, rather than
+   * showing them as having paid for no stated reason.
+   */
+  is_payer: boolean
   paid_date: string | null
 }
 
@@ -279,6 +289,7 @@ export function allocateBill(bill: ExportBill): PersonBreakdown[] {
       total: share.amount_owed,
       status: share.status,
       amount_paid: share.amount_paid,
+      is_payer: bill.paid_by_person === person,
       paid_date: share.paid_date,
     })
   }
