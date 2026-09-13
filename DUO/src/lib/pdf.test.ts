@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, test } from 'bun:test'
-import { buildNotaPdf, Pdf, textWidth, type QrisImage } from './pdf'
+import { buildNotaPdf, Pdf, textWidth } from './pdf'
 import { allocateBill, type ExportBill } from './export'
 
 const bill: ExportBill = {
@@ -62,27 +62,6 @@ const bill: ExportBill = {
 async function bytes(billData: ExportBill): Promise<string> {
   const blob = buildNotaPdf(billData, allocateBill(billData))
   return Buffer.from(await blob.arrayBuffer()).toString('latin1')
-}
-
-/**
- * A JPEG header for the writer to read — not a decodable image, and not meant
- * to be. Only the SOF marker is parsed, so a real one would be a hundred
- * kilobytes of fixture for the same three numbers.
- *
- * The bytes are deliberately free of 0x0a, so the xref line count in the test
- * below cannot be inflated by a binary line that happens to look like an entry.
- */
-function fakeJpeg(width: number, height: number): Uint8Array {
-  return Uint8Array.from([
-    0xff, 0xd8, // SOI
-    0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, // APP0 with an empty payload
-    0xff, 0xc0, 0x00, 0x11, 0x08, // SOF0, 17-byte segment, 8 bits per channel
-    height >> 8, height & 0xff,
-    width >> 8, width & 0xff,
-    0x03, // three components, which is what the canvas encoder produces
-    0x01, 0x11, 0x00, 0x02, 0x11, 0x00, 0x03, 0x11, 0x00, // component specs
-    0xff, 0xd9, // EOI
-  ])
 }
 
 describe('pdf writer', () => {
@@ -142,6 +121,10 @@ describe('pdf writer', () => {
    * An annotation is also the one part of the output that some readers reject
    * the whole file for when it is malformed, which is why this asserts on the
    * assembled dictionaries rather than on my having written them.
+   *
+   * The address is only ever in the annotation. What the page shows is the word
+   * that says what the row does, which is why these assertions are about the
+   * two being in the same place rather than about the URL being on the page.
    */
   describe('payment links', () => {
     const BASE = 'https://splitfair.xyz/'
@@ -175,13 +158,22 @@ describe('pdf writer', () => {
     })
 
     /*
-     * Where the URL is drawn as text. Not the first place the URL appears in
-     * the file: the annotation carries it too, and the page dictionary is
-     * written before the content stream, so a plain `indexOf` finds the
-     * annotation and every assertion after it is about the wrong bytes.
+     * Where the word is drawn. Not `s.indexOf('Pembayaran')` — the page
+     * dictionary is written before the content stream, so anything searching
+     * the whole file for a string the annotation also carries finds the
+     * annotation, and every assertion after it is about the wrong bytes. That
+     * cost two red tests when the row carried the URL.
      */
-    const drawnAt = (s: string) =>
-      s.indexOf(`(https://splitfair.xyz/#/bayar?t=${TOKEN}) Tj`)
+    const drawnAt = (s: string) => s.indexOf('(Pembayaran) Tj')
+
+    test('the link is a word, and the URL is nowhere on the page', async () => {
+      // A 36-character UUID in 7.5pt monospace was a line of small print that
+      // said nothing a reader wanted to read. It travels in the annotation,
+      // which is all a tap follows, and the page says what the row does.
+      const s = await withLinks(unpaid({}))
+      expect(drawnAt(s)).toBeGreaterThan(-1)
+      expect(s).not.toContain(`(#/bayar?t=${TOKEN}) Tj`)
+    })
 
     test('the link sits in that person own block, not in a section at the foot', async () => {
       // Under their items, so the document says whose credential it is by
@@ -194,13 +186,27 @@ describe('pdf writer', () => {
     })
 
     test('the link is set in the accent the bill total is set in', async () => {
-      // Which is what makes it read as something to press rather than as a line
-      // of small print. Asserted on the operator holding the URL rather than on
-      // the row, because the label beside it stays quiet on purpose.
+      // Which is what makes it read as something to press. Asserted on the
+      // operator holding the word rather than on the row, because the accent is
+      // the only thing distinguishing it from the quiet small print around it.
       const s = await withLinks(unpaid({}))
       const at = drawnAt(s)
       const op = s.slice(s.lastIndexOf('BT ', at), s.indexOf('Tj ET', at))
       expect(op).toContain('0.816 0.29 0.008 rg')
+    })
+
+    test('the tappable rectangle sits over the word', async () => {
+      // The rect is a fixed width because the writer cannot measure a
+      // proportional face. If the word ever outgrows it the link still works
+      // and only part of it is tappable, which is the failure this catches.
+      const s = await withLinks(unpaid({}))
+      const rect = s.match(/\/Rect \[([\d.]+) [\d.]+ ([\d.]+) [\d.]+\]/)
+      expect(rect).not.toBeNull()
+
+      const [x1, x2] = [Number(rect![1]), Number(rect![2])]
+      // Ten points of Helvetica, estimated generously at half its length.
+      const wordEndsBy = 48 + 12 + 'Pembayaran'.length * 5
+      expect(x2).toBeGreaterThan(wordEndsBy)
     })
 
     test('a settled share gets no link, even with a token', async () => {
@@ -234,31 +240,6 @@ describe('pdf writer', () => {
       expect(y1).toBeGreaterThanOrEqual(0)
       expect(y2).toBeLessThanOrEqual(841.89)
       expect(y1).toBeLessThan(y2)
-    })
-
-    test('the widest deployment still fits beside the label', () => {
-      // The label is left-aligned and the URL is right-aligned, so the two
-      // collide silently once they are wider than the column together — and
-      // there is nothing in the output that says so. GitHub Pages is the
-      // longest of the three places this is served from.
-      //
-      // This asserted against a twenty-character name back when the row carried
-      // one. The row moved into the person's block and the left-hand text became
-      // a fixed label, which is narrower — so the check is slack now, and slack
-      // in the safe direction. It stays because the URL is what grows.
-      const COLUMN = 595.28 - 48 - 48
-      const LABEL_INDENT = 12
-      const pagesUrl =
-        'https://aleeminho.github.io/vibecoding/#/bayar?t=00000000-0000-4000-8000-000000000000'
-
-      // Helvetica is proportional and this writer has no metrics table for it,
-      // so the label is estimated at about half its length in points at 9pt —
-      // deliberately generous, because the point of the check is to catch a
-      // collision with room to spare rather than to be exact.
-      const labelWidth = 'Link bayar'.length * 5 + LABEL_INDENT
-      const urlWidth = textWidth(pagesUrl, 7.5)
-
-      expect(labelWidth + urlWidth).toBeLessThan(COLUMN)
     })
 
     test('the vendor payer gets no link, even while their share reads unpaid', async () => {
@@ -303,95 +284,37 @@ describe('pdf writer', () => {
   })
 
   /*
-   * The code, which is the one part of this document somebody acts on rather
-   * than reads. It is drawn rather than linked because the payer is often not
-   * the person holding the phone, and both failure modes here are quiet: an
-   * image object that is not referenced draws nothing, and one whose object
-   * number is wrong draws nothing in some readers and the whole file fails in
-   * others.
+   * The QRIS is not in this document. The payer's own page shows the code, and
+   * that page is one tap from here — so what this writer has to get right is
+   * not drawing it, and not printing a transfer the operator turned off.
    */
-  describe('the QRIS code', () => {
-    const URL = 'https://x.supabase.co/storage/v1/object/public/qris/u/a.jpg'
-    const attached: ExportBill = { ...bill, qris_path: 'u/a.jpg', payment_method: 'qris' }
-
-    const withQris = async (
-      patch: Partial<ExportBill> = {},
-      qris: QrisImage | null = { jpeg: fakeJpeg(240, 240), url: URL },
-    ): Promise<string> => {
-      const b: ExportBill = { ...attached, ...patch }
-      return Buffer.from(await buildNotaPdf(b, allocateBill(b), '', qris).arrayBuffer()).toString(
-        'latin1',
-      )
+  describe('which way to pay', () => {
+    const withMethod = async (method: ExportBill['payment_method']): Promise<string> => {
+      const b: ExportBill = { ...bill, payment_method: method, qris_path: 'u/a.jpg' }
+      return Buffer.from(await buildNotaPdf(b, allocateBill(b)).arrayBuffer()).toString('latin1')
     }
-
-    test('draws the code and names it in the page resources', async () => {
-      const s = await withQris()
-      expect(s).toContain('/Subtype /Image')
-      expect(s).toContain('/Filter /DCTDecode')
-      // The size comes off the SOF marker, and the dictionary has to carry the
-      // source pixels rather than the placement — a reader that took these as
-      // points would draw the code at a quarter of its size.
-      expect(s).toContain('/Width 240 /Height 240')
-      expect(s).toContain('/ColorSpace /DeviceRGB')
-      expect(s).toContain('/XObject << /Im1')
-      expect(s).toContain('/Im1 Do')
-    })
-
-    test('the image object does not disturb the xref', async () => {
-      const s = await withQris()
-      const xrefAt = s.indexOf('\nxref\n') + 1
-      expect(Number(s.match(/startxref\n(\d+)/)?.[1])).toBe(xrefAt)
-
-      // one free entry, plus catalog, pages, four fonts, page, content, image
-      const entries = [...s.slice(xrefAt).matchAll(/^(\d{10}) (\d{5}) [nf] $/gm)]
-      expect(entries.length).toBe(10)
-
-      entries.slice(1).forEach((entry, i) => {
-        expect(s.startsWith(`${i + 1} 0 obj`, Number(entry[1]))).toBe(true)
-      })
-      // Last, so that adding one cannot move a page or a content object.
-      expect(s.startsWith('9 0 obj', Number(entries[9][1]))).toBe(true)
-    })
-
-    test('a code that is not a JPEG falls back to a link rather than a blank box', async () => {
-      // The bytes a PNG screenshot would start with. The writer cannot embed
-      // it, and a silently-skipped image would leave the label with nothing
-      // under it.
-      const png: QrisImage = { jpeg: Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d]), url: URL }
-      const s = await withQris({}, png)
-      expect(s).not.toContain('/Subtype /Image')
-      expect(s).toContain('/Subtype /Link')
-      expect(s).toContain(`(${URL})`)
-    })
-
-    test('an offline phone still produces a document that says how to pay', async () => {
-      const s = await withQris({}, { jpeg: null, url: URL })
-      expect(s).not.toContain('/Subtype /Image')
-      expect(s).toContain('Buka kode QR')
-    })
 
     test('a qris-only bill prints no transfer box, even with an account number', async () => {
       // The fixture has a BCA account number. Printing it would send somebody
       // to a method the operator turned off.
-      const s = await withQris()
-      expect(s).toContain('Scan QRIS')
+      const s = await withMethod('qris')
       expect(s).not.toContain('Transfer ke')
       expect(s).not.toContain('1234567890')
     })
 
-    test('a bank-only bill prints the transfer box and no code', async () => {
+    test('a bank-only bill prints the transfer box', async () => {
       // The bill can carry a code and still ask for a transfer — that is what
-      // `payment_method` is stored for rather than derived.
-      const s = await withQris({ payment_method: 'bank' })
-      expect(s).not.toContain('/Subtype /Image')
-      expect(s).not.toContain('Scan QRIS')
+      // `payment_method` is stored for rather than derived from qris_path.
+      const s = await withMethod('bank')
       expect(s).toContain('Transfer ke')
     })
 
-    test('offering both prints both', async () => {
-      const s = await withQris({ payment_method: 'both' })
-      expect(s).toContain('/Subtype /Image')
+    test('offering both prints the transfer box without the code', async () => {
+      const s = await withMethod('both')
       expect(s).toContain('Transfer ke')
+      // Nothing in the writer can draw one, so this is really an assertion that
+      // no half-removed QRIS plumbing grew back.
+      expect(s).not.toContain('/Subtype /Image')
     })
   })
 })

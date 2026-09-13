@@ -87,83 +87,6 @@ export function textWidth(text: string, size: number): number {
   return text.length * COURIER_ADVANCE * size
 }
 
-/**
- * One character per byte, so a string's length is a byte offset.
- *
- * The writer assembles the file as a string and measures every object offset
- * with `.length`, which is only the byte offset if nothing widens on the way
- * out — see the latin1 conversion at the end of `build()`.
- *
- * Chunked because `String.fromCharCode(...bytes)` on a hundred kilobytes of
- * image data overflows the argument stack, and the throw arrives as "too many
- * arguments" from a line that has nothing to do with images.
- */
-function latin1(bytes: Uint8Array): string {
-  let out = ''
-  for (let i = 0; i < bytes.length; i += 8192) {
-    out += String.fromCharCode(...bytes.subarray(i, i + 8192))
-  }
-  return out
-}
-
-interface Jpeg {
-  width: number
-  height: number
-  /** 1 for greyscale, 3 for colour. PDF has to be told which, separately. */
-  components: number
-}
-
-/**
- * Read a JPEG's size and component count out of its SOF marker.
- *
- * The image dictionary needs both and neither is anywhere else in the file, so
- * they have to be found by walking the marker segments. Walks rather than reads
- * a fixed offset because APP0 is the usual second marker but not the only one —
- * a JPEG carrying EXIF or an ICC profile first would otherwise be read as
- * though the header were there.
- *
- * Returns null for anything that is not a JPEG, which is the caller's cue to
- * fall back rather than to draw a blank rectangle.
- */
-function readJpeg(bytes: Uint8Array): Jpeg | null {
-  if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return null
-
-  let i = 2
-  while (i < bytes.length - 9) {
-    if (bytes[i] !== 0xff) {
-      i++
-      continue
-    }
-    const marker = bytes[i + 1]
-    // Markers that carry no length field: padding, restart intervals, SOI.
-    if (marker === 0xff || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
-      i += 2
-      continue
-    }
-    // Any SOF, except DHT (c4), JPG (c8) and DAC (cc), which share the range.
-    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
-      return {
-        height: (bytes[i + 5] << 8) | bytes[i + 6],
-        width: (bytes[i + 7] << 8) | bytes[i + 8],
-        components: bytes[i + 9],
-      }
-    }
-    i += 2 + ((bytes[i + 2] << 8) | bytes[i + 3])
-  }
-
-  return null
-}
-
-interface PlacedImage {
-  /** Unique across the document, because it is the name the content stream calls it by. */
-  name: string
-  /** The JPEG bytes as latin1, converted once at placement. */
-  data: string
-  width: number
-  height: number
-  gray: boolean
-}
-
 export class Pdf {
   private pages: string[][] = [[]]
   /**
@@ -174,9 +97,6 @@ export class Pdf {
    * the annotations go in the page dictionary.
    */
   private annots: string[][] = [[]]
-  /** Images, one list per page, parallel to `pages` for the same reason. */
-  private images: PlacedImage[][] = [[]]
-  private imageCount = 0
   private y = A4.height - 56
 
   readonly left = 48
@@ -197,47 +117,7 @@ export class Pdf {
   newPage(): void {
     this.pages.push([])
     this.annots.push([])
-    this.images.push([])
     this.y = this.top
-  }
-
-  /**
-   * Draw a JPEG with its bottom-left corner at (x, y), scaled to width × height
-   * points. Returns false for anything this writer cannot describe, rather than
-   * throwing or drawing nothing.
-   *
-   * The return matters. The one caller has a fallback — a link to the code —
-   * and needs to know whether to use it; a silent skip would leave a label with
-   * nothing under it in a document that is someone's instructions for paying.
-   *
-   * JPEG only, and that is enough here rather than a limitation to work around:
-   * every QRIS in the bucket was re-encoded by `prepareReceiptImage` before it
-   * was uploaded, so they are all canvas-produced JPEGs. A PNG would need the
-   * zlib stream unpacked and re-filtered, which is a lot of code for an object
-   * that cannot exist.
-   */
-  image(x: number, y: number, width: number, height: number, bytes: Uint8Array): boolean {
-    const jpeg = readJpeg(bytes)
-    // 1 and 3 map to a colour space this writer can name. CMYK would need a
-    // /Decode array, and nothing that reaches this app produces one.
-    if (!jpeg || (jpeg.components !== 1 && jpeg.components !== 3)) return false
-
-    const name = `Im${++this.imageCount}`
-    this.images[this.images.length - 1].push({
-      name,
-      data: latin1(bytes),
-      width: jpeg.width,
-      height: jpeg.height,
-      gray: jpeg.components === 1,
-    })
-
-    // The unit square mapped onto the placement rectangle, which is how a PDF
-    // scales an image without the writer ever touching its pixels.
-    this.current().push(
-      `q ${width.toFixed(2)} 0 0 ${height.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm ` +
-        `/${name} Do Q`,
-    )
-    return true
   }
 
   /**
@@ -326,19 +206,8 @@ export class Pdf {
   build(): Blob {
     const objects: string[] = []
     const pageCount = this.pages.length
-    // 1 catalog, 2 pages, then 4 font objects, then a page and a content per
-    // page, then one object per image.
+    // 1 catalog, 2 pages, then 4 font objects, then a page and a content per page
     const firstPageObj = 7
-    // Images are numbered after everything else, which is what keeps adding one
-    // from moving any object that was already numbered. The page/content stride
-    // is the fragile part of this writer; a feature that cannot disturb it
-    // cannot break it.
-    const firstImageObj = firstPageObj + pageCount * 2
-
-    // By name, because the page dictionaries are written before the image
-    // objects are and have to reference them by number regardless.
-    const placed = this.images.flat()
-    const objectOf = new Map(placed.map((img, k) => [img.name, firstImageObj + k]))
 
     for (const { base } of FONTS) {
       objects.push(
@@ -360,25 +229,13 @@ export class Pdf {
       // disturb it cannot break it.
       const links = this.annots[i]
       const annots = links.length > 0 ? ` /Annots [${links.join(' ')}]` : ''
-      const xobjects = this.images[i].map((img) => `/${img.name} ${objectOf.get(img.name)} 0 R`)
-      const xobject = xobjects.length > 0 ? ` /XObject << ${xobjects.join(' ')} >>` : ''
       objects.push(
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4.width} ${A4.height}] ` +
-          `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >>${xobject} >>` +
-          `${annots} /Contents ${firstPageObj + i * 2 + 1} 0 R >>`,
+          `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >>${annots} ` +
+          `/Contents ${firstPageObj + i * 2 + 1} 0 R >>`,
       )
       objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
     })
-
-    for (const img of placed) {
-      // The bytes go straight through: /DCTDecode means the reader runs its own
-      // JPEG decoder, so nothing here has to know what a DCT coefficient is.
-      objects.push(
-        `<< /Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} ` +
-          `/ColorSpace /${img.gray ? 'DeviceGray' : 'DeviceRGB'} /BitsPerComponent 8 ` +
-          `/Filter /DCTDecode /Length ${img.data.length} >>\nstream\n${img.data}\nendstream`,
-      )
-    }
 
     let file = '%PDF-1.4\n'
     const offsets: number[] = []
@@ -411,29 +268,6 @@ export class Pdf {
 import { formatDate, rupiahDigits } from './format'
 import type { PersonBreakdown } from './export'
 
-/**
- * How wide the QRIS code is drawn, in points. 150pt is 53mm.
- *
- * Big on purpose: it is scanned off a screen by a second phone, or
- * screenshotted into a banking app, and both of those want more pixels than a
- * comfortable-looking mark would give them. It still fits the column with the
- * money above it untouched.
- */
-const QRIS_SIZE = 150
-
-/**
- * The bill's QRIS code, as the document needs it.
- *
- * Both halves come from the caller and both are needed: the bytes to draw, and
- * where the code lives, which is what the document falls back to when the bytes
- * cannot be embedded. `jpeg` is null when the fetch failed — an offline phone
- * is the ordinary case, not a broken one.
- */
-export interface QrisImage {
-  jpeg: Uint8Array | null
-  url: string
-}
-
 export interface NotaBill {
   ref_code: string
   bill_date: string
@@ -442,9 +276,7 @@ export interface NotaBill {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
-  /** Object path of the bill's QRIS code, or null when it has none. */
-  qris_path: string | null
-  /** Which of the two the document offers. Not the same as which was used. */
+  /** Which of the two ways to pay the document offers. Not which one was used. */
   payment_method: 'bank' | 'qris' | 'both'
   /** The participant who paid the vendor, or null if nobody was marked. */
   paid_by_person: string | null
@@ -480,16 +312,11 @@ export interface NotaBill {
  * Passed in rather than read from `location` inside, so this module stays pure
  * and testable without a DOM, and so the caller decides what a link points at
  * rather than this file assuming it knows.
- *
- * `qris` is the same idea: the bytes are fetched by the caller, which is the
- * only part of this that can reach the network. Null when the bill offers no
- * code at all.
  */
 export function buildNotaPdf(
   bill: NotaBill,
   breakdown: PersonBreakdown[],
   baseUrl = '',
-  qris: QrisImage | null = null,
 ): Blob {
   const pdf = new Pdf()
   const { left, right } = pdf
@@ -498,9 +325,9 @@ export function buildNotaPdf(
   // What the bill offers, which is the operator's choice and not a record of
   // what any one payer used — nothing in the database says that. A method set
   // to qris with no code uploaded is a real state (see the payment method
-  // control), and it prints neither a code nor a transfer box rather than
-  // printing the one the operator turned off.
-  const offersQris = bill.payment_method !== 'bank' && Boolean(bill.qris_path)
+  // control), and it prints no transfer box rather than printing the one the
+  // operator turned off. The code itself is not in this document at all: the
+  // payer's own page shows it, and that is one tap from here.
   const offersBank = bill.payment_method !== 'qris' && Boolean(bill.account_number)
 
   const line = (points: number, needed = 0) => {
@@ -558,11 +385,11 @@ export function buildNotaPdf(
    * vendor and then ask them to pay.
    *
    * The trade-off, stated where it is made rather than left implicit: these are
-   * credentials and the document they are printed on goes to the whole group.
-   * A mis-tap is possible. What catches it is the amount check at the other end
-   * — paying Rp 98.175 against a page expecting Rp 127.050 settles nothing and
-   * lands in the review queue instead. Two people owing the exact same amount
-   * is the case that gets through, and it is rare enough to accept.
+   * credentials and the document they are on goes to the whole group. A mis-tap
+   * is possible. What catches it is the amount check at the other end — paying
+   * Rp 98.175 against a page expecting Rp 127.050 settles nothing and lands in
+   * the review queue instead. Two people owing the exact same amount is the
+   * case that gets through, and it is rare enough to accept.
    */
   const payLink = new Map<string, string>()
   if (baseUrl) {
@@ -644,22 +471,30 @@ export function buildNotaPdf(
 
     if (link) {
       line(5)
-      pdf.text('Link bayar', left + 12, pdf.cursor, { size: 9, color: SOFT })
-      // The rectangle covers the whole row, not just the URL. A 7.5pt run of
-      // monospace is a small target under a thumb, and there is no reason to
-      // make somebody aim at it when the name beside it is part of the same
-      // thing.
-      pdf.link(left, pdf.cursor - 4, right - left, 15, link)
-      // The same accent as the bill's total, which is what makes it read as
-      // something to press rather than as a line of small print. It is the only
-      // other place in the document that colour is spent, and both are things
-      // you act on rather than read.
-      pdf.text(link, right, pdf.cursor, {
-        size: 7.5,
-        font: 'mono',
+      /*
+       * The word is the link; the URL is not printed.
+       *
+       * A 36-character UUID set in 7.5pt monospace said nothing a reader wanted
+       * to read and looked like small print rather than like something to
+       * press. The row says what it does instead, and the address is where it
+       * always was — in the annotation, which is what a tap follows.
+       *
+       * Left-aligned rather than in the money column, which is a column of
+       * figures in a tabular face and the one place in this document a word
+       * would be read as a number. `text()` cannot right-align a proportional
+       * face anyway: measuring one needs a metrics table, and not carrying one
+       * is what keeps this writer small.
+       */
+      pdf.text('Pembayaran', left + 12, pdf.cursor, {
+        size: 10,
+        font: 'sans-bold',
         color: ACCENT,
-        align: 'right',
       })
+      // Wider than the word on purpose. Ten points of Helvetica is a small
+      // target under a thumb, and the width cannot be measured here — the
+      // estimate only has to be generous, not right, because the worst case is
+      // a tap that lands where the link would have been anyway.
+      pdf.link(left + 12, pdf.cursor - 4, 72, 15, link)
       line(14)
     }
 
@@ -686,64 +521,6 @@ export function buildNotaPdf(
     font: 'mono-bold',
     align: 'right',
   })
-
-  /*
-   * The code itself, drawn rather than linked.
-   *
-   * A nota is read on a phone, and the person paying is very often not the
-   * person holding the phone — somebody reads their own name off the shared
-   * document and scans it with theirs. A tappable link is no use for that, and
-   * it is no use for the payer either: their banking app wants an image in the
-   * gallery, and a QR on the page is a screenshot away from one. So the code
-   * goes in the document, at 53mm, which is comfortably above what a camera
-   * wants and still leaves the money column's margin alone.
-   *
-   * ponytail: the bytes go in at whatever size they were uploaded — up to
-   * 1568px from the canvas encoder, several hundred kilobytes, drawn 53mm wide.
-   * Re-encode to ~600px at upload if the file's size ever matters; it is the
-   * difference between a 6KB nota and a 300KB one.
-   */
-  if (offersQris) {
-    // The label, the code, the holder line, and the gap under it.
-    const block = 20 + QRIS_SIZE + 8 + 13
-
-    // The move down has to be part of this call, not a separate `line(20)`.
-    // The reconciliation above leaves the cursor on its own baseline and
-    // nothing has moved it since, so `line(0, block)` tests the fit and then
-    // does not move — which is how the label ended up printed through the
-    // sentence above it. Found in a render, not in the bytes.
-    line(26, block + 26)
-    pdf.text('Scan QRIS', left, pdf.cursor, { size: 9, color: SOFT })
-    line(20)
-
-    const drawn = qris?.jpeg
-      ? pdf.image(left, pdf.cursor - QRIS_SIZE, QRIS_SIZE, QRIS_SIZE, qris.jpeg)
-      : false
-
-    if (drawn) {
-      // The image is drawn upward from where the cursor was left, so the cursor
-      // has to be moved past its bottom edge by hand — the same trap the
-      // transfer box below fell into.
-      line(QRIS_SIZE + 8)
-      if (bill.account_holder) {
-        pdf.text(`a.n. ${bill.account_holder}`, left, pdf.cursor, { size: 9, color: SOFT })
-        line(13)
-      }
-    } else if (qris?.url) {
-      // There is a code but it could not be embedded — the phone was offline
-      // when the PDF was built, or the object is not a JPEG. A link is worse
-      // than the code and much better than a nota that names no way to pay.
-      pdf.link(left, pdf.cursor - 4, right - left, 15, qris.url)
-      pdf.text('Buka kode QR', left, pdf.cursor, { size: 9.5 })
-      pdf.text(qris.url, right, pdf.cursor, { size: 7.5, font: 'mono', color: SOFT, align: 'right' })
-      line(17)
-    } else {
-      // Reachable only from a caller that offered a QRIS and passed nothing to
-      // draw. Saying so beats a label with a hole under it.
-      pdf.text('Kode QRIS-nya gagal dimuat.', left, pdf.cursor, { size: 9, color: SOFT })
-      line(13)
-    }
-  }
 
   if (offersBank) {
     line(26)

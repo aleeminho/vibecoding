@@ -20,9 +20,9 @@
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
-  import { fetchQrisBytes, getExportBill, qrisUrl } from '../lib/api'
+  import { getExportBill, qrisUrl } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
-  import { buildNotaPdf, type QrisImage } from '../lib/pdf'
+  import { buildNotaPdf } from '../lib/pdf'
   import { copyText } from '../lib/clipboard'
 
   /**
@@ -58,23 +58,10 @@
     note = null
 
     try {
-      // Fetched here rather than inside the writer, which stays pure and
-      // synchronous — this is the only part that can reach the network, and it
-      // returns null on failure rather than throwing, so an offline phone still
-      // produces a document.
-      const qris: QrisImage | null = offersQris(bill)
-        ? { jpeg: await fetchQrisBytes(bill.qris_path!), url: qrisUrl(bill.qris_path!) }
-        : null
-
       // The links in the document point back at wherever this page is being
       // served from, so the same PDF is correct on localhost, on Pages and on
       // the cPanel host without a build-time setting for each.
-      const blob = buildNotaPdf(
-        bill,
-        breakdown,
-        `${location.origin}${location.pathname}`,
-        qris,
-      )
+      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`)
       const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
 
       if (navigator.canShare?.({ files: [file] })) {
