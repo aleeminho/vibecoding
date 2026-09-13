@@ -52,3 +52,8 @@ pnpm-debug.log*
 # impossible by accident. Remove a line when that project is actually wanted.
 uno/
 netlimiterlite/
+
+# Supabase CLI local state. The CLI writes this wherever it is run from, so a
+# stray copy appears at the root whenever a command is issued from here rather
+# than from DUO/. It is machine-local and meaningless to anyone else.
+supabase/.temp/
