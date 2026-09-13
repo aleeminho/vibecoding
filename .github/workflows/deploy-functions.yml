@@ -1,0 +1,93 @@
+# Deploys DUO's Edge Function to Supabase when its source changes.
+#
+# This is a SEPARATE pipeline from the two site deploys, and conflating the two
+# is the mistake this workflow exists to prevent.
+#
+#   src/, index.html, public/   -> built by vite    -> Jagoan + GitHub Pages
+#   supabase/functions/**       -> deployed by CLI  -> Supabase
+#
+# The function is not part of the frontend build. A change to prompt.ts does not
+# alter dist/ by a single byte, so the site workflows run, find nothing to
+# upload, report success — and the application behaves exactly as before. That
+# happened once already: a prompt fix was pushed, everything went green, and the
+# warning it was meant to remove was still on screen. The change only took
+# effect because the function was deployed by hand.
+#
+# One repository secret is required:
+#
+#   SUPABASE_ACCESS_TOKEN   dashboard -> Account -> Access Tokens
+#
+# That is an ACCOUNT token for the CLI, not a project key. Do not confuse it
+# with the publishable key, which is public and lives in repository variables.
+
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches: [main]
+    # Only when the function itself changes. Running this on every push would
+    # redeploy identical code and add noise to the history for nothing.
+    paths:
+      - 'DUO/supabase/functions/**'
+      - '.github/workflows/deploy-functions.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-functions
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for the access token
+        id: creds
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "::notice title=Skipping function deploy::SUPABASE_ACCESS_TOKEN is not set. Add it under Settings -> Secrets and variables -> Actions, then re-run this workflow."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.skip != 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - if: steps.creds.outputs.skip != 'true'
+        name: Deploy extract-receipt
+        working-directory: DUO
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          # The project ref is not a secret — it is the subdomain of the URL
+          # that ships inside the public JavaScript bundle — so it is written
+          # out rather than stored, which keeps this to one thing to configure.
+          #
+          # --no-verify-jwt is deliberately NOT passed. See the guard below.
+          supabase functions deploy extract-receipt \
+            --project-ref xkjtzthsqorqyyqkbrzb
+
+      - if: steps.creds.outputs.skip != 'true'
+        name: Confirm verify_jwt is still on
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          # isSignedIn() in the function reads the JWT payload WITHOUT verifying
+          # its signature, and that is only sound because the gateway verifies
+          # it first. Turning verification off would make the check forgeable by
+          # anyone who can write a token with role "authenticated" — and since
+          # the publishable key is public by design, that is anyone at all. The
+          # exposure is the operator's API credit.
+          #
+          # A deploy is the one moment that setting can change by accident, so
+          # it is checked here rather than being trusted.
+          if supabase functions list --project-ref xkjtzthsqorqyyqkbrzb \
+               --output json 2>/dev/null | grep -q '"verify_jwt": *false'; then
+            echo "::error::verify_jwt is OFF for a deployed function. The auth check in extract-receipt assumes the gateway verifies the token, so this exposes the API key. Redeploy without --no-verify-jwt."
+            exit 1
+          fi
+          echo "verify_jwt is on."
