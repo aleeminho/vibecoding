@@ -23,6 +23,7 @@
   import { getExportBill } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
   import { buildNotaPdf } from '../lib/pdf'
+  import { copyText } from '../lib/clipboard'
 
   /**
    * Read from the hash rather than threaded through props, the same way the
@@ -102,26 +103,50 @@
    * mark a bill paid, so a copy that reaches the group is a copy that lets
    * anyone mark anyone paid — which is why the PDF never carries them and this
    * is a per-person action rather than a line in a shared document.
+   *
+   * Three routes, in order of how good they are on a phone, and the third is
+   * the one that matters. `navigator.share` opens the share sheet and gets the
+   * link to a specific person in two taps; `copyText` puts it on the clipboard
+   * where it works everywhere including plain HTTP, which is how this gets
+   * tested off a laptop.
+   *
+   * Both of those can fail or not exist. What that used to do was show an
+   * error — `undefined is not an object (evaluating 'navigator.clipboard
+   * .writeText')`, on a LAN address, because the whole clipboard API needs a
+   * secure context. Which meant there was NO way to get the link at all, on a
+   * screen whose only job is handing it out. So a failure now reveals the URL
+   * itself, in a field that can be long-pressed and copied by hand. The link is
+   * the whole feature; losing it silently is not an option the screen gets.
    */
   let sent = $state<string | null>(null)
+  let shown = $state<string | null>(null)
 
   async function sendLink(person: string) {
     const url = linkFor(person)
     if (!url) return
     sent = null
+    shown = null
 
     try {
       if (navigator.share) {
         await navigator.share({ url, title: `Bayar ${bill?.place ?? ''}` })
         return
       }
-      await navigator.clipboard.writeText(url)
-      sent = person
     } catch (err) {
-      // `note`, not `error`: a failed clipboard write replaces the hint under
-      // the button. Replacing the whole document over it would be absurd.
-      if ((err as Error).name !== 'AbortError') note = (err as Error).message
+      // Dismissing the share sheet is not a failure — the operator decided
+      // against it. Anything else, fall through and offer the link another way.
+      if ((err as Error).name === 'AbortError') return
     }
+
+    if (await copyText(url)) {
+      sent = person
+      return
+    }
+
+    // Neither worked. Put the link on screen rather than an error message
+    // about why it could not be put on the clipboard.
+    shown = url
+    note = 'Nggak bisa nyalin otomatis — tekan lama link di bawah terus Copy.'
   }
 
   onMount(async () => {
@@ -236,6 +261,23 @@
               {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}
             </button>
           </div>
+
+          {#if shown === linkFor(person.person)}
+            <!--
+              A textarea, not an input, and that is the whole point: an input
+              never wraps, so a 90-character URL is shown with its tail cut off
+              — still copyable, but not readable, and this exists to be read.
+              readonly rather than disabled, because a disabled field cannot be
+              selected and selecting it by hand is why it is here at all.
+              `onfocus` takes the lot so one tap then Copy is enough.
+            -->
+            <textarea
+              class="link-url no-print"
+              readonly
+              rows="3"
+              onfocus={(e) => e.currentTarget.select()}
+            >{shown}</textarea>
+          {/if}
         {/if}
       </section>
     {/each}
@@ -485,6 +527,33 @@
   .link:active {
     opacity: 0.55;
     transform: none;
+  }
+
+  /*
+   * The fallback, when neither the share sheet nor the clipboard is available.
+   *
+   * Monospace and small so a 70-character URL fits the width without wrapping
+   * into something that looks broken, and read-only so a tap selects rather
+   * than opening the keyboard. It only ever appears after both automatic
+   * routes have failed, so it never competes with them.
+   */
+  .link-url {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    font-family: var(--fig);
+    font-size: 11px;
+    line-height: 1.5;
+    /* Wraps anywhere rather than at word boundaries. A URL has no spaces, so
+       the default would push the whole thing onto one overflowing line —
+       which is the truncation this replaced. */
+    overflow-wrap: anywhere;
+    resize: none;
   }
 
   /* A separator spanning the grid, drawn as a grid row of empty cells. */
