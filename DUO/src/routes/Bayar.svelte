@@ -12,12 +12,11 @@
    * or the bill total — none of that is theirs, and a public link that leaks a
    * table of who owes what is a worse problem than the one this solves.
    *
-   * Light, like the nota it is linked from, and drawn with the same sheet, the
-   * same two families and the same one accent. The two are read one after the
+   * Light, like the nota it is linked from. The two are read one after the
    * other and should look like the same piece of paper.
    */
   import { onMount } from 'svelte'
-  import { formatDate, rupiah, rupiahDigits } from '../lib/format'
+  import { formatDate, rupiah } from '../lib/format'
   import {
     paymentPage,
     qrisUrl,
@@ -28,6 +27,7 @@
   import { prepareReceiptImage } from '../lib/image'
 
   const token = new URLSearchParams(location.hash.split('?')[1] ?? '').get('t') ?? ''
+
 
   let info = $state<PaymentPageInfo | null>(null)
   let status = $state<'loading' | 'ready' | 'missing' | 'error'>('loading')
@@ -45,13 +45,6 @@
    */
   let showQris = $derived(Boolean(info?.qris_path) && info?.payment_method !== 'bank')
   let showBank = $derived(info?.payment_method !== 'qris')
-
-  /**
-   * What is still due, not what the bill started at. This is the page someone
-   * opens to decide how much to transfer, and showing the original amount after
-   * they have already sent half of it asks for the money twice.
-   */
-  let sisa = $derived(Math.max(0, (info?.amount_owed ?? 0) - (info?.amount_paid ?? 0)))
 
   onMount(async () => {
     if (!token) {
@@ -106,148 +99,105 @@
 
 <svelte:head>
   <title>Bayar — DUO</title>
-  <!--
-    The same two families the nota is set in, loaded per route rather than
-    app-wide: this page is the second half of that document and nothing else in
-    the app uses them.
-  -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link
-    rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap"
-  />
 </svelte:head>
 
-<div class="screen">
-  <main class="sheet">
-    {#if status === 'loading'}
-      <p class="msg">Memuat…</p>
-    {:else if status === 'missing'}
-      <p class="msg">Link-nya nggak dikenali. Mungkin salah ketik, atau tagihannya udah dihapus.</p>
-    {:else if status === 'error'}
-      <p class="msg">{error}</p>
-    {:else if info}
-      <header class="masthead">
-        <div class="brand">
-          <p class="brand__mark">{info.person}</p>
-          <p class="brand__sub">{info.place} · {formatDate(info.bill_date)}</p>
-        </div>
-
-        <div class="doc">
-          <p class="doc__title">Yang harus dibayar</p>
-          <p class="due"><span class="cur">Rp</span>{rupiahDigits(sisa)}</p>
-          <!--
-            Only once something has landed, so it never explains a number that
-            did not need explaining.
-          -->
-          {#if info.amount_paid > 0}
-            <p class="part">
-              Dari {rupiah(info.amount_owed)} · udah masuk {rupiah(info.amount_paid)}
-            </p>
-          {/if}
-        </div>
-      </header>
-
-      {#if result?.verdict === 'matched' || result?.verdict === 'already_paid'}
-        <!--
-          The settled band, the same one the nota puts under a share that is
-          done with. The two documents say the same thing the same way, and this
-          is the good news they are both capable of.
-        -->
-        <div class="band">
-          <p class="band__label">
-            {result.verdict === 'matched' ? 'Lunas' : 'Udah lunas'}
-          </p>
-          <p class="band__note">
-            {result.verdict === 'matched' ? result.message : 'Tagihan ini udah kelar sebelumnya.'}
-          </p>
-        </div>
-      {:else}
-        <section class="block">
-          <h2 class="section-label">Cara bayar</h2>
-
-          <div class="pay">
-            {#if showQris}
-              <!--
-                The code first when it is offered, because scanning is the
-                easier of the two and the one most people reach for. On white
-                with a quiet margin on all four sides — that margin is the quiet
-                zone a scanner needs to find the code's edges, not padding, and
-                cropping it is the commonest way to make a QR that reads fine on
-                screen and fails on a phone camera.
-              -->
-              <img class="pay__qr" src={qrisUrl(info.qris_path!)} alt="Kode QRIS" />
-            {/if}
-
-            <div class="pay__body">
-              {#if showQris}
-                <p class="pay__lead">Scan pakai m-banking atau e-wallet apa aja</p>
-                <p class="pay__line">
-                  Masukin sendiri jumlahnya — kodenya nggak dikunci ke satu nominal.
-                </p>
-              {/if}
-
-              {#if showBank && info.bank_name && info.account_number}
-                {#if showQris}
-                  <p class="pay__lead">Atau transfer</p>
-                {/if}
-                <p class="pay__dest">
-                  {info.bank_name} {info.account_number}{#if info.account_holder}, a.n. {info
-                      .account_holder}{/if}
-                </p>
-              {/if}
-            </div>
-          </div>
-        </section>
-
-        <section class="block">
-          <h2 class="section-label">Bukti bayar</h2>
-          <p class="section-note">
-            Transfernya dibaca otomatis. Kalau nominal dan penerimanya cocok,
-            statusnya langsung lunas.
-          </p>
-
-          <!--
-            Two inputs, one with capture and one without, because `capture`
-            removes the photo library option entirely on iOS — and a transfer
-            confirmation is almost always already a screenshot in the library,
-            not something to photograph.
-          -->
-          <label class="upload" class:busy>
-            <input type="file" accept="image/*" onchange={pick} disabled={busy} />
-            <span>{busy ? 'Lagi dicek…' : 'Upload bukti bayar'}</span>
-          </label>
-          <label class="upload secondary" class:busy>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onchange={pick}
-              disabled={busy}
-            />
-            <span>Foto layar transfernya</span>
-          </label>
-
-          {#if result?.verdict === 'mismatch'}
-            <div class="notice bad">
-              <p class="notice-title">Belum bisa dikonfirmasi</p>
-              <p class="notice-body">{result.message}</p>
-            </div>
-          {:else if result?.verdict === 'unclear'}
-            <div class="notice warn">
-              <p class="notice-title">Buktinya masuk</p>
-              <p class="notice-body">{result.message}</p>
-            </div>
-          {/if}
-
-          {#if error}
-            <div class="notice bad"><p class="notice-body">{error}</p></div>
-          {/if}
-        </section>
+<div class="sheet">
+  {#if status === 'loading'}
+    <p class="msg">Memuat…</p>
+  {:else if status === 'missing'}
+    <p class="msg">Link-nya nggak dikenali. Mungkin salah ketik, atau tagihannya udah dihapus.</p>
+  {:else if status === 'error'}
+    <p class="msg">{error}</p>
+  {:else if info}
+    <!--
+      The big number is what is still due, not what the bill started at. This
+      is the page someone opens to decide how much to transfer, and showing
+      them the original amount after they have already sent half of it asks
+      for the money twice.
+    -->
+    {@const sisa = Math.max(0, info.amount_owed - info.amount_paid)}
+    <header class="head">
+      <p class="who">{info.person}</p>
+      <p class="meta">{info.place} · {formatDate(info.bill_date)}</p>
+      <p class="amount">{rupiah(sisa)}</p>
+      {#if info.amount_paid > 0}
+        <p class="part">
+          Dari {rupiah(info.amount_owed)} · udah masuk {rupiah(info.amount_paid)}
+        </p>
       {/if}
+    </header>
+
+    {#if result?.verdict === 'matched'}
+      <div class="done">
+        <p class="done-title">Lunas</p>
+        <p class="done-body">{result.message}</p>
+      </div>
+    {:else if result?.verdict === 'already_paid'}
+      <div class="done">
+        <p class="done-title">Udah lunas</p>
+        <p class="done-body">Tagihan ini udah kelar sebelumnya.</p>
+      </div>
+    {:else}
+      {#if showQris}
+        <!--
+          The code first when it is offered, because scanning is the easier of
+          the two and the one most people reach for. Sized to be scannable from
+          another phone held over this one, on white with a quiet margin — a
+          quiet zone is part of how a QR code works, not padding.
+        -->
+        <div class="qris">
+          <img src={qrisUrl(info.qris_path!)} alt="Kode QRIS" />
+          <p class="qris-hint">Scan pakai m-banking atau e-wallet apa aja.</p>
+        </div>
+      {/if}
+
+      {#if showBank && info.bank_name && info.account_number}
+        <div class="dest">
+          <span class="dest-label">{showQris ? 'Atau transfer ke' : 'Transfer ke'}</span>
+          <span class="dest-value">
+            {info.bank_name} {info.account_number}{#if info.account_holder}
+              · {info.account_holder}{/if}
+          </span>
+        </div>
+      {/if}
+
+      <!--
+        Two inputs, one with capture and one without, because `capture` removes
+        the photo library option entirely on iOS — and a transfer confirmation
+        is almost always already a screenshot in the library, not something to
+        photograph.
+      -->
+      <label class="upload" class:busy>
+        <input type="file" accept="image/*" onchange={pick} disabled={busy} />
+        <span>{busy ? 'Lagi dicek…' : 'Upload bukti bayar'}</span>
+      </label>
+      <label class="upload secondary" class:busy>
+        <input type="file" accept="image/*" capture="environment" onchange={pick} disabled={busy} />
+        <span>Foto layar transfernya</span>
+      </label>
+
+      {#if result?.verdict === 'mismatch'}
+        <div class="notice bad">
+          <p class="notice-title">Belum bisa dikonfirmasi</p>
+          <p class="notice-body">{result.message}</p>
+        </div>
+      {:else if result?.verdict === 'unclear'}
+        <div class="notice warn">
+          <p class="notice-title">Buktinya masuk</p>
+          <p class="notice-body">{result.message}</p>
+        </div>
+      {/if}
+
+      {#if error}
+        <div class="notice bad"><p class="notice-body">{error}</p></div>
+      {/if}
+
+      <p class="hint">
+        Gambarnya dibaca otomatis. Kalau nominal dan penerimanya cocok, statusnya
+        langsung lunas.
+      </p>
     {/if}
-  </main>
+  {/if}
 </div>
 
 <style>
@@ -255,183 +205,130 @@
    * The page is not the app. Someone opening a link from a group chat has never
    * seen DUO, so the chrome would be noise and the dark theme would read as a
    * different product from the nota that sent them here.
-   *
-   * The same sheet the nota is drawn on, so the two documents are the same
-   * document seen twice rather than two designs that happen to share a colour.
    */
-  .screen {
-    min-height: 100dvh;
-    background: var(--desk, #eceef1);
-  }
-
   .sheet {
     --paper: #ffffff;
-    --ink: #14171c;
-    --ink-2: #5a616e;
-    --ink-3: #868d99;
-    --rule: #dce0e6;
-    --rule-soft: #eef0f3;
+    --ink: #1c1917;
+    --soft: #6b6560;
+    --rule: #e3ded8;
     --accent: #d04a02;
-    --accent-deep: #a83b00;
-    --accent-wash: #fdf2ea;
-    --bad: #b3261e;
-    --bad-wash: #fdf0ee;
+    --fig: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
-    --serif: 'IBM Plex Serif', ui-serif, Georgia, serif;
-
-    max-width: 830px;
+    min-height: 100dvh;
+    max-width: 30rem;
     margin: 0 auto;
-    padding: 58px 60px 46px;
+    padding: 3rem 1.5rem;
     background: var(--paper);
     color: var(--ink);
-    font: 400 15px/1.55 var(--sans);
-    -webkit-font-smoothing: antialiased;
-    box-shadow:
-      0 1px 2px rgba(20, 23, 28, 0.06),
-      0 12px 32px rgba(20, 23, 28, 0.09);
+    font-size: 15px;
+    line-height: 1.5;
   }
 
-  /* ---- masthead ---- */
-
-  .masthead {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 40px;
-    padding-bottom: 34px;
-    border-bottom: 3px solid var(--accent);
+  .head {
+    padding-bottom: 1.5rem;
+    border-bottom: 2px solid var(--ink);
   }
 
-  /* The payer's own name where the nota puts the restaurant's: on this page the
-     person reading it is the subject, not the place. */
-  .brand__mark {
+  .who {
     margin: 0;
-    font: 600 23px/1.1 var(--serif);
-    letter-spacing: -0.015em;
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
   }
 
-  .brand__sub {
-    margin: 6px 0 0;
+  .meta {
+    margin: 2px 0 0;
     font-size: 13px;
-    color: var(--ink-2);
+    color: var(--soft);
   }
 
-  .doc {
-    flex: none;
-    text-align: right;
-  }
-
-  .doc__title {
-    margin: 0 0 6px;
-    font: 500 12px/1 var(--sans);
-    color: var(--ink-3);
-  }
-
-  .due {
-    margin: 0;
-    font: 600 34px/1 var(--serif);
+  .amount {
+    margin: 1.25rem 0 0;
+    font-family: var(--fig);
+    font-variant-numeric: tabular-nums;
+    font-size: 34px;
+    font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--accent);
   }
 
-  .cur {
-    margin-right: 4px;
-    font: 400 15px/1 var(--sans);
-    color: var(--accent-deep);
-  }
-
+  /* Only present once something has landed, so it never explains a number that
+     did not need explaining. */
   .part {
-    margin: 8px 0 0;
+    margin: 6px 0 0;
     font-size: 13px;
-    color: var(--ink-2);
+    color: var(--soft);
   }
 
-  /* ---- sections ---- */
-
-  .block {
-    margin-top: 44px;
+  .qris {
+    margin-top: 1.5rem;
+    text-align: center;
   }
 
-  .section-label {
-    margin: 0 0 16px;
-    font: 500 12px/1 var(--sans);
-    color: var(--ink-3);
-  }
-
-  .section-note {
-    margin: -8px 0 20px;
-    max-width: 52ch;
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--ink-2);
-  }
-
-  /* ---- how to pay ---- */
-
-  .pay {
-    display: flex;
-    align-items: flex-start;
-    gap: 26px;
-  }
-
-  .pay__qr {
-    flex: none;
-    width: 220px;
-    height: 220px;
+  /*
+   * White behind the code even on a page that is already white, and a margin
+   * on all four sides. That margin is the quiet zone a scanner needs to find
+   * the code's edges; cropping it is the commonest way to make a QR that reads
+   * fine on screen and fails on a phone camera.
+   */
+  .qris img {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin: 0 auto;
     padding: 12px;
+    background: #fff;
     border: 1px solid var(--rule);
-    border-radius: 6px;
-    background: var(--paper);
+    border-radius: 12px;
   }
 
-  .pay__body {
-    max-width: 48ch;
-  }
-
-  .pay__lead {
-    margin: 0 0 8px;
-    font: 600 16px/1.3 var(--sans);
-  }
-
-  .pay__line {
-    margin: 0 0 16px;
+  .qris-hint {
+    margin: 10px 0 0;
     font-size: 13px;
-    line-height: 1.6;
-    color: var(--ink-2);
+    color: var(--soft);
   }
 
-  /* The account number is the one thing on this page somebody copies by hand,
-     so it is set the way the nota sets a figure. */
-  .pay__dest {
-    margin: 0;
-    font: 600 16px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
+  .dest {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 1.5rem;
+    padding: 14px 16px;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
   }
 
-  /* ---- upload ---- */
+  .dest-label {
+    font-size: 13px;
+    color: var(--soft);
+  }
+
+  .dest-value {
+    font-family: var(--fig);
+    font-size: 14px;
+    font-weight: 600;
+    text-align: right;
+  }
 
   .upload {
     display: block;
-    margin-top: 8px;
+    margin-top: 1.5rem;
     padding: 16px;
-    border: 1px solid var(--accent);
-    border-radius: 8px;
+    border: none;
+    border-radius: 14px;
     background: var(--accent);
     color: #fff;
     text-align: center;
-    font: 600 15px/1.4 var(--sans);
+    font-weight: 640;
     cursor: pointer;
   }
 
-  .upload:first-of-type {
-    margin-top: 0;
-  }
-
   .upload.secondary {
+    margin-top: 8px;
     background: none;
-    border-color: var(--rule);
-    color: var(--ink-2);
+    border: 1px solid var(--rule);
+    color: var(--soft);
     font-weight: 500;
   }
 
@@ -444,90 +341,65 @@
     pointer-events: none;
   }
 
-  /* ---- the settled band ---- */
-
-  .band {
-    margin-top: 34px;
-    padding: 20px 22px;
-    border-top: 3px solid var(--accent);
-    border-radius: 0 0 6px 6px;
-    background: var(--accent-wash);
-  }
-
-  .band__label {
-    margin: 0;
-    font: 600 26px/1.1 var(--serif);
-    letter-spacing: -0.02em;
-    color: var(--accent-deep);
-  }
-
-  .band__note {
-    margin: 8px 0 0;
-    font-size: 13px;
-    line-height: 1.6;
-    color: var(--ink-2);
-  }
-
-  /* ---- notices ---- */
-
   .notice {
-    margin-top: 14px;
+    margin-top: 1.5rem;
     padding: 14px 16px;
-    border-radius: 6px;
+    border-radius: 12px;
   }
 
   .notice.bad {
-    background: var(--bad-wash);
+    background: #fdf0ee;
     border: 1px solid #f3c9c2;
   }
 
   .notice.warn {
-    background: var(--rule-soft);
-    border: 1px solid var(--rule);
+    background: #fdf6e6;
+    border: 1px solid #f0dfb4;
   }
 
   .notice-title {
     margin: 0 0 4px;
-    font: 600 14px/1.3 var(--sans);
-  }
-
-  .notice.bad .notice-title {
-    color: var(--bad);
+    font-weight: 640;
+    font-size: 14px;
   }
 
   .notice-body {
     margin: 0;
     font-size: 14px;
-    line-height: 1.55;
-    color: var(--ink-2);
+    color: #5a534e;
+  }
+
+  .done {
+    margin-top: 2rem;
+    padding: 24px 20px;
+    border-radius: 14px;
+    background: #eef8f2;
+    border: 1px solid #c4e6d4;
+    text-align: center;
+  }
+
+  .done-title {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 650;
+    color: #14603c;
+  }
+
+  .done-body {
+    margin: 6px 0 0;
+    font-size: 14px;
+    color: #3d6b55;
+  }
+
+  .hint {
+    margin: 1.5rem 0 0;
+    font-size: 13px;
+    color: var(--soft);
   }
 
   .msg {
     padding: 3rem 0;
     text-align: center;
-    color: var(--ink-2);
-  }
-
-  /* ---- narrow screens ---- */
-
-  @media (max-width: 720px) {
-    .sheet {
-      padding: 34px 26px 32px;
-    }
-
-    .masthead {
-      flex-direction: column;
-      gap: 26px;
-      padding-bottom: 26px;
-    }
-
-    .doc {
-      text-align: left;
-    }
-
-    .pay {
-      flex-direction: column;
-      gap: 18px;
-    }
+    color: var(--soft);
   }
 </style>
