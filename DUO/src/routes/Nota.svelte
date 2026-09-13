@@ -263,7 +263,9 @@
           {note}
         {:else}
           Di layar print, pilih <strong>Simpan sebagai PDF</strong> — di iPhone
-          tombol Share di situ bisa langsung ke WhatsApp.
+          tombol Share di situ bisa langsung ke WhatsApp. Link bayarnya dikirim
+          satu-satu: tap <strong>link bayar</strong> di samping nama, dan
+          WhatsApp-nya kebuka.
         {/if}
       </p>
     </div>
@@ -375,22 +377,26 @@
               class:slip--settled={person.is_payer || person.status === 'lunas'}
             >
               <!--
-                Beside the name, because the link is that person's. Set as a
-                quiet underlined word and not as a button, so it reads as a
-                link in the document rather than as a control in an app — and
-                it prints, which is the whole point of it.
+                Beside the name, because the link is that person's.
 
-                A real anchor, so the printed document carries a working link
-                annotation that a payer can tap. On screen the click is
-                intercepted: there the reader is the operator, and what they
-                want is the link sent to somebody rather than opened by
-                themselves.
+                An anchor rather than a button so that long-press offers the
+                address and so the screen still works if the handler does not,
+                but the click is intercepted: here the reader is the operator,
+                and what they want is the link sent to somebody rather than
+                opened by themselves.
+
+                `no-print`, and that is not a style choice. The browser's print
+                pipeline drops link annotations — a bare `<a href>` on a blank
+                page comes out of it with no /URI at all — so a printed "link
+                bayar" would be a word that looks tappable and is not, in a
+                document about money. The links travel the way they did before
+                the PDF carried them: one message each, from this screen.
               -->
               <h3 class="slip__name">
                 {person.person}
                 {#if linkOf(person)}
                   <a
-                    class="slip__pay"
+                    class="slip__pay no-print"
                     href={linkOf(person)}
                     onclick={(e) => {
                       e.preventDefault()
@@ -900,10 +906,11 @@
   }
 
   /*
-   * Beside the name, quiet and underlined. Not a button and not bold: in the
-   * printed document this is an address somebody taps, and the underlined word
-   * is the whole of what says so. Weight is what a heading does; this is not a
-   * heading.
+   * Beside the name, quiet and underlined, and never printed.
+   *
+   * Not a button and not bold, because on screen it is an address the operator
+   * hands out rather than a control in an app. Weight is what a heading does;
+   * this is not a heading.
    */
   .slip__pay {
     margin-left: 8px;
