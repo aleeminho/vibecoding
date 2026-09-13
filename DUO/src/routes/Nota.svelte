@@ -2,21 +2,22 @@
   /**
    * The bill as a document.
    *
-   * This replaced a WhatsApp text template that printed every item as a line of
-   * prose. That was unreadable in a group chat and impossible to check: five
-   * lines of numbers in a proportional font line up with nothing.
+   * Two renderings of one set of numbers, on purpose. The ledger at the top is
+   * the whole bill in one glance — who, how much, and that the rows add up to
+   * the printed total. The slips below are the same figures at reading size,
+   * one per person, which is what somebody finds their own name in.
    *
-   * What this is instead is a nota — the vernacular of the thing it describes.
-   * Money in a column, figures in a tabular face, and the arithmetic visible:
-   * each person's items, then the charges that are not items, then their total.
-   * At the foot, the four totals stack to the bill's.
-   *
-   * The point is not decoration. The document exists to be argued with, and it
-   * only survives that if every number on it can be traced to the one above it.
+   * The arithmetic in both is the same arithmetic: each slip's items sum to its
+   * subtotal, subtotal plus the tax line is its total, and the ledger's three
+   * money columns sum to the footer. That is not decoration — the document
+   * exists to be argued with, and it only survives that if every number can be
+   * traced to the one above it. The numbers themselves come from `allocateBill`
+   * rather than being recomputed here, so this file cannot disagree with the
+   * export about what anybody owes.
    *
    * Light, always. The app is dark, but this leaves the app — through a PDF, a
-   * print, or a screenshot in a group chat — and a dark document is worse in all
-   * three. Colors are set here rather than inherited for that reason.
+   * print, or a screenshot in a group chat — and a dark document is worse in
+   * all three. Colours are set here rather than inherited for that reason.
    */
   import { onMount } from 'svelte'
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
@@ -86,6 +87,7 @@
   }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
+  let owing = $derived(breakdown.filter((p) => !p.is_payer && p.status !== 'lunas').length)
 
   /**
    * Whether this bill offers its QRIS code, seen from the document's side.
@@ -100,6 +102,67 @@
 
   const offersBank = (b: NonNullable<typeof bill>) =>
     Boolean(b.account_number) && b.payment_method !== 'qris'
+
+  /**
+   * What a person's items come to before tax and service.
+   *
+   * Derived by subtraction the same way `allocateBill` derives `extra`, so the
+   * two are the same arithmetic read in opposite directions — the slip shows
+   * subtotal and the charge that turns it into the total, and the two have to
+   * meet exactly at `person.total`.
+   */
+  const subtotalOf = (p: PersonBreakdown) => p.total - p.extra
+
+  /**
+   * The line between subtotal and total, named for what it actually does.
+   *
+   * The bill's charges are five separate things — discount, tax, service,
+   * rounding and a residual adjustment — and they are shown here as one net
+   * figure, which is the shape a slip wants. But a discount makes that net
+   * negative, and calling a negative figure "PPN & service" would be the
+   * document lying about the largest number on it.
+   */
+  const chargeLabel = (p: PersonBreakdown) => (p.extra < 0 ? 'Diskon' : 'PPN & service')
+
+  /**
+   * The same figure with its sign, for the ledger.
+   *
+   * `rupiahDigits` returns an absolute value, which is right on a slip: the
+   * label above the number already says which way it goes, and "Diskon 4.860"
+   * is how a receipt prints it. A column is different — a column is read by
+   * adding it up, and the footer is the sum of these cells, so a row that
+   * subtracts has to look like it subtracts.
+   */
+  const signed = (amount: number) => (amount < 0 ? `−${rupiahDigits(amount)}` : rupiahDigits(amount))
+
+  /**
+   * What the middle column is called, which depends on what is in it.
+   *
+   * One line was asked for where the bill's five charges used to be, but a
+   * discount makes that line negative, and a column headed "PPN & service"
+   * holding a discount is the table saying something untrue about the money.
+   */
+  let chargeHeader = $derived(
+    breakdown.some((p) => p.extra < 0) ? 'PPN, service & diskon' : 'PPN & service',
+  )
+
+  /**
+   * Who a share is owed to, said as a sentence rather than as a state.
+   *
+   * Three different facts that all look like "settled" from a distance. The
+   * payer's share was never a debt — they are in the split because their dinner
+   * is part of the bill — so they get the one phrasing that does not raise the
+   * question "paid whom?".
+   */
+  function bandLabel(p: PersonBreakdown): string {
+    if (p.is_payer) return 'Bagian dia, sudah termasuk'
+    if (p.status === 'lunas') return 'Sudah lunas'
+    // What is left, not what has landed. The band is where somebody looks for
+    // the number to transfer, and "udah masuk 100.000" beside a figure of
+    // 127.050 leaves them to do the subtraction on a payment screen.
+    if (p.amount_paid > 0) return `Sisa ${rupiah(p.total - p.amount_paid)}`
+    return bill?.paid_by_person ? `Utang ke ${bill.paid_by_person}` : 'Bagian dia'
+  }
 
   /**
    * The payer's link for one person, or null if they have no token yet.
@@ -182,6 +245,26 @@
 
 <svelte:head>
   <title>{bill ? `Nota ${bill.place}` : 'Nota'}</title>
+  <!--
+    The document's own two families, loaded here rather than app-wide: nothing
+    outside this route and the payer page uses them, and a font request on the
+    bills screen would be paid on every visit to a screen that does not want it.
+
+    Plex Sans for words, Plex Serif for the figures that carry the document —
+    the title, the totals, the amount each person owes. The serif is not
+    decoration: it is what makes a number read as a stated amount rather than as
+    a value inside a sentence.
+
+    `display=swap` so a slow font never holds up a document somebody is standing
+    in a restaurant waiting for, and the stack falls back to the system serif
+    and sans if the request never lands at all.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap"
+  />
 </svelte:head>
 
 {#if error}
@@ -189,7 +272,7 @@
 {:else if !bill}
   <p class="msg">Memuat…</p>
 {:else}
-  <div class="sheet">
+  <div class="screen">
     <div class="controls no-print">
       <button class="go" disabled={busy} onclick={sharePdf}>
         {busy ? 'Nyiapin…' : 'Bagikan PDF'}
@@ -205,476 +288,698 @@
       </p>
     </div>
 
-    <header class="head">
-      <h1>{bill.place}</h1>
-      <p class="meta">
-        {formatDate(bill.bill_date)} · <span class="ref">{bill.ref_code}</span>
-      </p>
-      <p class="grand">
-        <span class="cur">Rp</span>
-        <span class="fig">{rupiahDigits(bill.total)}</span>
-      </p>
-    </header>
-
-    <!--
-      Each person is a block, not a table row. The document gets read on a phone
-      in a group chat where the first thing anyone does is find their own name,
-      and a block is something a person can screenshot for themselves.
-    -->
-    {#each breakdown as person (person.person)}
-      <section class="who">
-        <div class="who-head">
-          <h2>
-            {person.person}
-            <!--
-              A note beside the name, not a different figure in the column.
-              The amount stays the person's share of the split, because the
-              footer reconciles the column against the bill total — swap it for
-              a remainder and the arithmetic on the page stops adding up, which
-              is the one thing this document cannot afford. What has been paid
-              is a fact about the debt, and the settle-up screen is where the
-              debt is tracked.
-            -->
-            {#if person.is_payer}
-              <!--
-                Said differently from "sudah bayar", because it is a different
-                fact. This person is in the split — the shares have to sum to
-                the bill — but their share was never a debt. Showing them as
-                having paid would invite the question "paid whom?".
-              -->
-              <span class="paid">yang bayar ke vendor</span>
-            {:else if person.status === 'lunas'}
-              <span class="paid">sudah bayar</span>
-            {:else if person.amount_paid > 0}
-              <span class="paid">udah masuk {rupiah(person.amount_paid)}</span>
-            {/if}
-          </h2>
-          <span class="fig strong">{rupiahDigits(person.total)}</span>
+    <main class="sheet">
+      <header class="masthead">
+        <div class="brand">
+          <p class="brand__mark">{bill.place}</p>
+          <p class="brand__sub">{formatDate(bill.bill_date)}</p>
+          {#if bill.paid_by_person}
+            <address class="brand__addr">
+              Dibayar dulu sama {bill.paid_by_person}
+            </address>
+          {/if}
         </div>
 
-        <div class="lines">
-          {#each person.items as item (item.name)}
-            <span class="label">
-              {item.name}
-              {#if item.shared > 1}<span class="split">dibagi {item.shared}</span>{/if}
-            </span>
-            <span class="op"></span>
-            <span class="fig">{rupiahDigits(item.amount)}</span>
-          {/each}
+        <div class="doc">
+          <h1 class="doc__title">Nota</h1>
+          <dl class="doc__meta">
+            <dt>Tagihan</dt>
+            <dd>{bill.ref_code}</dd>
+            <dt>Item</dt>
+            <dd>{bill.items.length}</dd>
+            <dt>Total</dt>
+            <dd>Rp {rupiahDigits(bill.total)}</dd>
+          </dl>
+        </div>
+      </header>
 
-          {#if person.components.length > 0}
-            <span class="rule"></span>
-            <span class="rule"></span>
-            <span class="rule"></span>
+      <section class="block">
+        <h2 class="section-label">Bagian tiap orang</h2>
+        <p class="section-note">
+          Satu baris per orang, PPN dan service sudah masuk. Barisnya berjumlah
+          pas dengan total struk — rincian itemnya ada di bawah.
+        </p>
 
-            {#each person.components as part (part.label)}
-              <span class="label soft">{part.label}</span>
-              <span class="op">{part.amount < 0 ? '−' : '+'}</span>
-              <span class="fig soft">{rupiahDigits(Math.abs(part.amount))}</span>
-            {/each}
-          {/if}
+        <div class="ledger-wrap">
+          <table class="ledger ledger--people">
+            <thead>
+              <tr>
+                <th scope="col">Nama</th>
+                <th scope="col" class="num">Subtotal</th>
+                <th scope="col" class="num">{chargeHeader}</th>
+                <th scope="col" class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each breakdown as person (person.person)}
+                <tr class:row--settled={person.is_payer}>
+                  <th scope="row">
+                    <span class="item__name">{person.person}</span>
+                    <!--
+                      The state belongs beside the name, where the eye is
+                      already looking for it, and the band below stays about
+                      what to do. Same split as the original document: a note
+                      here, the amount in the column.
+                    -->
+                    {#if person.is_payer}
+                      <span class="item__note">Yang bayar ke vendor</span>
+                    {:else if person.status === 'lunas'}
+                      <span class="item__note">Sudah lunas</span>
+                    {:else if person.amount_paid > 0}
+                      <span class="item__note">Udah masuk {rupiah(person.amount_paid)}</span>
+                    {/if}
+                  </th>
+                  <td class="num">{rupiahDigits(subtotalOf(person))}</td>
+                  <td class="num">{signed(person.extra)}</td>
+                  <td class="num">{rupiahDigits(person.total)}</td>
+                </tr>
+              {/each}
+            </tbody>
+            <tfoot>
+              <tr>
+                <th scope="row">Total struk</th>
+                <td class="num">
+                  {rupiahDigits(breakdown.reduce((a, p) => a + subtotalOf(p), 0))}
+                </td>
+                <td class="num">{signed(breakdown.reduce((a, p) => a + p.extra, 0))}</td>
+                <td class="num">{rupiahDigits(summed)}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
         <!--
-          The payer's own link, under their own block. Hidden in print and
-          absent from the PDF, so the document that goes to the group carries
-          the arithmetic and none of the credentials.
+          The reconciliation, said out loud only when it fails. A row of
+          reassurance on every nota is a row nobody reads, and the one time it
+          matters is the one time it would have been skimmed.
         -->
-        {#if !person.is_payer && person.status !== 'lunas' && linkFor(person.person)}
-          <div class="pay-link no-print">
-            <button class="link" onclick={() => sendLink(person.person)}>
-              {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}
-            </button>
-          </div>
-
-          {#if shown === linkFor(person.person)}
-            <!--
-              A textarea, not an input, and that is the whole point: an input
-              never wraps, so a 90-character URL is shown with its tail cut off
-              — still copyable, but not readable, and this exists to be read.
-              readonly rather than disabled, because a disabled field cannot be
-              selected and selecting it by hand is why it is here at all.
-              `onfocus` takes the lot so one tap then Copy is enough.
-            -->
-            <textarea
-              class="link-url no-print"
-              readonly
-              rows="3"
-              onfocus={(e) => e.currentTarget.select()}
-            >{shown}</textarea>
-          {/if}
+        {#if summed !== bill.total}
+          <p class="warn">
+            Barisnya berjumlah {rupiah(summed)}, nggak cocok sama total struk
+            {rupiah(bill.total)}.
+          </p>
         {/if}
       </section>
-    {/each}
 
-    <footer class="foot">
-      <div class="check">
-        <span>
-          {breakdown.length} orang
-          {#if summed === bill.total}— cocok dengan total struk{:else}— <strong
-              >TIDAK cocok, total struk {rupiah(bill.total)}</strong
-            >{/if}
-        </span>
-        <span class="fig strong">{rupiahDigits(summed)}</span>
-      </div>
+      <section class="block">
+        <h2 class="section-label">Rincian per orang</h2>
 
-      <!--
-        The code, on the page rather than behind a link.
+        <div class="slips">
+          {#each breakdown as person (person.person)}
+            <!--
+              The quiet band means nothing to do here, which is true of a
+              settled share as much as of the payer's. Leaving a paid share in
+              the accent would read as still owed, and the accent only works
+              while it means one thing.
+            -->
+            <article
+              class="slip"
+              class:slip--settled={person.is_payer || person.status === 'lunas'}
+            >
+              <h3 class="slip__name">{person.person}</h3>
 
-        The person paying is often not the person holding the phone — one
-        person reads their own name off the shared document and another scans
-        it — and a banking app wants an image in the gallery. A QR that is
-        already on the page is a screenshot away from both.
-      -->
-      {#if offersQris(bill)}
-        <div class="qris">
-          <span class="pay-label">Scan QRIS</span>
-          <img src={qrisUrl(bill.qris_path!)} alt="Kode QRIS tagihan ini" />
-          {#if bill.account_holder}
-            <span class="qris-holder">a.n. {bill.account_holder}</span>
+              <ul class="slip__lines">
+                {#each person.items as item (item.name)}
+                  <li class="slip__line">
+                    <span>
+                      {item.name}
+                      {#if item.shared > 1}<em class="frac">1/{item.shared}</em>{/if}
+                    </span>
+                    <i class="dots"></i>
+                    <span class="num">{rupiahDigits(item.amount)}</span>
+                  </li>
+                {/each}
+              </ul>
+
+              <dl class="slip__sub">
+                <dt>Subtotal</dt>
+                <dd class="num">{rupiahDigits(subtotalOf(person))}</dd>
+                {#if person.extra !== 0}
+                  <dt>{chargeLabel(person)}</dt>
+                  <dd class="num">{rupiahDigits(person.extra)}</dd>
+                {/if}
+              </dl>
+
+              <div class="slip__due">
+                <p class="slip__due-row">
+                  <span class="slip__due-label">{bandLabel(person)}</span>
+                  <span class="slip__amount num">
+                    <span class="cur">Rp</span>{rupiahDigits(person.total)}
+                  </span>
+                </p>
+
+                <!--
+                  The operator's action, not the payer's: this shares or copies
+                  the link, it does not open it. The PDF's version of this row
+                  is the word "Pembayaran" and a tap goes to the page, because
+                  there the reader is the person paying.
+                -->
+                {#if !person.is_payer && person.status !== 'lunas' && linkFor(person.person)}
+                  <button class="slip__pay no-print" onclick={() => sendLink(person.person)}>
+                    {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}
+                  </button>
+
+                  {#if shown === linkFor(person.person)}
+                    <!--
+                      A textarea, not an input, and that is the whole point: an
+                      input never wraps, so a 90-character URL is shown with its
+                      tail cut off — still copyable, but not readable, and this
+                      exists to be read. readonly rather than disabled, because
+                      a disabled field cannot be selected and selecting it by
+                      hand is why it is here at all. `onfocus` takes the lot so
+                      one tap then Copy is enough.
+                    -->
+                    <textarea
+                      class="slip__url no-print"
+                      readonly
+                      rows="3"
+                      onfocus={(e) => e.currentTarget.select()}
+                    >{shown}</textarea>
+                  {/if}
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      </section>
+
+      {#if offersQris(bill) || offersBank(bill)}
+        <section class="block pay">
+          <h2 class="section-label">Cara bayar</h2>
+          <div class="pay__row">
+            {#if offersQris(bill)}
+              <img class="pay__qr" src={qrisUrl(bill.qris_path!)} alt="Kode QRIS tagihan ini" />
+            {/if}
+            <div class="pay__body">
+              {#if offersQris(bill)}
+                <p class="pay__lead">Scan pakai m-banking atau e-wallet apa aja</p>
+                <p class="pay__line">
+                  Masukin sendiri jumlahnya — kodenya nggak dikunci ke satu nominal.
+                </p>
+              {/if}
+              {#if offersBank(bill)}
+                <p class="pay__lead">
+                  {offersQris(bill) ? 'Atau transfer' : 'Transfer'}
+                </p>
+                <p class="pay__line">
+                  {bill.bank_name} {bill.account_number}{#if bill.account_holder}, a.n. {bill
+                      .account_holder}{/if}
+                </p>
+              {/if}
+              <p class="pay__line">Sebutin nomor tagihan {bill.ref_code} di keterangannya.</p>
+            </div>
+          </div>
+        </section>
+      {/if}
+
+      <footer class="colophon">
+        <p>
+          {#if owing === 0}
+            Semua udah lunas.
+          {:else}
+            Tinggal {owing} dari {breakdown.length} orang yang belum lunas.
           {/if}
-        </div>
-      {/if}
-
-      {#if offersBank(bill)}
-        <div class="pay">
-          <span class="pay-label">Transfer ke</span>
-          <span class="pay-value">
-            {bill.bank_name} {bill.account_number}{#if bill.account_holder}
-              · {bill.account_holder}{/if}
-          </span>
-        </div>
-      {/if}
-    </footer>
+        </p>
+        <p class="colophon__fine">Semua angka dalam rupiah.</p>
+      </footer>
+    </main>
   </div>
 {/if}
 
 <style>
   /*
-   * Two families with clearly separate jobs: the system sans for words, a
-   * monospace for money. The monospace is not a styling flourish — it is what a
-   * till prints, and it is why the column reads as a figure rather than as a
-   * sentence that happens to contain digits.
+   * The sheet, not the screen. Two families with separate jobs: the system sans
+   * for words, and a serif for the figures that state an amount. Everything
+   * else here is structure — rules, a wash, and one accent spent twice.
+   *
+   * Flat by construction: opaque surfaces, hairline borders, no blur and no
+   * translucency anywhere. The one shadow is on the sheet itself, and it exists
+   * to lift paper off a desk, which is a thing paper does.
    */
+  .screen {
+    min-height: 100dvh;
+    background: var(--desk, #eceef1);
+  }
+
   .sheet {
     --paper: #ffffff;
-    --ink: #1c1917;
-    --soft: #6b6560;
-    --rule: #e3ded8;
+    --ink: #14171c;
+    --ink-2: #5a616e;
+    --ink-3: #868d99;
+    --rule: #dce0e6;
+    --rule-soft: #eef0f3;
     --accent: #d04a02;
-    --fig: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+    --accent-deep: #a83b00;
+    --accent-wash: #fdf2ea;
 
-    max-width: 34rem;
-    min-height: 100dvh;
+    /* The app's own orange already, so the document and the app agree on what
+       the brand colour is without either importing the other. */
+    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+    --serif: 'IBM Plex Serif', ui-serif, Georgia, serif;
+
+    max-width: 830px;
     margin: 0 auto;
-    padding: 2.5rem 1.5rem 4rem;
+    padding: 58px 60px 46px;
     background: var(--paper);
     color: var(--ink);
-    font-size: 14px;
-    line-height: 1.5;
+    font: 400 15px/1.55 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    box-shadow:
+      0 1px 2px rgba(20, 23, 28, 0.06),
+      0 12px 32px rgba(20, 23, 28, 0.09);
+  }
+
+  /* Every figure on this page is money or a count. Align it. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    white-space: nowrap;
   }
 
   /* ---- controls, never printed ---- */
 
   .controls {
-    margin-bottom: 2.5rem;
+    max-width: 830px;
+    margin: 0 auto 14px;
+    padding: 0 16px;
+  }
+
+  .controls .go,
+  .controls .back {
+    width: 100%;
+    min-height: 48px;
+    font: inherit;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
   }
 
   .go {
-    width: 100%;
-    min-height: 48px;
-    border: none;
-    border-radius: 12px;
-    background: var(--accent);
+    border: 1px solid var(--brand, #d04a02);
+    background: var(--brand, #d04a02);
     color: #fff;
-    font: inherit;
-    font-weight: 640;
-    cursor: pointer;
   }
 
   .back {
-    width: 100%;
-    min-height: 44px;
     margin-top: 8px;
-    border: 1px solid var(--rule);
-    border-radius: 12px;
+    border: 1px solid #dce0e6;
     background: none;
-    color: var(--soft);
-    font: inherit;
-    cursor: pointer;
+    color: #5a616e;
+    min-height: 44px;
+    font-weight: 500;
   }
 
   .hint {
     margin: 10px 0 0;
     font-size: 12px;
-    color: var(--soft);
+    color: #c8ccd4;
   }
 
-  /* ---- head ---- */
+  /* ---- masthead ---- */
 
-  .head {
-    padding-bottom: 1.25rem;
-    border-bottom: 2px solid var(--ink);
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 40px;
+    padding-bottom: 34px;
+    border-bottom: 3px solid var(--accent);
   }
 
-  .head h1 {
+  .brand__mark {
     margin: 0;
-    font-size: 22px;
-    font-weight: 650;
-    letter-spacing: -0.02em;
+    font: 600 23px/1.1 var(--serif);
+    letter-spacing: -0.015em;
   }
 
-  .meta {
-    margin: 2px 0 0;
-    font-size: 12px;
-    color: var(--soft);
+  .brand__sub {
+    margin: 6px 0 0;
+    font-size: 13px;
+    color: var(--ink-2);
   }
 
-  .ref {
-    font-family: var(--fig);
+  .brand__addr {
+    margin-top: 18px;
+    font-size: 13px;
+    line-height: 1.65;
+    font-style: normal;
+    color: var(--ink-2);
+  }
+
+  .doc {
+    flex: none;
+    text-align: right;
+  }
+
+  .doc__title {
+    margin: 0 0 14px;
+    font: 400 30px/1 var(--serif);
     letter-spacing: -0.01em;
   }
 
-  /* The one place the accent is spent. Everything else is ink on paper. */
-  .grand {
+  .doc__meta {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 5px 20px;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .doc__meta dt {
+    color: var(--ink-2);
+  }
+
+  .doc__meta dd {
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    font-weight: 500;
+  }
+
+  /* ---- sections ---- */
+
+  .block {
+    margin-top: 44px;
+  }
+
+  .section-label {
+    margin: 0 0 16px;
+    font: 500 12px/1 var(--sans);
+    color: var(--ink-3);
+  }
+
+  .section-note {
+    margin: -8px 0 20px;
+    max-width: 52ch;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  .warn {
+    margin: 14px 0 0;
+    font-size: 13px;
+    color: var(--accent-deep);
+  }
+
+  /* ---- the ledger ---- */
+
+  .ledger-wrap {
+    overflow-x: auto;
+  }
+
+  .ledger {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .ledger thead th {
+    padding: 0 0 9px;
+    font: 500 12px/1 var(--sans);
+    color: var(--ink-3);
+    text-align: left;
+    border-bottom: 2px solid var(--accent);
+  }
+
+  .ledger tbody th,
+  .ledger tbody td {
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule-soft);
+    vertical-align: top;
+    font-weight: 400;
+    text-align: left;
+  }
+
+  .ledger tbody td {
+    font-size: 14px;
+  }
+
+  /* Two classes deep on purpose: the rules above are also one-class-plus-tag
+     and would otherwise win, leaving every figure under the wrong heading. */
+  .ledger thead th.num,
+  .ledger tbody td.num,
+  .ledger tfoot td.num {
+    text-align: right;
+  }
+
+  .ledger tbody td.num {
+    padding-left: 24px;
+  }
+
+  .item__name {
+    display: block;
+    font-weight: 500;
+    font-size: 15px;
+  }
+
+  .item__note {
+    display: block;
+    margin-top: 3px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-2);
+  }
+
+  .ledger--people tfoot th,
+  .ledger--people tfoot td {
+    padding: 15px 0;
+    font-size: 14px;
+    font-weight: 600;
+    text-align: left;
+    border-top: 3px solid var(--accent);
+    background: var(--accent-wash);
+  }
+
+  .ledger--people tfoot th {
+    color: var(--accent-deep);
+  }
+
+  .ledger--people tfoot td {
+    color: var(--ink);
+  }
+
+  /* The payer's row states a fact, not a debt. */
+  .ledger--people .row--settled th,
+  .ledger--people .row--settled td {
+    color: var(--ink-2);
+  }
+
+  /* ---- the slips ---- */
+
+  .slips {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  /* Column layout so the due band can be pinned to the bottom: cards in a row
+     are stretched to equal height, and a slip with fewer lines would otherwise
+     float its band up and leave dead space under it. */
+  .slip {
+    display: flex;
+    flex-direction: column;
+    padding: 15px 14px 0;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+  }
+
+  .slip__name {
+    margin: 0 0 11px;
+    font: 600 16px/1.2 var(--sans);
+  }
+
+  .slip__lines {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .slip__line {
     display: flex;
     align-items: baseline;
-    gap: 8px;
-    margin: 1rem 0 0;
+    gap: 7px;
+    padding: 4px 0;
+    font-size: 13px;
+  }
+
+  /* Empty element: its baseline is its bottom edge, so the dotted rule lands
+     exactly on the text baseline. */
+  .dots {
+    flex: 1 1 auto;
+    min-width: 14px;
+    border-bottom: 1px dotted var(--rule);
+  }
+
+  .slip__line .num {
+    font-size: 13px;
+  }
+
+  /* Shared lines carry no styling of their own — the fraction is the only
+     marker, so every amount on a slip reads with equal weight. */
+  .frac {
+    font-style: normal;
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+
+  .slip__sub {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 3px 12px;
+    margin: 11px 0 13px;
+    padding-top: 9px;
+    border-top: 1px solid var(--rule-soft);
+    font-size: 13px;
+  }
+
+  .slip__sub dt {
+    color: var(--ink-2);
+  }
+
+  .slip__sub dd {
+    margin: 0;
+  }
+
+  /* The band bleeds past the slip's padding to meet its border. */
+  .slip__due {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: auto -14px 0;
+    padding: 11px 14px 12px;
+    border-top: 3px solid var(--accent);
+    border-radius: 0 0 5px 5px;
+    background: var(--accent-wash);
+  }
+
+  .slip__due-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+    margin: 0;
+  }
+
+  .slip__due-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-deep);
+  }
+
+  .slip__amount {
+    font: 600 21px/1 var(--serif);
+    letter-spacing: -0.02em;
     color: var(--accent);
   }
 
   .cur {
-    font-size: 13px;
-    font-weight: 600;
+    margin-right: 3px;
+    font: 400 12px/1 var(--sans);
+    color: var(--accent-deep);
   }
 
-  .grand .fig {
-    font-size: 30px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+  /* The payer paid the bill — their slip states a fact, not a debt. */
+  .slip--settled .slip__due {
+    border-top-color: var(--ink-3);
+    background: var(--rule-soft);
   }
 
-  /* ---- one person ---- */
-
-  .who {
-    padding-top: 1.5rem;
-    /* A person's block is the unit that has to survive a page break. Splitting
-       someone's items across two pages is how a document stops being checkable. */
-    break-inside: avoid;
+  .slip--settled .slip__due-label {
+    color: var(--ink-2);
   }
 
-  .who-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--rule);
+  .slip--settled .slip__amount,
+  .slip--settled .cur {
+    color: var(--ink-2);
   }
 
-  .who-head h2 {
-    margin: 0;
-    font-size: 15px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-  }
-
-  .paid {
-    margin-left: 8px;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--soft);
-    letter-spacing: 0.02em;
-  }
-
-  /*
-   * Three columns: label, operator, figure. The middle column exists so the
-   * + and − line up on their own axis and the arithmetic can be read straight
-   * down the page — which is the one thing this document is for.
-   */
-  .lines {
-    display: grid;
-    grid-template-columns: 1fr 0.75rem auto;
-    align-items: baseline;
-    row-gap: 3px;
-    column-gap: 8px;
-    padding-top: 8px;
-  }
-
-  .label {
-    min-width: 0;
-    font-size: 13px;
-  }
-
-  .label.soft {
-    color: var(--soft);
-  }
-
-  .split {
-    margin-left: 6px;
-    font-size: 11px;
-    color: var(--soft);
-  }
-
-  .op {
-    text-align: center;
-    font-size: 12px;
-    color: var(--soft);
-  }
-
-  .fig {
-    font-family: var(--fig);
-    font-variant-numeric: tabular-nums;
-    font-size: 13px;
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .fig.soft {
-    color: var(--soft);
-  }
-
-  .fig.strong {
-    font-size: 15px;
-    font-weight: 600;
-  }
-
-  /*
-   * The payer's link, set as a footnote to the block rather than as a control
-   * in it. Right-aligned under the figure it belongs to, small, and in the
-   * accent — the only other place the accent is spent, and both are things you
-   * act on rather than read.
-   */
-  .pay-link {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 6px;
-  }
-
-  .link {
-    min-height: 32px;
-    padding: 0 8px;
+  /* An action, so it is set like one: small, underlined, and on the wash
+     rather than beside it. */
+  .slip__pay {
+    align-self: flex-start;
+    padding: 0;
     border: none;
-    border-radius: 6px;
     background: none;
-    color: var(--accent);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 550;
+    font: 500 12px/1.4 var(--sans);
+    color: var(--accent-deep);
     text-decoration: underline;
     text-decoration-style: dotted;
     text-underline-offset: 3px;
+    cursor: pointer;
   }
 
-  .link:active {
-    opacity: 0.55;
-    transform: none;
+  .slip--settled .slip__pay {
+    color: var(--ink-2);
   }
 
-  /*
-   * The fallback, when neither the share sheet nor the clipboard is available.
-   *
-   * Monospace and small so a 70-character URL fits the width without wrapping
-   * into something that looks broken, and read-only so a tap selects rather
-   * than opening the keyboard. It only ever appears after both automatic
-   * routes have failed, so it never competes with them.
-   */
-  .link-url {
+  /* Monospace and small so a 90-character URL fits the width without wrapping
+     into something that looks broken, and read-only so a tap selects rather
+     than opening the keyboard. It only ever appears after both automatic
+     routes failed, so it never competes with them. */
+  .slip__url {
     display: block;
     width: 100%;
-    margin-top: 6px;
     padding: 8px 10px;
     border: 1px solid var(--accent);
     border-radius: 8px;
-    background: #fff;
+    background: var(--paper);
     color: var(--ink);
-    font-family: var(--fig);
-    font-size: 11px;
-    line-height: 1.5;
-    /* Wraps anywhere rather than at word boundaries. A URL has no spaces, so
-       the default would push the whole thing onto one overflowing line —
-       which is the truncation this replaced. */
+    font: 400 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     overflow-wrap: anywhere;
     resize: none;
   }
 
-  /* A separator spanning the grid, drawn as a grid row of empty cells. */
-  .rule {
-    grid-column: 1 / -1;
-    height: 1px;
-    margin: 4px 0;
-    background: var(--rule);
-  }
+  /* ---- how to pay ---- */
 
-  /* ---- foot ---- */
-
-  .foot {
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 2px solid var(--ink);
-  }
-
-  .check {
+  .pay__row {
     display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    font-size: 13px;
-    color: var(--soft);
-  }
-
-  .pay {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 12px;
-    margin-top: 1rem;
-    padding: 12px 14px;
-    border: 1px solid var(--rule);
-    border-radius: 10px;
-  }
-
-  .pay-label {
-    font-size: 12px;
-    color: var(--soft);
-  }
-
-  .pay-value {
-    font-family: var(--fig);
-    font-size: 14px;
-    font-weight: 600;
-    text-align: right;
-  }
-
-  /*
-   * The QR sits under the label rather than beside it, and at a fixed size
-   * rather than a fluid one. A code that shrinks with the viewport is a code
-   * that stops scanning on exactly the device it is scanned from.
-   */
-  .qris {
-    display: flex;
-    flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
-    margin-top: 1rem;
-    padding: 12px 14px;
-    border: 1px solid var(--rule);
-    border-radius: 10px;
+    gap: 26px;
   }
 
-  .qris img {
-    width: 180px;
-    height: 180px;
-    /* The code is black on white on a white card; the border is what keeps a
-       white quiet zone from bleeding into the page behind it. */
+  /* Padding is extra quiet zone on top of the code's own. */
+  .pay__qr {
+    flex: none;
+    width: 148px;
+    height: 148px;
+    padding: 10px;
     border: 1px solid var(--rule);
     border-radius: 6px;
+    background: var(--paper);
   }
 
-  .qris-holder {
-    font-size: 12px;
-    color: var(--soft);
+  .pay__body {
+    max-width: 48ch;
+  }
+
+  .pay__lead {
+    margin: 0 0 8px;
+    font: 600 16px/1.3 var(--sans);
+  }
+
+  .pay__line {
+    margin: 0 0 7px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--ink-2);
+  }
+
+  /* ---- colophon ---- */
+
+  .colophon {
+    margin-top: 48px;
+    padding-top: 22px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .colophon p {
+    margin: 0;
+    font: 400 15px/1.4 var(--serif);
+  }
+
+  .colophon__fine {
+    margin-top: 7px !important;
+    font: 400 12px/1.6 var(--sans) !important;
+    color: var(--ink-3);
   }
 
   .msg {
@@ -683,10 +988,63 @@
     color: #6b6560;
   }
 
+  /* ---- narrow screens ---- */
+
+  @media (max-width: 720px) {
+    .sheet {
+      padding: 34px 26px 32px;
+    }
+
+    .masthead {
+      flex-direction: column;
+      gap: 26px;
+      padding-bottom: 26px;
+    }
+
+    .doc {
+      text-align: left;
+    }
+
+    .doc__meta {
+      grid-template-columns: auto 1fr;
+      gap: 5px 16px;
+    }
+
+    .doc__meta dd {
+      text-align: right;
+    }
+
+    .slips {
+      grid-template-columns: 1fr;
+    }
+
+    .pay__row {
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    /*
+     * The headers may wrap; the figures still may not.
+     *
+     * At phone width the four columns fit, but not with "PPN & service" held
+     * on one line — it ran into "Subtotal" and the two read as one word. The
+     * money columns cannot wrap or a figure splits across lines, but a heading
+     * breaking in two costs nothing.
+     */
+    .ledger thead th.num {
+      white-space: normal;
+    }
+
+    .ledger tbody td.num {
+      padding-left: 12px;
+    }
+  }
+
   /* ---- print ---- */
 
   @media print {
     @page {
+      size: A4;
       margin: 14mm;
     }
 
@@ -694,25 +1052,29 @@
       display: none !important;
     }
 
-    /*
-     * The measure is kept, not reset to the full page.
-     *
-     * A4 with 14mm margins is 182mm wide, and this document is a label on the
-     * left with a figure on the right. Let it fill the sheet and the eye has to
-     * travel most of a hand-span to connect the two — which is exactly the
-     * reading problem the column layout exists to solve.
-     */
-    .sheet {
-      max-width: 34rem;
-      padding: 0;
-      margin: 0 auto;
+    .screen {
+      background: none;
+      min-height: 0;
     }
 
-    /* The accent is cheap to keep — it is one line — but a printed document
-       should not depend on it, so the total is already ink-weight as well as
-       coloured. */
-    .grand {
-      color: var(--accent);
+    .sheet {
+      max-width: none;
+      padding: 0;
+      box-shadow: none;
+    }
+
+    .slip,
+    .pay,
+    .ledger tr {
+      break-inside: avoid;
+    }
+
+    /* Keep the accent and the wash from printing grey. */
+    .slip__due,
+    .slip--settled .slip__due,
+    .ledger--people tfoot th,
+    .ledger--people tfoot td {
+      -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
   }
