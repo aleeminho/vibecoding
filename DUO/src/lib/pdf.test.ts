@@ -14,7 +14,7 @@ import { buildNotaPdf, Pdf, textWidth } from './pdf'
 import { allocateBill, type ExportBill } from './export'
 
 const bill: ExportBill = {
-  ref_code: 'BILL_20260614_001',
+  ref_code: '9PMXR2KV',
   bill_date: '2026-06-14',
   place: 'Warung Bu Siti',
   total: 75900,

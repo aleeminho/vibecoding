@@ -5,8 +5,8 @@
  *
  *   extractReceipt  photo -> Extraction, via the Edge Function
  *   findOwnerId     who is signed in, needed for the storage path
- *   nextRefCode     reserve the code BEFORE uploading, because the photo's
- *                   object path is named after it
+ *   newRefCode      get the code BEFORE uploading, because the photo's object
+ *                   path is named after it
  *   uploadReceipt   the photo lands in Storage before any row exists, so a
  *                   storage failure can never leave a bill without a photo
  *   commitBill      one transaction for the bill, its items, its assignees and
@@ -92,17 +92,17 @@ export async function findOwnerId(): Promise<string> {
 }
 
 /**
- * Reserve the next reference code for a date.
+ * Propose a reference code for a new bill: eight characters, A-Z and 0-9.
  *
  * Called before the upload, because the photo's path is named after the code
- * (spec section 10). This is not a lock: the unique constraint on ref_code is
- * what actually prevents duplicates, and it fails loudly if two commits ever
- * race for the same number.
+ * (spec section 10). Not a reservation: the unique constraint on ref_code is
+ * what actually prevents duplicates, and it fails loudly in the one-in-a-
+ * hundred-million case where two commits draw the same code.
  */
-export async function nextRefCode(billDate: string): Promise<string> {
-  const { data, error } = await supabase.rpc('next_ref_code', { p_bill_date: billDate })
+export async function newRefCode(): Promise<string> {
+  const { data, error } = await supabase.rpc('new_ref_code')
   if (error) throw new Error(error.message)
-  if (typeof data !== 'string') throw new Error('next_ref_code nggak balikin kode.')
+  if (typeof data !== 'string') throw new Error('new_ref_code nggak balikin kode.')
   return data
 }
 
@@ -370,7 +370,10 @@ export async function listBills(limit = 60): Promise<BillWithShares[]> {
       // than relying on the caller to remember.
       .is('deleted_at', null)
       .order('bill_date', { ascending: false })
-      .order('ref_code', { ascending: false })
+      // Two bills on the same date have to land in a fixed order, and ref_code
+      // stopped being able to say which came first when it stopped carrying the
+      // date. created_at is the fact the old tiebreak was inferring.
+      .order('created_at', { ascending: false })
       .limit(limit)
 
   let { data, error } = await query(paymentsAvailable)

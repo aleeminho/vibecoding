@@ -3,7 +3,7 @@ import { describeAudit } from './audit'
 
 const row = (action: string, detail: unknown = null) => ({
   action,
-  ref_code: 'BILL_20260626_001',
+  ref_code: 'YQ3HWJDM',
   detail,
 })
 

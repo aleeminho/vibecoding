@@ -42,7 +42,7 @@ describe('allocate', () => {
 
 /** Warung Bu Siti, with the items assigned the way the spec example splits them. */
 const bill: ExportBill = {
-  ref_code: 'BILL_20260912_001',
+  ref_code: 'QH82NKVD',
   bill_date: '2026-09-12',
   place: 'Warung Bu Siti',
   total: 75900,

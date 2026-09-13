@@ -35,7 +35,7 @@
     listKnownPeople,
     setPaidBy,
     setShareStatus,
-    nextRefCode,
+    newRefCode,
     normaliseAccountNumber,
     uploadReceipt,
   } from '../lib/api'
@@ -259,7 +259,7 @@
 
     try {
       const ownerId = await findOwnerId()
-      const refCode = await nextRefCode(ext.date!)
+      const refCode = await newRefCode()
 
       let receiptPath: string | null = null
       if (draft.photo) {

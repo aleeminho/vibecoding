@@ -54,11 +54,11 @@ const PEOPLE = ['Budi', 'Sarah', 'Andi', 'Dewi', 'Rina', 'Tono']
 export const DEMO_BILLS: BillWithShares[] = [
   {
     id: 'demo-1',
-    ref_code: 'BILL_20260626_001',
+    ref_code: 'YQ3HWJDM',
     place: 'Lucky Cat Coffee & Kitchen',
     bill_date: '2026-06-26',
     total: 456225,
-    receipt_path: 'demo/BILL_20260626_001.jpg',
+    receipt_path: 'demo/YQ3HWJDM.jpg',
     bank_name: 'BCA',
     account_number: '1234567890',
     account_holder: 'Alee',
@@ -78,11 +78,11 @@ export const DEMO_BILLS: BillWithShares[] = [
   },
   {
     id: 'demo-2',
-    ref_code: 'BILL_20260614_001',
+    ref_code: '9PMXR2KV',
     place: 'Warung Bu Siti',
     bill_date: '2026-06-14',
     total: 75900,
-    receipt_path: 'demo/BILL_20260614_001.jpg',
+    receipt_path: 'demo/9PMXR2KV.jpg',
     bank_name: 'BCA',
     account_number: '1234567890',
     account_holder: 'Alee',
@@ -97,7 +97,7 @@ export const DEMO_BILLS: BillWithShares[] = [
   },
   {
     id: 'demo-3',
-    ref_code: 'BILL_20260530_001',
+    ref_code: '4XB9TMRW',
     place: 'Sate Taichan Bang Jali',
     bill_date: '2026-05-30',
     total: 312000,
@@ -121,7 +121,7 @@ export const DEMO_BILLS: BillWithShares[] = [
   },
   {
     id: 'demo-4',
-    ref_code: 'BILL_20260526_001',
+    ref_code: 'K7M2QX9P',
     place: 'Kopi Kenangan Senopati',
     bill_date: '2026-05-26',
     total: 94500,
@@ -169,11 +169,11 @@ export const DEMO_OUTSTANDING = [
 ]
 
 export const DEMO_SETTLE_UP: SettleUpEntry[] = [
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Budi', amount_owed: 127050, amount_paid: 100000 },
-  { bill_id: 'demo-2', ref_code: 'BILL_20260614_001', place: 'Warung Bu Siti', bill_date: '2026-06-14', person: 'Budi', amount_owed: 78000, amount_paid: 0 },
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Sarah', amount_owed: 98175, amount_paid: 0 },
-  { bill_id: 'demo-1', ref_code: 'BILL_20260626_001', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Dewi', amount_owed: 109725, amount_paid: 0 },
-  { bill_id: 'demo-3', ref_code: 'BILL_20260530_001', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000, amount_paid: 0 },
+  { bill_id: 'demo-1', ref_code: 'YQ3HWJDM', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Budi', amount_owed: 127050, amount_paid: 100000 },
+  { bill_id: 'demo-2', ref_code: '9PMXR2KV', place: 'Warung Bu Siti', bill_date: '2026-06-14', person: 'Budi', amount_owed: 78000, amount_paid: 0 },
+  { bill_id: 'demo-1', ref_code: 'YQ3HWJDM', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Sarah', amount_owed: 98175, amount_paid: 0 },
+  { bill_id: 'demo-1', ref_code: 'YQ3HWJDM', place: 'Lucky Cat Coffee & Kitchen', bill_date: '2026-06-26', person: 'Dewi', amount_owed: 109725, amount_paid: 0 },
+  { bill_id: 'demo-3', ref_code: '4XB9TMRW', place: 'Sate Taichan Bang Jali', bill_date: '2026-05-30', person: 'Rina', amount_owed: 78000, amount_paid: 0 },
 ]
 
 /**
@@ -185,7 +185,7 @@ export const DEMO_SETTLE_UP: SettleUpEntry[] = [
 export const DEMO_DELETED: DeletedBill[] = [
   {
     id: 'demo-gone',
-    ref_code: 'BILL_20260602_001',
+    ref_code: 'VM6T3KQ8',
     place: 'Bakmi GM Grand Indonesia',
     bill_date: '2026-06-02',
     total: 187000,
@@ -194,9 +194,9 @@ export const DEMO_DELETED: DeletedBill[] = [
 ]
 
 export const DEMO_AUDIT: AuditEntry[] = [
-  { id: 'a-1', action: 'share.paid', ref_code: 'BILL_20260626_001', detail: { person: 'Andi' }, created_at: '2026-07-02T11:20:00Z' },
-  { id: 'a-2', action: 'bill.amount_changed', ref_code: 'BILL_20260614_001', detail: { field: 'total', from: 75900, to: 75900 }, created_at: '2026-06-15T09:04:00Z' },
-  { id: 'a-3', action: 'share.paid', ref_code: 'BILL_20260614_001', detail: { person: 'Budi' }, created_at: '2026-06-15T08:31:00Z' },
+  { id: 'a-1', action: 'share.paid', ref_code: 'YQ3HWJDM', detail: { person: 'Andi' }, created_at: '2026-07-02T11:20:00Z' },
+  { id: 'a-2', action: 'bill.amount_changed', ref_code: '9PMXR2KV', detail: { field: 'total', from: 75900, to: 75900 }, created_at: '2026-06-15T09:04:00Z' },
+  { id: 'a-3', action: 'share.paid', ref_code: '9PMXR2KV', detail: { person: 'Budi' }, created_at: '2026-06-15T08:31:00Z' },
 ]
 
 /**
@@ -208,7 +208,7 @@ export const DEMO_AUDIT: AuditEntry[] = [
  */
 export const DEMO_EXPORT_BILLS: ExportBill[] = [
   {
-    ref_code: 'BILL_20260614_001',
+    ref_code: '9PMXR2KV',
     bill_date: '2026-06-14',
     place: 'Warung Bu Siti',
     total: 75900,
@@ -234,7 +234,7 @@ export const DEMO_EXPORT_BILLS: ExportBill[] = [
     // that proves the itemisation reconciles, because a fixture where everyone
     // orders exactly one thing would reconcile no matter how broken the
     // allocation was.
-    ref_code: 'BILL_20260626_001',
+    ref_code: 'YQ3HWJDM',
     bill_date: '2026-06-26',
     place: 'Lucky Cat Coffee & Kitchen',
     total: 456225,
@@ -314,7 +314,7 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
   {
     id: 'p-1',
     bill_id: 'demo-1',
-    ref_code: 'BILL_20260626_001',
+    ref_code: 'YQ3HWJDM',
     place: 'Lucky Cat Coffee & Kitchen',
     person: 'Budi',
     amount_owed: 127050,
@@ -324,13 +324,13 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     recipient_ok: true,
     verdict: 'mismatch',
     note: 'Kurang Rp 27.050 — kebaca Rp 100.000, sisa Rp 127.050.',
-    image_path: 'bukti/BILL_20260626_001/3f2a1b9c.jpg',
+    image_path: 'bukti/YQ3HWJDM/3f2a1b9c.jpg',
     created_at: '2026-07-02T11:20:00Z',
   },
   {
     id: 'p-2',
     bill_id: 'demo-1',
-    ref_code: 'BILL_20260626_001',
+    ref_code: 'YQ3HWJDM',
     place: 'Lucky Cat Coffee & Kitchen',
     person: 'Dewi',
     amount_owed: 109725,
@@ -340,13 +340,13 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     recipient_ok: false,
     verdict: 'mismatch',
     note: 'Nominalnya pas tapi rekeningnya beda.',
-    image_path: 'bukti/BILL_20260626_001/9c4d2e7f.jpg',
+    image_path: 'bukti/YQ3HWJDM/9c4d2e7f.jpg',
     created_at: '2026-07-02T09:02:00Z',
   },
   {
     id: 'p-3',
     bill_id: 'demo-3',
-    ref_code: 'BILL_20260530_001',
+    ref_code: '4XB9TMRW',
     place: 'Sate Taichan Bang Jali',
     person: 'Rina',
     amount_owed: 78000,
@@ -356,7 +356,7 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     recipient_ok: null,
     verdict: 'unclear',
     note: 'Gambarnya kek buram, nominalnya nggak kebaca.',
-    image_path: 'bukti/BILL_20260530_001/1a7f3b20.jpg',
+    image_path: 'bukti/4XB9TMRW/1a7f3b20.jpg',
     created_at: '2026-05-31T20:41:00Z',
   },
 ]
