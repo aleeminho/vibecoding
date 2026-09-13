@@ -1083,6 +1083,51 @@
       box-shadow: none;
     }
 
+    /*
+     * The page's layout, stated rather than inherited.
+     *
+     * Some mobile browsers evaluate print media queries against the width of
+     * the device instead of the page box, so a 390px phone printed the phone
+     * layout onto A4: the slips came out one per row at the full width of the
+     * sheet, which is what "too wide" looked like from the other end.
+     *
+     * A paper size is not a viewport. Whatever the screen did, this is the
+     * arrangement the page gets, so it cannot depend on which breakpoint the
+     * browser happened to pick.
+     */
+    .masthead {
+      flex-direction: row;
+      gap: 40px;
+      padding-bottom: 34px;
+    }
+
+    .doc {
+      text-align: right;
+    }
+
+    .doc__meta {
+      grid-template-columns: 1fr auto;
+      gap: 5px 20px;
+    }
+
+    .slips {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .pay__row {
+      flex-direction: row;
+      gap: 26px;
+    }
+
+    /* The headings may wrap on a phone; on paper they have room. */
+    .ledger thead th.num {
+      white-space: nowrap;
+    }
+
+    .ledger tbody td.num {
+      padding-left: 24px;
+    }
+
     .slip,
     .pay,
     .ledger tr {
