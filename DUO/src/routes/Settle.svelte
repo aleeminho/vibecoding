@@ -26,7 +26,7 @@
   import { onMount } from 'svelte'
   import { formatDate, rupiah } from '../lib/format'
   import { listSettleUp, type SettleUpEntry } from '../lib/api'
-  import { copyText } from '../lib/share'
+  import { copyText } from '../lib/clipboard'
 
   let entries = $state<SettleUpEntry[]>([])
   let status = $state<'loading' | 'ready' | 'error'>('loading')

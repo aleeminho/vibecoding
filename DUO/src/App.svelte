@@ -25,8 +25,9 @@
   import Report from './routes/Report.svelte'
   import Settle from './routes/Settle.svelte'
   import Preview from './routes/Preview.svelte'
+  import Nota from './routes/Nota.svelte'
 
-  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview'
+  type Route = 'bills' | 'capture' | 'settle' | 'report' | 'review' | 'preview' | 'nota'
 
   /**
    * Tab icons as SVG source. Trusted constants, never user input — which is the
@@ -64,7 +65,7 @@
     // silently falls back to the default route — which looks like the query
     // param was ignored rather than like a routing bug.
     const raw = location.hash.replace(/^#\/?/, '').split('?')[0]
-    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview']
+    const known: Route[] = ['bills', 'capture', 'settle', 'report', 'review', 'preview', 'nota']
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
   }
 
@@ -97,6 +98,7 @@
     report: 'Report',
     review: 'Bagi Rata',
     preview: 'Preview',
+    nota: 'Nota',
   }
 
   onMount(() => {
@@ -112,6 +114,12 @@
 </script>
 
 <div class="shell">
+  <!--
+    The nota is not a screen in the app, it is a document that leaves it. No
+    header and no tab bar, so printing has nothing to hide and the page that
+    reaches the PDF is only the report.
+  -->
+  {#if route !== 'nota'}
   <header class="app-header">
     <div class="brand">
       <span class="mark">D</span>
@@ -124,13 +132,16 @@
       <button class="plain nav-action" onclick={() => session.signOut()}>Keluar</button>
     {/if}
   </header>
+  {/if}
 
-  <!--
-    Dev-only. Deliberately ahead of the session gate: the whole point is to look
-    at the Review screen without a login, a camera, an API call and a round
-    trip in the way.
-  -->
-  {#if import.meta.env.DEV && route === 'preview'}
+  {#if route === 'nota'}
+    <Nota />
+  {:else if import.meta.env.DEV && route === 'preview'}
+    <!--
+      Dev-only, and deliberately ahead of the session gate: the whole point is
+      to look at the Review screen without a login, a camera, an API call and a
+      round trip in the way.
+    -->
     <main><Preview /></main>
     <nav class="tab-bar">
       {#each tabs as tab (tab.id)}

@@ -25,7 +25,6 @@
   import { formatDate, rupiah } from '../lib/format'
   import {
     deleteBill,
-    getExportBill,
     listBills,
     listOutstanding,
     setBillStatus,
@@ -34,8 +33,6 @@
     type BillWithShares,
     type Outstanding,
   } from '../lib/api'
-  import { allocateBill } from '../lib/export'
-  import { buildShareMessage, copyText, whatsappUrl } from '../lib/share'
   import { isDemo } from '../lib/demo'
 
   let outstanding = $state<Outstanding[]>([])
@@ -44,10 +41,6 @@
   let message = $state('')
   let open = $state<string | null>(null)
   let busy = $state<string | null>(null)
-  /** Bill id whose message was just copied, so the button can say so. */
-  let copied = $state<string | null>(null)
-  /** Bill id whose message is being assembled, which needs a round trip. */
-  let sharing = $state<string | null>(null)
 
   /**
    * `silent` reloads without dropping the screen back to "Memuat…".
@@ -121,56 +114,16 @@
   }
 
   /**
-   * Build the message for a bill, fetching its items first.
+   * Open the bill as a document.
    *
-   * The breakdown has to come from the same allocation the CSV export uses, and
-   * that needs the items and who shared them — which the bill list does not
-   * carry. Fetched on the tap rather than on every list load, because the item
-   * graph is far more rows than the list needs and only this one action wants
-   * it.
+   * The nota is where the PDF and the WhatsApp share both happen. A web page
+   * cannot attach a file to a WhatsApp message directly — `wa.me` only
+   * pre-fills text — so the route in is the share sheet, which iOS offers from
+   * the print preview. One screen, one path, and it carries a document instead
+   * of a wall of text that a proportional font renders as an unreadable column.
    */
-  async function messageFor(bill: BillWithShares): Promise<string> {
-    const full = await getExportBill(bill.id)
-    return buildShareMessage({
-      ref_code: full.ref_code,
-      place: full.place,
-      bill_date: full.bill_date,
-      total: bill.total,
-      bank_name: full.bank_name,
-      account_number: full.account_number,
-      account_holder: full.account_holder,
-      breakdown: allocateBill(full),
-    })
-  }
-
-  /**
-   * Copy the WhatsApp message and say so.
-   *
-   * The confirmation matters more than it looks: the clipboard write is
-   * invisible, and on a phone a tap that produces no feedback reads as a tap
-   * that did not register — so people tap again, and then paste twice.
-   */
-  async function shareBill(bill: BillWithShares) {
-    sharing = bill.id
-    try {
-      copied = (await copyText(await messageFor(bill))) ? bill.id : null
-      setTimeout(() => (copied = null), 2000)
-    } catch (err) {
-      message = (err as Error).message
-    } finally {
-      sharing = null
-    }
-  }
-
-  async function openWhatsApp(bill: BillWithShares) {
-    sharing = bill.id
-    try {
-      window.open(whatsappUrl(await messageFor(bill)), '_blank', 'noopener')
-    } catch (err) {
-      message = (err as Error).message
-    } finally {
-      sharing = null
-    }
+  function openNota(bill: BillWithShares) {
+    location.hash = `#/nota?id=${bill.id}`
   }
 
   /**
@@ -333,16 +286,7 @@
                   Lihat struk
                 </button>
               {/if}
-              <button class="plain" disabled={sharing === bill.id} onclick={() => shareBill(bill)}>
-                {sharing === bill.id
-                  ? 'Nyiapin…'
-                  : copied === bill.id
-                    ? 'Tersalin ✓'
-                    : 'Copy pesan WA'}
-              </button>
-              <button class="plain" disabled={sharing === bill.id} onclick={() => openWhatsApp(bill)}>
-                Buka WA
-              </button>
+              <button class="plain" onclick={() => openNota(bill)}>Nota &amp; WA</button>
             </div>
 
             <div class="row actions">

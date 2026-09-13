@@ -45,6 +45,7 @@ const bill: ExportBill = {
   ref_code: 'BILL_20260912_001',
   bill_date: '2026-09-12',
   place: 'Warung Bu Siti',
+  total: 75900,
   bank_name: 'BCA',
   account_number: '1234567890',
   account_holder: 'Alee',

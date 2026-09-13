@@ -60,6 +60,14 @@ export interface ExportBill {
   ref_code: string
   bill_date: string
   place: string
+  /**
+   * The printed total, read from the bill rather than summed from the shares.
+   *
+   * That distinction is the whole point of the reconciliation line on the nota:
+   * if this were derived from the same shares it is being checked against, the
+   * check would be a tautology and would pass on a bill that does not balance.
+   */
+  total: number
   bank_name: string | null
   account_number: string | null
   account_holder: string | null

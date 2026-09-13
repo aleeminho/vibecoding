@@ -478,7 +478,63 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
 // ---------------------------------------------------------------------------
 
 /**
- * Everything the detailed export needs for a date range, in one round trip.
+ * One bill with its items, assignees and shares.
+ *
+ * The select string and the row mapping live here because two callers need the
+ * same shape — the detailed export over a date range, and the nota for a single
+ * bill. Written twice they drifted the moment a column was added, which is
+ * exactly what happened when `total` was introduced.
+ */
+const EXPORT_SELECT = `total, ref_code, bill_date, place, bank_name, account_number, account_holder,
+   bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
+   bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`
+
+type ExportRow = {
+  total: number
+  ref_code: string
+  bill_date: string
+  place: string
+  bank_name: string | null
+  account_number: string | null
+  account_holder: string | null
+  bill_items: {
+    position: number
+    name: string
+    qty: number
+    line_total: number
+    bill_item_assignees: { bill_participants: { person: string } | null }[]
+  }[]
+  bill_participants: ExportBill['shares']
+}
+
+function mapExportBill(bill: ExportRow): ExportBill {
+  return {
+    ref_code: bill.ref_code,
+    bill_date: bill.bill_date,
+    place: bill.place,
+    total: bill.total,
+    bank_name: bill.bank_name,
+    account_number: bill.account_number,
+    account_holder: bill.account_holder,
+    items: (bill.bill_items ?? [])
+      .sort((a, b) => a.position - b.position)
+      .map((item) => ({
+        name: item.name,
+        qty: item.qty,
+        line_total: item.line_total,
+        assigned_to: (item.bill_item_assignees ?? [])
+          .map((a) => a.bill_participants?.person)
+          .filter((p): p is string => typeof p === 'string'),
+      })),
+    shares: (bill.bill_participants ?? []).map((s) => ({
+      ...s,
+      rounding_share: s.rounding_share ?? 0,
+    })),
+  }
+}
+
+/**
+ * Every bill in a date range, for the detailed export.
  *
  * One nested query rather than a view, for the same reason listBills is: the
  * row count is bounded by the range and the embedding is already there. The
@@ -491,66 +547,23 @@ export async function listExportBills(from: string, to: string): Promise<ExportB
 
   const { data, error } = await supabase
     .from('bills')
-    .select(
-      `ref_code, bill_date, place, bank_name, account_number, account_holder,
-       bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
-       bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`,
-    )
+    .select(EXPORT_SELECT)
     .is('deleted_at', null)
     .gte('bill_date', from)
     .lte('bill_date', to)
     .order('bill_date', { ascending: true })
 
   if (error) throw new Error(error.message)
-
-  type Row = {
-    ref_code: string
-    bill_date: string
-    place: string
-    bank_name: string | null
-    account_number: string | null
-    account_holder: string | null
-    bill_items: {
-      position: number
-      name: string
-      qty: number
-      line_total: number
-      bill_item_assignees: { bill_participants: { person: string } | null }[]
-    }[]
-    bill_participants: ExportBill['shares']
-  }
-
-  return ((data ?? []) as unknown as Row[]).map((bill) => ({
-    ref_code: bill.ref_code,
-    bill_date: bill.bill_date,
-    place: bill.place,
-    bank_name: bill.bank_name,
-    account_number: bill.account_number,
-    account_holder: bill.account_holder,
-    items: (bill.bill_items ?? [])
-      .sort((a, b) => a.position - b.position)
-      .map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        line_total: item.line_total,
-        assigned_to: (item.bill_item_assignees ?? [])
-          .map((a) => a.bill_participants?.person)
-          .filter((p): p is string => typeof p === 'string'),
-      })),
-    shares: (bill.bill_participants ?? []).map((s) => ({
-      ...s,
-      rounding_share: s.rounding_share ?? 0,
-    })),
-  }))
+  return ((data ?? []) as unknown as ExportRow[]).map(mapExportBill)
 }
 
 /**
- * One bill with its items, assignees and shares.
+ * One bill, for the nota.
  *
  * Fetched on demand rather than added to listBills, because the item graph is
- * an order of magnitude more rows than the bill list needs, and only the share
- * message asks for it. One extra round trip on a deliberate tap is a better
- * trade than carrying it on every screen load.
+ * an order of magnitude more rows than the bill list needs and only the nota
+ * asks for it. One extra round trip on a deliberate tap is a better trade than
+ * carrying it on every screen load.
  */
 export async function getExportBill(billId: string): Promise<ExportBill> {
   if (import.meta.env.DEV && isDemo()) {
@@ -562,56 +575,14 @@ export async function getExportBill(billId: string): Promise<ExportBill> {
 
   const { data, error } = await supabase
     .from('bills')
-    .select(
-      `ref_code, bill_date, place, bank_name, account_number, account_holder,
-       bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
-       bill_participants (person, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date)`,
-    )
+    .select(EXPORT_SELECT)
     .eq('id', billId)
     .single()
 
   if (error) throw new Error(error.message)
-
-  const bill = data as unknown as {
-    ref_code: string
-    bill_date: string
-    place: string
-    bank_name: string | null
-    account_number: string | null
-    account_holder: string | null
-    bill_items: {
-      position: number
-      name: string
-      qty: number
-      line_total: number
-      bill_item_assignees: { bill_participants: { person: string } | null }[]
-    }[]
-    bill_participants: ExportBill['shares']
-  }
-
-  return {
-    ref_code: bill.ref_code,
-    bill_date: bill.bill_date,
-    place: bill.place,
-    bank_name: bill.bank_name,
-    account_number: bill.account_number,
-    account_holder: bill.account_holder,
-    items: (bill.bill_items ?? [])
-      .sort((a, b) => a.position - b.position)
-      .map((item) => ({
-        name: item.name,
-        qty: item.qty,
-        line_total: item.line_total,
-        assigned_to: (item.bill_item_assignees ?? [])
-          .map((a) => a.bill_participants?.person)
-          .filter((p): p is string => typeof p === 'string'),
-      })),
-    shares: (bill.bill_participants ?? []).map((s) => ({
-      ...s,
-      rounding_share: s.rounding_share ?? 0,
-    })),
-  }
+  return mapExportBill(data as unknown as ExportRow)
 }
+
 
 export interface SettleUpEntry {
   bill_id: string
