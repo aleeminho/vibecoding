@@ -23,8 +23,6 @@
   import { formatDate, rupiah, rupiahDigits } from '../lib/format'
   import { getExportBill, qrisUrl } from '../lib/api'
   import { allocateBill, type PersonBreakdown } from '../lib/export'
-  import { buildNotaPdf } from '../lib/pdf'
-  import { loadNotaFont } from '../lib/nota-font'
   import { copyText } from '../lib/clipboard'
 
   /**
@@ -39,57 +37,23 @@
   let breakdown = $state<PersonBreakdown[]>([])
   let error = $state<string | null>(null)
   let note = $state<string | null>(null)
-  let busy = $state(false)
 
   /**
-   * The PDF, built in the page.
+   * The PDF is this page, printed.
    *
-   * One tap, straight to the share sheet. The alternative — `window.print()`
-   * and its preview — reaches the same place on iOS but through a dialog that
-   * has to be dismissed, and does not exist at all on a desktop browser without
-   * a print-to-PDF driver.
+   * It used to be drawn by a PDF writer in `pdf.ts`, one primitive at a time,
+   * and the result was a document that shared the design's structure and none
+   * of its type: one face embedded where the design uses two, no leaders,
+   * square cards, one column. Reimplementing a layout engine to approximate a
+   * page the browser can already render exactly is a bad trade, and it was the
+   * approximation that showed.
    *
-   * `navigator.canShare` is checked with the actual file rather than by feature
-   * detection on `navigator.share` alone: desktop Chrome has share and will
-   * reject a file, so asking about the file specifically is the only version of
-   * the question that has a useful answer.
+   * The cost is the tap: this opens the print sheet, where the document is
+   * saved or shared from. That is two or three taps where the writer was one,
+   * and it is worth it — the thing being sent is the thing that was designed.
    */
-  async function sharePdf() {
-    if (!bill || busy) return
-    busy = true
-    note = null
-
-    try {
-      // Fetched here rather than inside the writer, which draws and measures
-      // and knows nothing about the network. Null when the font is not there,
-      // and the document is then set in the faces every reader already has.
-      const font = await loadNotaFont()
-
-      // The links in the document point back at wherever this page is being
-      // served from, so the same PDF is correct on localhost, on Pages and on
-      // the cPanel host without a build-time setting for each.
-      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`, font)
-      const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Nota ${bill.place}` })
-        return
-      }
-
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = file.name
-      link.click()
-      setTimeout(() => URL.revokeObjectURL(url), 0)
-      note = 'HP-nya nggak dukung share langsung, jadi PDF-nya ke-download.'
-    } catch (err) {
-      // Dismissing the share sheet is not an error, and telling someone their
-      // own cancel failed is a small insult.
-      if ((err as Error).name !== 'AbortError') error = (err as Error).message
-    } finally {
-      busy = false
-    }
+  function printNota() {
+    window.print()
   }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
@@ -128,7 +92,7 @@
    * negative, and calling a negative figure "PPN & service" would be the
    * document lying about the largest number on it.
    */
-  const chargeLabel = (p: PersonBreakdown) => (p.extra < 0 ? 'Diskon' : 'PPN & service')
+  const chargeLabel = (p: PersonBreakdown) => (p.extra < 0 ? 'Discount' : 'Tax + service')
 
   /**
    * The same figure with its sign, for the ledger.
@@ -149,7 +113,7 @@
    * holding a discount is the table saying something untrue about the money.
    */
   let chargeHeader = $derived(
-    breakdown.some((p) => p.extra < 0) ? 'PPN, service & diskon' : 'PPN & service',
+    breakdown.some((p) => p.extra < 0) ? 'Tax, service & discount' : 'Tax + service',
   )
 
   /**
@@ -161,13 +125,13 @@
    * question "paid whom?".
    */
   function bandLabel(p: PersonBreakdown): string {
-    if (p.is_payer) return 'Bagian dia, sudah termasuk'
-    if (p.status === 'lunas') return 'Sudah lunas'
+    if (p.is_payer) return 'Their share, already covered'
+    if (p.status === 'lunas') return 'Paid'
     // What is left, not what has landed. The band is where somebody looks for
-    // the number to transfer, and "udah masuk 100.000" beside a figure of
-    // 127.050 leaves them to do the subtraction on a payment screen.
-    if (p.amount_paid > 0) return `Sisa ${rupiah(p.total - p.amount_paid)}`
-    return bill?.paid_by_person ? `Utang ke ${bill.paid_by_person}` : 'Bagian dia'
+    // the number to transfer, and "100.000 in" beside a figure of 127.050
+    // leaves them to do the subtraction on a payment screen.
+    if (p.amount_paid > 0) return `Rp ${rupiahDigits(p.total - p.amount_paid)} left`
+    return bill?.paid_by_person ? `Owes ${bill.paid_by_person}` : 'Their share'
   }
 
   /**
@@ -180,6 +144,18 @@
   function linkFor(person: string): string | null {
     const token = bill?.shares.find((s) => s.person === person)?.pay_token
     return token ? `${location.origin}${location.pathname}#/bayar?t=${token}` : null
+  }
+
+  /**
+   * The link for one person, or null when they should not have one.
+   *
+   * Three conditions and all three matter: the payer's share was never a debt,
+   * a settled share must not be handed a way to pay twice, and a share with no
+   * token has no link to give.
+   */
+  function linkOf(p: PersonBreakdown): string | null {
+    if (p.is_payer || p.status === 'lunas') return null
+    return linkFor(p.person)
   }
 
   /**
@@ -280,16 +256,14 @@
 {:else}
   <div class="screen">
     <div class="controls no-print">
-      <button class="go" disabled={busy} onclick={sharePdf}>
-        {busy ? 'Nyiapin…' : 'Bagikan PDF'}
-      </button>
+      <button class="go" onclick={printNota}>Print / simpan PDF</button>
       <button class="back" onclick={() => history.back()}>Kembali</button>
       <p class="hint">
         {#if note}
           {note}
         {:else}
-          PDF-nya ke-generate di HP lu, terus share sheet-nya kebuka — pilih
-          WhatsApp dan dokumennya nempel sendiri.
+          Di layar print, pilih <strong>Simpan sebagai PDF</strong> — di iPhone
+          tombol Share di situ bisa langsung ke WhatsApp.
         {/if}
       </p>
     </div>
@@ -300,37 +274,35 @@
           <p class="brand__mark">{bill.place}</p>
           <p class="brand__sub">{formatDate(bill.bill_date)}</p>
           {#if bill.paid_by_person}
-            <address class="brand__addr">
-              Dibayar dulu sama {bill.paid_by_person}
-            </address>
+            <address class="brand__addr">Bill paid by {bill.paid_by_person}</address>
           {/if}
         </div>
 
         <div class="doc">
-          <h1 class="doc__title">Nota</h1>
+          <h1 class="doc__title">Split bill</h1>
           <dl class="doc__meta">
-            <dt>Tagihan</dt>
+            <dt>Bill</dt>
             <dd>{bill.ref_code}</dd>
-            <dt>Item</dt>
+            <dt>Items</dt>
             <dd>{bill.items.length}</dd>
-            <dt>Total</dt>
+            <dt>Total paid</dt>
             <dd>Rp {rupiahDigits(bill.total)}</dd>
           </dl>
         </div>
       </header>
 
       <section class="block">
-        <h2 class="section-label">Bagian tiap orang</h2>
+        <h2 class="section-label">Everyone's share</h2>
         <p class="section-note">
-          Satu baris per orang, PPN dan service sudah masuk. Barisnya berjumlah
-          pas dengan total struk — rincian itemnya ada di bawah.
+          One row per person, tax and service already in. The rows add up to the
+          bill exactly — the itemised version of each is below.
         </p>
 
         <div class="ledger-wrap">
           <table class="ledger ledger--people">
             <thead>
               <tr>
-                <th scope="col">Nama</th>
+                <th scope="col">Person</th>
                 <th scope="col" class="num">Subtotal</th>
                 <th scope="col" class="num">{chargeHeader}</th>
                 <th scope="col" class="num">Total</th>
@@ -348,11 +320,11 @@
                       here, the amount in the column.
                     -->
                     {#if person.is_payer}
-                      <span class="item__note">Yang bayar ke vendor</span>
+                      <span class="item__note">Paid the bill</span>
                     {:else if person.status === 'lunas'}
-                      <span class="item__note">Sudah lunas</span>
+                      <span class="item__note">Paid</span>
                     {:else if person.amount_paid > 0}
-                      <span class="item__note">Udah masuk {rupiah(person.amount_paid)}</span>
+                      <span class="item__note">{rupiah(person.amount_paid)} in</span>
                     {/if}
                   </th>
                   <td class="num">{rupiahDigits(subtotalOf(person))}</td>
@@ -363,7 +335,7 @@
             </tbody>
             <tfoot>
               <tr>
-                <th scope="row">Total struk</th>
+                <th scope="row">The bill</th>
                 <td class="num">
                   {rupiahDigits(breakdown.reduce((a, p) => a + subtotalOf(p), 0))}
                 </td>
@@ -388,7 +360,7 @@
       </section>
 
       <section class="block">
-        <h2 class="section-label">Rincian per orang</h2>
+        <h2 class="section-label">Who owes what</h2>
 
         <div class="slips">
           {#each breakdown as person (person.person)}
@@ -402,7 +374,31 @@
               class="slip"
               class:slip--settled={person.is_payer || person.status === 'lunas'}
             >
-              <h3 class="slip__name">{person.person}</h3>
+              <!--
+                Beside the name, because the link is that person's. Set as a
+                quiet underlined word and not as a button, so it reads as a
+                link in the document rather than as a control in an app — and
+                it prints, which is the whole point of it.
+
+                A real anchor, so the printed document carries a working link
+                annotation that a payer can tap. On screen the click is
+                intercepted: there the reader is the operator, and what they
+                want is the link sent to somebody rather than opened by
+                themselves.
+              -->
+              <h3 class="slip__name">
+                {person.person}
+                {#if linkOf(person)}
+                  <a
+                    class="slip__pay"
+                    href={linkOf(person)}
+                    onclick={(e) => {
+                      e.preventDefault()
+                      sendLink(person.person)
+                    }}>{sent === person.person ? 'link copied' : 'link bayar'}</a
+                  >
+                {/if}
+              </h3>
 
               <ul class="slip__lines">
                 {#each person.items as item (item.name)}
@@ -435,33 +431,26 @@
                 </p>
 
                 <!--
-                  The operator's action, not the payer's: this shares or copies
-                  the link, it does not open it. The PDF's version of this row
-                  is the word "Pembayaran" and a tap goes to the page, because
-                  there the reader is the person paying.
+                  The last resort, when neither the share sheet nor the
+                  clipboard works. Never printed: it is the operator's copy of
+                  a URL, not part of the document.
                 -->
-                {#if !person.is_payer && person.status !== 'lunas' && linkFor(person.person)}
-                  <button class="slip__pay no-print" onclick={() => sendLink(person.person)}>
-                    {sent === person.person ? 'Link-nya udah disalin' : 'Kirim link bayar'}
-                  </button>
-
-                  {#if shown === linkFor(person.person)}
-                    <!--
-                      A textarea, not an input, and that is the whole point: an
-                      input never wraps, so a 90-character URL is shown with its
-                      tail cut off — still copyable, but not readable, and this
-                      exists to be read. readonly rather than disabled, because
-                      a disabled field cannot be selected and selecting it by
-                      hand is why it is here at all. `onfocus` takes the lot so
-                      one tap then Copy is enough.
-                    -->
-                    <textarea
-                      class="slip__url no-print"
-                      readonly
-                      rows="3"
-                      onfocus={(e) => e.currentTarget.select()}
-                    >{shown}</textarea>
-                  {/if}
+                {#if shown && shown === linkOf(person)}
+                  <!--
+                    A textarea, not an input, and that is the whole point: an
+                    input never wraps, so a 90-character URL is shown with its
+                    tail cut off — still copyable, but not readable, and this
+                    exists to be read. readonly rather than disabled, because a
+                    disabled field cannot be selected and selecting it by hand
+                    is why it is here at all. `onfocus` takes the lot so one tap
+                    then Copy is enough.
+                  -->
+                  <textarea
+                    class="slip__url no-print"
+                    readonly
+                    rows="3"
+                    onfocus={(e) => e.currentTarget.select()}
+                  >{shown}</textarea>
                 {/if}
               </div>
             </article>
@@ -471,28 +460,27 @@
 
       {#if offersQris(bill) || offersBank(bill)}
         <section class="block pay">
-          <h2 class="section-label">Cara bayar</h2>
+          <h2 class="section-label">How to pay</h2>
           <div class="pay__row">
             {#if offersQris(bill)}
               <img class="pay__qr" src={qrisUrl(bill.qris_path!)} alt="Kode QRIS tagihan ini" />
             {/if}
             <div class="pay__body">
               {#if offersQris(bill)}
-                <p class="pay__lead">Scan pakai m-banking atau e-wallet apa aja</p>
+                <p class="pay__lead">Scan with any QRIS app</p>
                 <p class="pay__line">
-                  Masukin sendiri jumlahnya — kodenya nggak dikunci ke satu nominal.
+                  GoPay, OVO, DANA, ShopeePay, or your mobile banking. Enter your
+                  own total — the code is not amount-locked.
                 </p>
               {/if}
               {#if offersBank(bill)}
-                <p class="pay__lead">
-                  {offersQris(bill) ? 'Atau transfer' : 'Transfer'}
-                </p>
+                <p class="pay__lead">{offersQris(bill) ? 'Prefer a transfer?' : 'Transfer'}</p>
                 <p class="pay__line">
                   {bill.bank_name} {bill.account_number}{#if bill.account_holder}, a.n. {bill
                       .account_holder}{/if}
                 </p>
               {/if}
-              <p class="pay__line">Sebutin nomor tagihan {bill.ref_code} di keterangannya.</p>
+              <p class="pay__line">Quote the bill number {bill.ref_code} either way.</p>
             </div>
           </div>
         </section>
@@ -501,12 +489,15 @@
       <footer class="colophon">
         <p>
           {#if owing === 0}
-            Semua udah lunas.
+            Everyone has paid. The table's square.
+          {:else if bill.paid_by_person}
+            {owing}
+            {owing === 1 ? 'payment' : 'payments'} to {bill.paid_by_person} and the table's square.
           {:else}
-            Tinggal {owing} dari {breakdown.length} orang yang belum lunas.
+            {owing} of {breakdown.length} still to pay.
           {/if}
         </p>
-        <p class="colophon__fine">Semua angka dalam rupiah.</p>
+        <p class="colophon__fine">Amounts in Indonesian rupiah.</p>
       </footer>
     </main>
   </div>
@@ -898,23 +889,19 @@
     color: var(--ink-2);
   }
 
-  /* An action, so it is set like one: small, underlined, and on the wash
-     rather than beside it. */
+  /*
+   * Beside the name, quiet and underlined. Not a button and not bold: in the
+   * printed document this is an address somebody taps, and the underlined word
+   * is the whole of what says so. Weight is what a heading does; this is not a
+   * heading.
+   */
   .slip__pay {
-    align-self: flex-start;
-    padding: 0;
-    border: none;
-    background: none;
-    font: 500 12px/1.4 var(--sans);
+    margin-left: 8px;
+    font: 400 12px/1.4 var(--sans);
     color: var(--accent-deep);
     text-decoration: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 3px;
+    text-underline-offset: 2px;
     cursor: pointer;
-  }
-
-  .slip--settled .slip__pay {
-    color: var(--ink-2);
   }
 
   /* Monospace and small so a 90-character URL fits the width without wrapping
@@ -1058,11 +1045,38 @@
       display: none !important;
     }
 
+    /*
+     * Everything behind the sheet is painted white rather than left alone.
+     *
+     * The app's own shell is dark and it prints, and it showed as a hairline
+     * around the document wherever the two boxes did not quite meet — a line
+     * with nothing behind it, which reads as a rendering fault. `:global`
+     * because the shell lives in App.svelte.
+     *
+     * White and not `none`: the paper is white, so saying so costs nothing and
+     * an explicitly painted colour cannot be the thing that surprises anybody.
+     *
+     * `!important` because the shell's own rule lives in App.svelte, where
+     * Svelte scopes it to two classes — `.shell.svelte-xxxx` — and a single
+     * `:global(.shell)` from here loses to it. The dark background then printed
+     * as a 15px sliver down the side of every page, which is the whole bug.
+     */
+    :global(.shell),
+    :global(#app),
+    :global(body),
+    .screen,
+    .sheet {
+      background: #fff !important;
+    }
+
     .screen {
-      background: none;
       min-height: 0;
     }
 
+    /*
+     * No max-width and no padding: the @page margin is the margin now, and
+     * applying both would print the document inset inside an inset.
+     */
     .sheet {
       max-width: none;
       padding: 0;
