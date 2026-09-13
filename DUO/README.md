@@ -223,10 +223,60 @@ aplikasinya client-only. Fungsinya sendiri nggak nyentuh database sama sekali �
 dia cuma nerima gambar, manggil model, balikin teks mentah. Semua parsing,
 validasi, dan penulisan data terjadi di client.
 
-> **Soal key:** ambil di **aistudio.google.com** (Google AI Studio), bagian
-> *Get API key*. Gemini dipilih karena punya `responseSchema` — schema dipaksa
-> di level API, jadi modelnya nggak bisa balikin field yang hilang atau JSON
-> yang dibungkus markdown. Dua provider sebelumnya nggak punya itu.
+> **Soal key:** ambil di **platform.deepseek.com** → *API keys*. DeepSeek nggak
+> punya mode `json_schema` — yang jalan cuma `json_object`, yang cuma menjamin
+> JSON-nya valid, bukan bentuknya bener. Karena itu schema-nya ditanam di dalam
+> prompt, dan `src/lib/normalize.ts` jadi satu-satunya pertahanan struktur.
+>
+> Satu jebakan khas model ini: `deepseek-flash` itu reasoning model, dan token
+> buat mikir ikut kepotong dari `max_tokens`. Kalau cap-nya kekecilan,
+> responsenya HTTP 200 dengan content **kosong** — kelihatan sukses padahal
+> nggak ada isinya.
+
+## Deploy ke HP
+
+Aplikasinya jalan di **https://aleeminho.github.io/vibecoding/**, gratis dan
+nyala terus. Laptop nggak perlu dinyalain.
+
+### Cara masang di iPhone
+
+1. Buka alamat itu di **Safari** — bukan Chrome. Di iOS cuma Safari yang bisa
+   masang PWA ke home screen.
+2. Tombol **Share** (kotak panah ke atas).
+3. Scroll, pilih **Add to Home Screen**.
+4. Kasih nama, **Add**.
+5. Buka dari ikon di home screen, login sekali.
+
+Kenapa harus dipasang, bukan cuma dibuka di tab biasa: sebagai tab Safari,
+iOS bisa ngebuang storage situsnya setelah seminggu nggak dikunjungi — buat
+aplikasi ini artinya ke-logout dan harus login ulang. Dipasang, sesinya nempel.
+
+### Cara deploy-nya kerja
+
+`.github/workflows/deploy-duo.yml`. Tiap push ke `main` yang nyentuh `DUO/`,
+GitHub Actions build dan naikin ke Pages. Nggak ada yang perlu dijalanin manual.
+
+Dua nilainya diambil dari **repository variables** (Settings → Secrets and
+variables → Actions → Variables), bukan dari git:
+
+| Variable | Isinya |
+|---|---|
+| `VITE_SUPABASE_URL` | sama kayak di `.env.local` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | idem |
+
+Ini bukan rahasia — dua-duanya ke-compile masuk ke JavaScript yang di-download
+tiap pengunjung, dan yang melindungi data adalah row level security. Tapi kalau
+dua-duanya kosong, build-nya **tetep sukses** dan ngasilin aplikasi yang nulis
+"Supabase belum dikonfigurasi" di tiap layar. Makanya workflow-nya ngecek
+eksplisit dan gagal kalau kosong — centang hijau tapi aplikasinya rusak itu
+lebih parah daripada gagal terang-terangan.
+
+> `base` di `vite.config.ts` diset `/vibecoding/` **cuma pas build**. Pages
+> ngelayanin dari subpath; kalau path asetnya nggak ikut ke-prefix, HTML-nya
+> kebuka tapi semua script dan CSS-nya 404 — kelihatannya kayak halaman blank,
+> bukan kayak masalah path. Di mode dev prefix itu sengaja dimatiin, karena
+> kalau nggak, dev server-nya pindah ke `localhost:5173/vibecoding/` dan URL
+> LAN yang ke-bookmark di HP mendadak mati.
 
 ## Status
 
