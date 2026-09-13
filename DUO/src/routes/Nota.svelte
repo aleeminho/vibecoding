@@ -58,7 +58,10 @@
     note = null
 
     try {
-      const blob = buildNotaPdf(bill, breakdown)
+      // The links in the document point back at wherever this page is being
+      // served from, so the same PDF is correct on localhost, on Pages and on
+      // the cPanel host without a build-time setting for each.
+      const blob = buildNotaPdf(bill, breakdown, `${location.origin}${location.pathname}`)
       const file = new File([blob], `nota-${bill.ref_code}.pdf`, { type: 'application/pdf' })
 
       if (navigator.canShare?.({ files: [file] })) {

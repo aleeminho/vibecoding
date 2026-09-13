@@ -89,6 +89,14 @@ export function textWidth(text: string, size: number): number {
 
 export class Pdf {
   private pages: string[][] = [[]]
+  /**
+   * Clickable regions, one list per page, parallel to `pages`.
+   *
+   * Kept beside the content rather than interleaved with it because the two
+   * are emitted in different places: the drawing ops go in the content stream,
+   * the annotations go in the page dictionary.
+   */
+  private annots: string[][] = [[]]
   private y = A4.height - 56
 
   readonly left = 48
@@ -108,7 +116,27 @@ export class Pdf {
   /** Start a new page. The caller is responsible for re-drawing any header. */
   newPage(): void {
     this.pages.push([])
+    this.annots.push([])
     this.y = this.top
+  }
+
+  /**
+   * Make a rectangle of the page open `uri` when tapped.
+   *
+   * The whole point of putting links in a document that is read on a phone:
+   * selecting a URL out of a PDF by hand is miserable, and on iOS it is
+   * frequently impossible. A link that cannot be tapped is a link that has to
+   * be retyped, which for a 36-character UUID means it will not be.
+   *
+   * `y` is the bottom edge and `height` grows upward, matching how everything
+   * else here is measured — PDF coordinates put the origin at the bottom left.
+   */
+  link(x: number, y: number, width: number, height: number, uri: string): void {
+    this.annots[this.annots.length - 1].push(
+      `<< /Type /Annot /Subtype /Link /Rect [${x.toFixed(2)} ${y.toFixed(2)} ` +
+        `${(x + width).toFixed(2)} ${(y + height).toFixed(2)}] ` +
+        `/Border [0 0 0] /A << /S /URI /URI (${escapeText(uri)}) >> >>`,
+    )
   }
 
   moveDown(points: number): void {
@@ -193,9 +221,17 @@ export class Pdf {
 
     this.pages.forEach((ops, i) => {
       const content = ops.join('\n')
+      // Inline dictionaries in the array rather than numbered objects with
+      // references. Both are legal PDF and every reader in use handles the
+      // first, and inline leaves the object numbering — and therefore the xref
+      // and the page/content stride below — completely untouched. That
+      // numbering is the fragile part of this writer; a feature that cannot
+      // disturb it cannot break it.
+      const links = this.annots[i]
+      const annots = links.length > 0 ? ` /Annots [${links.join(' ')}]` : ''
       objects.push(
         `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${A4.width} ${A4.height}] ` +
-          `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >> ` +
+          `/Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R /F4 6 0 R >> >>${annots} ` +
           `/Contents ${firstPageObj + i * 2 + 1} 0 R >>`,
       )
       objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`)
@@ -240,6 +276,20 @@ export interface NotaBill {
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
+  /**
+   * Just enough to print the payment links: who still owes, and their token.
+   *
+   * Deliberately narrower than the export's share shape. This file draws; it
+   * does not decide who owes what, and a type that carried the item breakdown
+   * would invite layout code to start working it out.
+   */
+  shares: {
+    person: string
+    pay_token: string | null
+    amount_owed: number
+    amount_paid: number
+    status: string
+  }[]
 }
 
 /**
@@ -253,8 +303,17 @@ export interface NotaBill {
  * The money column carries no "Rp". It is stated once at the top, the way a
  * till does it, and repeating it fourteen times down a narrow column is what
  * makes a receipt hard to scan.
+ *
+ * `baseUrl` is where the app is served from — `location.origin + pathname`.
+ * Passed in rather than read from `location` inside, so this module stays pure
+ * and testable without a DOM, and so the caller decides what a link points at
+ * rather than this file assuming it knows.
  */
-export function buildNotaPdf(bill: NotaBill, breakdown: PersonBreakdown[]): Blob {
+export function buildNotaPdf(
+  bill: NotaBill,
+  breakdown: PersonBreakdown[],
+  baseUrl = '',
+): Blob {
   const pdf = new Pdf()
   const { left, right } = pdf
   const OPERATOR_X = right - 62
@@ -385,6 +444,47 @@ export function buildNotaPdf(bill: NotaBill, breakdown: PersonBreakdown[]): Blob
       font: 'mono-bold',
       align: 'right',
     })
+    // The box is drawn upward from the cursor, so the cursor is left sitting
+    // inside it. Nothing followed this section before, which is why it never
+    // showed — and the payment links did, landing straight on the account
+    // number. Found in a render, not in the bytes.
+    line(42)
+  }
+
+  // ---- payment links ----
+  //
+  // One per person who still owes, in the document rather than sent one at a
+  // time, so the whole group gets a link they can tap without the operator
+  // sending four separate messages.
+  //
+  // The trade-off, stated where it is made rather than left implicit: these
+  // are credentials and they are all in one file that goes to everybody. A
+  // mis-tap is possible. What catches it is the amount check at the other end
+  // — paying Rp 98.175 against a page expecting Rp 127.050 settles nothing
+  // and lands in the review queue instead. Two people owing the exact same
+  // amount is the case that gets through, and it is rare enough to accept.
+  const owed = bill.shares.filter(
+    (s) => s.status !== 'lunas' && s.pay_token && s.amount_paid < s.amount_owed,
+  )
+
+  if (owed.length > 0 && baseUrl) {
+    // The header and every row, so a page break lands before the section
+    // rather than through the middle of it.
+    line(0, 34 + owed.length * 17)
+    pdf.text('Link bayar', left, pdf.cursor, { size: 8.5, font: 'sans-bold', color: SOFT })
+    line(18)
+
+    for (const share of owed) {
+      const url = `${baseUrl}#/bayar?t=${share.pay_token}`
+      // The rectangle covers the whole row, not just the URL. A 7.5pt run of
+      // monospace is a small target under a thumb, and there is no reason to
+      // make someone aim at it when the name beside it is part of the same
+      // thing.
+      pdf.link(left, pdf.cursor - 4, right - left, 15, url)
+      pdf.text(share.person, left, pdf.cursor, { size: 9.5 })
+      pdf.text(url, right, pdf.cursor, { size: 7.5, font: 'mono', color: SOFT, align: 'right' })
+      line(17)
+    }
   }
 
   return pdf.build()
