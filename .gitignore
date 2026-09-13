@@ -1,0 +1,44 @@
+# Repository-root ignore rules.
+#
+# Each project keeps its own .gitignore for anything specific to it; this file
+# only covers the things that would otherwise leak from ANY project in here.
+# Git applies every .gitignore from the root down, so both are in force.
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Secrets. The pattern is deliberately broad and the negation narrow: an
+# unlisted env file is ignored by default, so forgetting to update this file
+# fails safe rather than publishing a key.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Editor and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
