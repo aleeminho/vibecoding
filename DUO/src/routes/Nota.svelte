@@ -262,10 +262,10 @@
         {#if note}
           {note}
         {:else}
-          Di layar print, pilih <strong>Simpan sebagai PDF</strong> — di iPhone
-          tombol Share di situ bisa langsung ke WhatsApp. Link bayarnya dikirim
-          satu-satu: tap <strong>link bayar</strong> di samping nama, dan
-          WhatsApp-nya kebuka.
+          Di layar print, pilih tujuan <strong>Save as PDF</strong> — bukan
+          Microsoft Print to PDF. Cuma yang itu yang ngebawa tombol Pay-nya
+          hidup. Di iPhone, tombol Share di layar print bisa langsung ke
+          WhatsApp.
         {/if}
       </p>
     </div>
@@ -385,26 +385,29 @@
                 and what they want is the link sent to somebody rather than
                 opened by themselves.
 
-                `no-print`, and that is not a style choice. The browser's print
-                pipeline drops link annotations — a bare `<a href>` on a blank
-                page comes out of it with no /URI at all — so a printed "link
-                bayar" would be a word that looks tappable and is not, in a
-                document about money. The links travel the way they did before
-                the PDF carried them: one message each, from this screen.
+                It prints, so the tap depends on where the PDF comes from.
+                Chrome's own "Save as PDF" keeps link annotations; the Windows
+                "Microsoft Print to PDF" driver does not keep them in anything,
+                and one of those two is what a print dialog offers by default.
+                The button is worth the risk because the alternative is a
+                document that tells somebody what they owe and gives them no way
+                to settle it — but if the links turn out not to survive, this
+                element takes `no-print` and the screen sends them one at a
+                time.
               -->
-              <h3 class="slip__name">
-                {person.person}
+              <div class="slip__head">
+                <h3 class="slip__name">{person.person}</h3>
                 {#if linkOf(person)}
                   <a
-                    class="slip__pay no-print"
+                    class="slip__pay"
                     href={linkOf(person)}
                     onclick={(e) => {
                       e.preventDefault()
                       sendLink(person.person)
-                    }}>{sent === person.person ? 'link copied' : 'link bayar'}</a
+                    }}>{sent === person.person ? 'copied' : 'Pay'}</a
                   >
                 {/if}
-              </h3>
+              </div>
 
               <ul class="slip__lines">
                 {#each person.items as item (item.name)}
@@ -685,8 +688,18 @@
 
   /* ---- the ledger ---- */
 
+  /*
+   * The table in a card, which is what the rest of the document is made of.
+   *
+   * `overflow: hidden` is doing two jobs: it rounds the wash footer off at the
+   * bottom instead of squaring it over the corners, and it stops the table
+   * escaping the border it now sits inside.
+   */
   .ledger-wrap {
-    overflow-x: auto;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    padding: 0 14px;
+    overflow: hidden;
   }
 
   .ledger {
@@ -784,8 +797,17 @@
     border-radius: 6px;
   }
 
+  /* The name and its button on one line, the button against the right edge. */
+  .slip__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 11px;
+  }
+
   .slip__name {
-    margin: 0 0 11px;
+    margin: 0;
     font: 600 16px/1.2 var(--sans);
   }
 
@@ -906,18 +928,25 @@
   }
 
   /*
-   * Beside the name, quiet and underlined, and never printed.
+   * The one control on this page. It carries the person's own link — the
+   * credential that lets them mark their share paid.
    *
-   * Not a button and not bold, because on screen it is an address the operator
-   * hands out rather than a control in an app. Weight is what a heading does;
-   * this is not a heading.
+   * Two readers, one element. On paper it is the payer's: they tap it and land
+   * on their page. On screen it is the operator's, and the click is
+   * intercepted so that tapping it sends the link instead of opening it.
+   *
+   * Against the right edge of the card rather than after the name, so that the
+   * buttons line up down a column — a name-length-dependent position would put
+   * every button somewhere different.
    */
   .slip__pay {
-    margin-left: 8px;
-    font: 400 12px/1.4 var(--sans);
+    flex: none;
+    padding: 3px 11px;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    font: 500 12px/1.5 var(--sans);
     color: var(--accent-deep);
-    text-decoration: underline;
-    text-underline-offset: 2px;
+    text-decoration: none;
     cursor: pointer;
   }
 
