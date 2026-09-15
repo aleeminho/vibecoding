@@ -202,12 +202,28 @@ Deno.serve(async (req: Request) => {
 
   let body: {
     choices?: { message?: { content?: string }; finish_reason?: string }[]
-    usage?: { prompt_tokens?: number; completion_tokens?: number }
+    usage?: {
+      prompt_tokens?: number
+      completion_tokens?: number
+      total_tokens?: number
+      // DeepSeek splits input by cache hit/miss and bills them differently.
+      prompt_cache_hit_tokens?: number
+      prompt_cache_miss_tokens?: number
+    }
   }
   try {
     body = JSON.parse(raw)
   } catch {
     return json({ error: `Jawaban DeepSeek bukan JSON: ${raw.slice(0, 300)}` }, 502)
+  }
+
+  // What this scan cost, where the wallet can see it: Supabase → Edge Functions
+  // → Logs. The reasoning tokens are inside completion_tokens, so this is the
+  // whole spend; the cache fields say which half of the input was re-paid for.
+  // Logged before the failure branches below so a capped or empty answer still
+  // shows what it burned.
+  if (body.usage) {
+    console.log('extract-receipt usage', MODEL, JSON.stringify(body.usage))
   }
 
   const choice = body.choices?.[0]
