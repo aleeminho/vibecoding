@@ -54,6 +54,16 @@ dropped field for an insert. Keep the guard after the migration lands too.
 
 **And check `migration list` before assuming the database matches the code.**
 
+**Storage is not SQL.** Supabase refuses `delete from storage.objects` with
+SQLSTATE 42501 — "Direct deletion from storage tables is not allowed. Use the
+Storage API instead" — so receipt photos, proofs and QRIS codes are cleared
+through the CLI (`bunx supabase storage rm ss:///bucket/path --experimental`,
+and it needs `--experimental`). One trap that cost a bucket: `rm -r` on a bucket
+root deletes **the bucket itself**, not just its contents. That is how
+`receipts` briefly stopped existing, and why
+`20260916000000_clean_run_data.sql` recreates it — an insert into
+`storage.buckets` with migration 0001's exact settings.
+
 Other deploy gotchas: `FTP_SERVER` must be the bare host, not a URL. The FTP
 account is chrooted to its configured Directory — it must be `public_html`. The
 Edge Functions have **opposite** `verify_jwt` settings and the workflow asserts
