@@ -14,6 +14,8 @@ them.
 | `b9148ce` | White-out palette (the green cast deleted), orange-forward chrome and attention ink, Dua Ply mark (favicon + PWA icon set + letterhead), desktop layout at ≥1100px (rail + two-pane Tagihan/Review/Report) |
 | `b8d1b0d` | "Copy teks buat WA": the nota button copies a full group message — summary, per-person share, link, payment info — instead of just the URL |
 | `dd8b7d6` | Cleanup migration `20260916000000_clean_run_data.sql`: run data deleted, `bills_ref_code_was` dropped, `receipts` bucket recreated |
+| `69f28d1` | Edge Function logs DeepSeek's `usage` for every scan (Supabase → Edge Functions → Logs) |
+| `edd47f9` | The log line prices the scan in USD — `pricing.ts` carries the per-token rates and the peak/off-peak rule, `scripts/pricing.test.ts` pins the math, and `test:extract` prints the same cost |
 
 ## Production state
 
