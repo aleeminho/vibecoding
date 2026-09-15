@@ -225,7 +225,15 @@
   }
 
   .row-value.sisa {
-    color: var(--ink);
+    color: var(--stamp-deep);
     font-weight: 700;
+  }
+
+  /* One person is one narrow column, however wide the desk gets. */
+  @media (min-width: 1100px) {
+    .screen {
+      max-width: 720px;
+      margin: 0 auto;
+    }
   }
 </style>

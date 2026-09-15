@@ -202,10 +202,10 @@
       <p class="dim">Periode {monthLabel(month)}</p>
     </div>
 
+    <div class="main-col">
     <div class="group no-print">
       <div class="list">
-        <div class="row stepper">
-          <button
+        <div class="row stepper">          <button
             class="plain step-btn"
             onclick={() => step(1)}
             disabled={months.indexOf(month) >= months.length - 1}
@@ -277,6 +277,14 @@
       </div>
     {/if}
 
+    </div>
+
+    <!--
+      What is still out, the ways to get the data out, and the change log. On a
+      phone this stacks under the month; on a wide screen it holds the right
+      column.
+    -->
+    <div class="side-col">
     <h3 class="group-title">Belum lunas (semua waktu)</h3>
     <div class="group">
       <div class="list">
@@ -329,6 +337,8 @@
       </div>
     {/if}
 
+    </div>
+
     {#if exportNote}
       <p class="pad dim small">{exportNote}</p>
     {/if}
@@ -340,6 +350,14 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .main-col,
+  .side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
   }
 
   .group {
@@ -354,11 +372,6 @@
 
   .strong {
     font-weight: 650;
-  }
-
-  .owed {
-    color: var(--ink);
-    font-weight: 700;
   }
 
   .stepper {
@@ -395,6 +408,22 @@
 
     .print-head h2 {
       color: #000;
+    }
+  }
+
+  /* The wide screen: the month on the left, what is still out on the right. */
+  @media (min-width: 1100px) {
+    .screen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 460px;
+      gap: 26px;
+      align-items: start;
+      max-width: 1360px;
+    }
+
+    .print-head,
+    .screen > .pad {
+      grid-column: 1 / -1;
     }
   }
 </style>

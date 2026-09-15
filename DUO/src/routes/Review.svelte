@@ -25,6 +25,7 @@
   import { onMount } from 'svelte'
   import MoneyInput from '../components/MoneyInput.svelte'
   import { draft } from '../lib/draft.svelte'
+  import { desktop } from '../lib/viewport.svelte'
   import { rupiah, formatDate } from '../lib/format'
   import { checkGates, computeSplit } from '../lib/split'
   import {
@@ -330,6 +331,26 @@
   }
 </script>
 
+{#snippet commitBar()}
+  {#if splitError}
+    <p class="blocker error">{splitError}</p>
+  {/if}
+  {#each blockers as failure, i (i)}
+    <p class="blocker error">{failure.message}</p>
+  {/each}
+  {#if commitError}
+    <p class="blocker error">{commitError}</p>
+  {/if}
+
+  <button
+    class="primary full"
+    disabled={!gates.passed || !!splitError || committing}
+    onclick={commit}
+  >
+    {commitLabel}
+  </button>
+{/snippet}
+
 {#if committed}
   <div class="done">
     <div class="done-mark" aria-hidden="true">
@@ -345,9 +366,10 @@
   <p class="empty dim">Nggak ada struk yang lagi diproses.</p>
 {:else}
   <div class="screen">
+    <div class="work-col">
     {#if ext.confidence_notes}
       <div class="group">
-        <div class="list tint-warn">
+        <div class="list tint-attention">
           <div class="row notice-row">
             <span class="notice-mark" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -370,7 +392,7 @@
     -->
     {#if duplicate.length > 0}
       <div class="group">
-        <div class="list tint-warn">
+        <div class="list tint-attention">
           <div class="row notice-row">
             <span class="notice-mark" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -458,12 +480,12 @@
     <!-- The work. Everything above is checking; this is doing. -->
     <h3 class="group-title">Bagi ke siapa</h3>
     <div class="group">
-      <div class="list" class:tint-ok={unassigned.length === 0} class:tint-warn={unassigned.length > 0}>
+      <div class="list" class:tint-ok={unassigned.length === 0} class:tint-attention={unassigned.length > 0}>
         <div class="row">
           {#if unassigned.length === 0}
             <span class="ok">Semua {items.length} item udah dibagi</span>
           {:else}
-            <span class="warn">{unassigned.length} dari {items.length} item belum dibagi</span>
+            <span class="attention">{unassigned.length} dari {items.length} item belum dibagi</span>
           {/if}
         </div>
       </div>
@@ -486,7 +508,7 @@
             <div class="stack">
               <span class="strong">{item.name}</span>
               {#if empty}
-                <span class="warn small">Belum dibagi</span>
+                <span class="attention small">Belum dibagi</span>
               {:else}
                 <span class="small assignees">
                   {item.assigned_to.join(', ')}{#if item.assigned_to.length > 1}<span
@@ -538,6 +560,15 @@
       {/each}
     </div>
 
+    </div>
+
+    <!--
+      The running summary: who pays for the vendor, the roster, where the money
+      goes, and the result the numbers settle on. On a phone this stacks under
+      the items; on a wide screen it holds the right column while the operator
+      assigns.
+    -->
+    <div class="side-col">
     <!--
       Its own section rather than a mark on the roster chips, because a roster
       chip already means something on tap: it removes that person. Two meanings
@@ -695,7 +726,7 @@
                   <span class="term">+ {rupiah(share.tax_share)}</span>
                   <span class="term">+ {rupiah(share.service_share)}</span>
                   {#if share.rounding_share}
-                    <span class="term warn">
+                    <span class="term attention">
                       {share.rounding_share > 0 ? '+' : '−'}{rupiah(
                         Math.abs(share.rounding_share),
                       )} pembulatan
@@ -729,6 +760,13 @@
         </div>
       </div>
     </div>
+
+    {#if desktop.current}
+      <footer class="commit-bar side-commit">
+        {@render commitBar()}
+      </footer>
+    {/if}
+    </div>
   </div>
 
   <!--
@@ -737,25 +775,11 @@
     button — the most important control on the screen, invisible, with nothing
     to indicate it is there.
   -->
-  <footer class="commit-bar">
-    {#if splitError}
-      <p class="blocker error">{splitError}</p>
-    {/if}
-    {#each blockers as failure, i (i)}
-      <p class="blocker error">{failure.message}</p>
-    {/each}
-    {#if commitError}
-      <p class="blocker error">{commitError}</p>
-    {/if}
-
-    <button
-      class="primary full"
-      disabled={!gates.passed || !!splitError || committing}
-      onclick={commit}
-    >
-      {commitLabel}
-    </button>
-  </footer>
+  {#if !desktop.current}
+    <footer class="commit-bar">
+      {@render commitBar()}
+    </footer>
+  {/if}
 {/if}
 
 <style>
@@ -764,6 +788,14 @@
     flex-direction: column;
     gap: 20px;
     padding-bottom: 8px;
+  }
+
+  .work-col,
+  .side-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
   }
 
   .group {
@@ -838,7 +870,7 @@
     width: 18px;
     height: 18px;
     margin-top: 1px;
-    color: var(--warn);
+    color: var(--stamp-deep);
   }
 
   .notice-mark svg {
@@ -849,7 +881,7 @@
 
   .notice-text {
     font-size: var(--text-sm);
-    color: var(--warn);
+    color: var(--stamp-deep);
   }
 
   .assignees {
@@ -1065,7 +1097,9 @@
     margin: 0;
     padding: 10px 16px;
     background: var(--sheet);
-    border-top: 2px solid var(--ink);
+    /* The same stamp-orange rule the letterhead and the tab bar wear: the
+       commit is chrome, and chrome is ruled in the brand. */
+    border-top: 2px solid var(--stamp);
   }
 
   .blocker {
@@ -1109,5 +1143,28 @@
 
   .empty {
     padding: 24px 16px;
+  }
+
+  /*
+   * The wide screen: assignment left, summary and commit right. The commit
+   * stops being a sticky bar and becomes the line the form is signed on, at
+   * the foot of the column that holds the result.
+   */
+  @media (min-width: 1100px) {
+    .screen {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 460px;
+      gap: 26px;
+      align-items: start;
+      max-width: 1360px;
+      padding-bottom: 0;
+    }
+
+    .side-commit {
+      position: static;
+      margin-top: 0;
+      border: 1px solid var(--rule-strong);
+      border-radius: var(--radius);
+    }
   }
 </style>

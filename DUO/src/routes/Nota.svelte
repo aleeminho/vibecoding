@@ -302,7 +302,7 @@
           matters is the one time it would have been skimmed.
         -->
         {#if summed !== bill.total}
-          <p class="warn">
+          <p class="attention">
             Barisnya berjumlah {rupiah(summed)}, nggak cocok sama total struk
             {rupiah(bill.total)}.
           </p>
@@ -434,15 +434,15 @@
    */
   .screen {
     min-height: 100dvh;
-    background: var(--ground, #e7ebe0);
+    background: var(--ground, #f0f0ee);
   }
 
   .sheet {
-    --paper: #fbfcf7;
-    --rule-soft: #eef1e7;
+    --paper: #fffefa;
+    --rule-soft: #f7f7f5;
     --accent: #d04a02;
     --accent-deep: #9e3802;
-    --accent-wash: #fbeee5;
+    --accent-wash: #fdf1ea;
 
     /*
      * The app's own palette, not an import: the document and the app agree on
@@ -454,9 +454,9 @@
     margin: 0 auto;
     padding: 54px 56px 44px;
     background: var(--paper);
-    color: var(--ink, #1b2f5e);
-    border-left: 1px solid var(--rule, #c6ccba);
-    border-right: 1px solid var(--rule, #c6ccba);
+    color: var(--ink, #14161c);
+    border-left: 1px solid var(--rule, #e4e4e1);
+    border-right: 1px solid var(--rule, #e4e4e1);
     font: 400 15px/1.55 var(--sans);
     -webkit-font-smoothing: antialiased;
   }
@@ -588,10 +588,10 @@
     color: var(--ink-2);
   }
 
-  .warn {
+  .attention {
     margin: 14px 0 0;
     font-size: 13px;
-    color: var(--warn, #7d5400);
+    color: var(--stamp-deep, #9e3802);
   }
 
   /* ---- the ledger ---- */
@@ -958,7 +958,7 @@
   .msg {
     padding: 3rem 1.5rem;
     text-align: center;
-    color: var(--ink-2, #4a5a7d);
+    color: var(--ink-2, #565b66);
   }
 
   /* ---- narrow screens ---- */

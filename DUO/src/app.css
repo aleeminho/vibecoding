@@ -1,73 +1,68 @@
 /*
- * DUO — the pad.
+ * DUO — the pad, white-out.
  *
- * The world, in one line: an Indonesian carbon-copy kwitansi pad. Light form
- * paper, a blue-black pre-printed ink, a numbering-machine red for the serial,
- * and one orange rubber stamp that means the money arrived. Paper on a table,
- * so separation is a ruled line and a frame — nothing floats, nothing blurs,
- * nothing is translucent.
+ * The world: an Indonesian kwitansi form printed on white paper and stamped in
+ * one orange. Pre-printed field labels, ruled detail rows, an amount box for a
+ * decision, a counterfoil carrying the serial — and one stamp ink (#d04a02,
+ * the pinned brand) that means "this happened": the pressed square, the
+ * lettered LUNAS, the commit button, the focus ring, the active tab.
  *
- * The ground is the form's pale green-grey rather than cream on purpose. A warm
- * cream ground is what every model reaches for when it is handed "paper", and
- * the kwitansi pad this world is named after is printed on green.
+ * Orange is also the attention ink. Unpaid money, unreadable proofs and work
+ * still to do are printed in it, because in this product the thing that needs
+ * attention is the money; green stays for settled, red for destruction.
  *
- * Orange is the stamp and the commit action, and both mean the same thing: this
- * happened. It is never decoration. Identity is the serial red, attention the
- * amber, a duplicate the carbon purple, destruction the form red.
+ * Nothing blurs, nothing floats, nothing is translucent. An earlier pass
+ * dressed this app in Apple's Liquid Glass and was rejected twice, and those
+ * bans survived the redesign: no `backdrop-filter`, no translucent fills, no
+ * `inset 0 1px 0` highlights, no capsule chrome. Printed forms are square —
+ * 4px radius, 3px on small parts. No webfonts, in the app or the documents.
  *
- * Token names are role-based (--sheet, --ink, --stamp), never hue-based: the
- * palette has changed under this app twice, and names that describe the current
- * answer turn every change into a rename across every file.
+ * Token names are role-based (`--sheet`, `--ink`, `--stamp`), never hue-based.
  */
 
 :root {
-  /* The desk the pad sits on, and the forms that sit on the desk. */
-  --ground: #e7ebe0;
-  --sheet: #f6f8f1;
-  --sheet-2: #eef1e7;
-  --sheet-3: #e0e5d6;
+  /* The desk, the forms on it, and the blank a pen fills. */
+  --ground: #f0f0ee;
+  --sheet: #ffffff;
+  --sheet-2: #f7f7f5;
+  --sheet-3: #ececea;
+  --write-in: #ffffff;
 
-  --rule: #c6ccba;
-  --rule-strong: #98a18c;
+  --rule: #e4e4e1;
+  --rule-strong: #c2c2bc;
 
-  /* Pre-printed form ink. */
-  --ink: #1b2f5e;
-  --ink-2: #4a5a7d;
-  --ink-3: #64708c;
+  --ink: #14161c;
+  --ink-2: #565b66;
+  --ink-3: #7b8089;
 
   /*
-   * PwC orange, kept as the brand and spent here as the stamp. #d04a02 carries
-   * white labels at 4.5:1, so it fills the primary button; as small ink on
-   * paper it needs its darker sibling, which is what --stamp-deep is for.
+   * PwC orange, kept as the brand. #d04a02 carries white labels at 4.5:1, so
+   * it fills the primary button; as small ink on paper it needs its darker
+   * sibling, which is what --stamp-deep is for.
    */
   --stamp: #d04a02;
   --stamp-deep: #9e3802;
   --stamp-tint: rgba(208, 74, 2, 0.12);
 
-  /* The numbering-machine red, and the second ply. */
-  --serial: #b0362b;
-  --carbon: #6b5a86;
-  --carbon-tint: #efeaf3;
+  /*
+   * Attention states wear the stamp wash — the money to collect, the proof to
+   * read. Green and red stay functional: settled, and destruction.
+   */
+  --attention-tint: #fdf1ea;
+  --attention-rule: #eec3ab;
+  --ok: #1c6b47;
+  --ok-tint: #e6f0e9;
+  --ok-rule: #a9c9b3;
+  --bad: #a32b1e;
+  --bad-tint: #f7e7e3;
+  --bad-rule: #d9aca3;
 
-  --warn: #7d5400;
-  --warn-tint: #f5eed6;
-  --warn-rule: #d8c48c;
-
-  --ok: #1e6b46;
-  --ok-tint: #e5efe7;
-  --ok-rule: #aac9b1;
-
-  --bad: #a02a1e;
-  --bad-tint: #f6e6e2;
-  --bad-rule: #d9aaa1;
-
-  /* Printed forms are square. The radius is a press mark, not a capsule. */
   --radius: 4px;
   --radius-sm: 3px;
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui,
     sans-serif;
-  /* Serial numbers, account numbers and reference codes: machine-issued data. */
+  /* Serials, account numbers and reference codes: machine-issued data. */
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
   --text-xs: 11px;
@@ -77,11 +72,10 @@
   --text-xl: 26px;
 
   /*
-   * How much room the tab bar occupies.
-   *
-   * The commit bar in Review is sticky at `bottom: var(--tab-space)` so the two
-   * never overlap, and .tab-bar sets `min-height: var(--tab-space)` so this is
-   * the single source of truth and the two cannot drift apart.
+   * How much room the mobile tab bar occupies. The commit bar in Review is
+   * sticky at `bottom: var(--tab-space)` so the two never overlap, and
+   * .tab-bar sets `min-height: var(--tab-space)` so this stays the single
+   * source of truth.
    */
   --tab-space: calc(62px + env(safe-area-inset-bottom));
 }
@@ -120,7 +114,7 @@ body {
 /*
  * Routes that are documents rather than screens — the nota, and the payment
  * page a payer opens from a link. Both leave the app: through a print, or a
- * screenshot in a group chat, so they sit on the cleanest sheet the world has.
+ * screenshot in a group chat, so they sit on the cleanest paper the world has.
  *
  * Applied as a class by App.svelte rather than as a :global() rule inside the
  * components, because a global rule is in the stylesheet for the whole session
@@ -128,7 +122,7 @@ body {
  * it.
  */
 body.paper {
-  background-color: #fbfcf7;
+  background-color: #fffefa;
 }
 
 h1,
@@ -145,10 +139,6 @@ h3 {
   letter-spacing: -0.015em;
 }
 
-/*
- * A drawn focus ring for keyboard users, in stamp orange so it is legible on
- * every ground in the world.
- */
 :focus-visible {
   outline: 2px solid var(--stamp);
   outline-offset: 2px;
@@ -224,7 +214,7 @@ select {
   min-height: 44px;
   border-radius: var(--radius);
   border: 1px solid var(--rule-strong);
-  background: #fdfef9;
+  background: var(--write-in);
   color: var(--ink);
   padding: 0 12px;
   width: 100%;
@@ -268,13 +258,14 @@ select:focus {
 }
 
 /*
- * Notices are the same paper, printed in another ink. Opaque, always: a
+ * Notices are the same paper printed in another ink. Opaque, always: a
  * translucent wash over paper is glass, and glass is the thing this world was
- * asked to replace.
+ * asked to replace. Attention is the orange wash; green is settled, red is
+ * destruction.
  */
-.list.tint-warn {
-  background: var(--warn-tint);
-  border-color: var(--warn-rule);
+.list.tint-attention {
+  background: var(--attention-tint);
+  border-color: var(--attention-rule);
 }
 
 .list.tint-ok {
@@ -285,12 +276,6 @@ select:focus {
 .list.tint-bad {
   background: var(--bad-tint);
   border-color: var(--bad-rule);
-}
-
-/* The carbon copy: a duplicate, not a warning. */
-.list.tint-carbon {
-  background: var(--carbon-tint);
-  border-color: var(--carbon);
 }
 
 .row {
@@ -395,7 +380,7 @@ select:focus {
   padding: 3px 9px 2px;
   border: 1px solid var(--rule-strong);
   border-radius: var(--radius-sm);
-  background: #fdfef9;
+  background: var(--write-in);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   font-weight: 700;
@@ -407,12 +392,6 @@ select:focus {
   font-family: var(--mono);
   font-size: var(--text-xs);
   letter-spacing: 0.06em;
-  color: var(--serial);
-}
-
-.serial--ink {
-  font-family: var(--mono);
-  letter-spacing: 0.04em;
   color: var(--ink-2);
 }
 
@@ -436,8 +415,9 @@ select:focus {
   color: var(--bad);
 }
 
-.warn {
-  color: var(--warn);
+/* Attention: the money still out, the proof not read, the step not done. */
+.attention {
+  color: var(--stamp-deep);
 }
 
 .ok {
@@ -445,11 +425,12 @@ select:focus {
 }
 
 /*
- * Outstanding money is plain ink, bold: the attention belongs to the empty
- * stamp square on the line, which is the one channel orange never shares.
+ * Outstanding money is the one figure set in the stamp ink outside the stamp
+ * itself: it is what the whole screen exists to collect. Amounts inside a
+ * bill's ledger stay ink.
  */
 .owed {
-  color: var(--ink);
+  color: var(--stamp-deep);
   font-weight: 700;
 }
 

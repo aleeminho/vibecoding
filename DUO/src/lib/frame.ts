@@ -20,9 +20,11 @@
  *      still the document. A fixed-width wrapper with its own scroll would
  *      change how the sticky bars behave and stop being a faithful preview.
  *
- * It applies above 420px only. On the actual phone the frame would do nothing
- * anyway, but without the query it would still draw its hairline outline along
- * the real screen edge.
+ * It applies between 420px and the desktop breakpoint. Below 420px the frame
+ * would do nothing anyway, but without a query it would still draw its hairline
+ * outline along the real screen edge; at 1100px and up the app has a real
+ * desktop layout — rail and two-pane screens — and a phone frame there would
+ * hide the very thing the wide screen is for.
  */
 
 const ID = 'duo-dev-frame'
@@ -35,11 +37,11 @@ export function applyPhoneFrame(): void {
   const style = document.createElement('style')
   style.id = ID
   style.textContent = `
-    @media (min-width: 420px) {
+    @media (min-width: 420px) and (max-width: 1099.98px) {
       #app {
         max-width: 390px;
         margin: 0 auto;
-        box-shadow: 0 0 0 1px rgba(27, 47, 94, 0.18);
+        box-shadow: 0 0 0 1px rgba(20, 22, 28, 0.16);
       }
     }
   `

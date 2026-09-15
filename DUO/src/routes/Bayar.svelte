@@ -182,7 +182,7 @@
           <p class="notice-body">{result.message}</p>
         </div>
       {:else if result?.verdict === 'unclear'}
-        <div class="notice warn">
+        <div class="notice attention">
           <p class="notice-title">Buktinya masuk</p>
           <p class="notice-body">{result.message}</p>
         </div>
@@ -207,10 +207,10 @@
    * form the operator filled in, handed to the person named on it.
    */
   .sheet {
-    --paper: #fbfcf7;
-    --ink: #1b2f5e;
-    --soft: #4a5a7d;
-    --rule: #c6ccba;
+    --paper: #fffefa;
+    --ink: #14161c;
+    --soft: #565b66;
+    --rule: #e4e4e1;
     --accent: #d04a02;
     --accent-deep: #9e3802;
     --fig: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
@@ -250,7 +250,7 @@
     padding: 4px 12px 3px;
     border: 1.5px solid var(--rule);
     border-radius: var(--radius-sm, 3px);
-    background: #fdfef9;
+    background: var(--write-in);
     font-variant-numeric: tabular-nums;
     font-size: 32px;
     font-weight: 700;
@@ -304,7 +304,7 @@
     padding: 12px 14px;
     border: 1px solid var(--rule);
     border-radius: var(--radius, 4px);
-    background: #fdfef9;
+    background: var(--write-in);
   }
 
   .dest-label {
@@ -359,13 +359,13 @@
   }
 
   .notice.bad {
-    background: var(--bad-tint, #f6e6e2);
-    border-color: var(--bad-rule, #d9aaa1);
+    background: var(--bad-tint);
+    border-color: var(--bad-rule);
   }
 
-  .notice.warn {
-    background: var(--warn-tint, #f5eed6);
-    border-color: var(--warn-rule, #d8c48c);
+  .notice.attention {
+    background: var(--attention-tint);
+    border-color: var(--attention-rule);
   }
 
   .notice-title {
@@ -375,11 +375,11 @@
   }
 
   .notice.bad .notice-title {
-    color: var(--bad, #a02a1e);
+    color: var(--bad);
   }
 
-  .notice.warn .notice-title {
-    color: var(--warn, #7d5400);
+  .notice.attention .notice-title {
+    color: var(--stamp-deep);
   }
 
   .notice-body {
@@ -394,7 +394,7 @@
     padding: 22px 20px;
     border: 2px solid var(--accent-deep);
     border-radius: var(--radius, 4px);
-    background: #fbeee5;
+    background: var(--attention-tint);
     text-align: center;
   }
 

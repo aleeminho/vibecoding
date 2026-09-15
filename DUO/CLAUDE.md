@@ -63,14 +63,21 @@ each; `validate-payment` is public on purpose, `extract-receipt` is not.
 
 ## Design: the kwitansi pad
 
-Flat, light, paper on a table. The world is an Indonesian carbon-copy receipt
-pad: pale green-grey ground, near-white form sheets, blue-black pre-printed ink,
-numbering-machine red serials, carbon purple for duplicates, and **one orange
-stamp** (`--stamp`, `#d04a02`) that means "this happened" — the stamp square,
-the commit button, the focus ring, the active tab's top edge, and nothing else.
-**Money is ink; orange never colours a ledger figure.** State is carried by
-shape and word as well as colour (dashed square → half-pressed → solid stamp,
-lettered LUNAS, "Belum dibagi").
+Flat, light, paper on a table. The world is an Indonesian receipt form printed
+on white paper and stamped in **one orange** (`--stamp`, `#d04a02`): the stamp
+square, the lettered LUNAS, the commit button, the focus ring, the active tab,
+and the 2px rules under the letterhead and above the tab bar. **Orange is also
+the attention ink** — unpaid money, unreadable proofs and work still to do are
+printed in it (`--stamp-deep` on the stamp wash, `--attention-tint`), because
+in this product the thing that needs attention is the money; green means
+settled, red means destruction. State is carried by shape and word as well as
+colour (dashed square → half-pressed → solid stamp, lettered LUNAS, "Belum
+dibagi"). No serial red, no carbon purple: those were tried and cut.
+
+The mark is the **Dua Ply** — a stamped square with its carbon copy behind it.
+`public/favicon.svg` is the tab icon, the letterhead draws it inline, and the
+PNG set (`icon-192/512`, `icon-maskable-512`, `apple-touch-icon`) is rendered
+from the same geometry.
 
 Nothing blurs, nothing floats, nothing is translucent. The Liquid Glass pass
 this app was dressed in earlier was rejected twice, and those bans survived the
@@ -82,11 +89,15 @@ small parts. No webfonts, in the app or the documents.
 don'ts) and `src/app.css` carries the same tokens in code; token names are
 role-based (`--sheet`, `--ink`, `--stamp`), never hue-based.
 
-Everything on screen is a phone-width pad: the app chrome and content cap at
-520px and centre, and only the documents get widths of their own — the nota is
-an 830px sheet, the payer page 480px. Both documents stay light and paint their
-own colours rather than inheriting, because they arrive as a link pasted into a
-group chat; a dark document is worse there.
+**Two scenes, one breakpoint** (`src/lib/viewport.svelte.ts`, 1100px). A phone
+gets the 520px column with the index tabs welded to the bottom edge. A wide
+screen gets the full-width letterhead (operator + Keluar move into it), the
+same four tabs as a left rail, and the screens that can use the room become
+two-pane: Tagihan is ledger + the selected bill's open form, Review is the
+assignment work + the running summary and commit, Report is the month +
+what is still out. The documents keep widths of their own — the nota is an
+830px sheet, the payer page 480px — and stay light and self-painted, because
+they arrive as a link pasted into a group chat; a dark document is worse there.
 
 The other rules live in the file that owns them — read them before touching a
 surface: the counterfoil and stamp-square grammar on `src/routes/Bills.svelte`,

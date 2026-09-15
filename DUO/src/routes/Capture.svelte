@@ -160,7 +160,7 @@
     margin-bottom: 8px;
     border: 1.5px dashed var(--rule-strong);
     border-radius: var(--radius);
-    background: #fdfef9;
+    background: var(--write-in);
     color: var(--stamp-deep);
   }
 
@@ -223,6 +223,15 @@
   @media (prefers-reduced-motion: reduce) {
     .spinner {
       animation-duration: 2s;
+    }
+  }
+
+  /* One quiet form on a wide desk, still one action. */
+  @media (min-width: 1100px) {
+    .screen {
+      max-width: 560px;
+      margin: 0 auto;
+      padding-top: 34px;
     }
   }
 </style>

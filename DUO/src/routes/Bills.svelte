@@ -44,6 +44,7 @@
   } from '../lib/api'
   import { isDemo } from '../lib/demo'
   import { session } from '../lib/session.svelte'
+  import { desktop } from '../lib/viewport.svelte'
   import { prepareReceiptImage } from '../lib/image'
 
   let outstanding = $state<Outstanding[]>([])
@@ -52,7 +53,11 @@
   let status = $state<'loading' | 'ready' | 'error'>('loading')
   let message = $state('')
   let open = $state<string | null>(null)
+  /** Which bill the wide screen's right-hand form is showing. */
+  let selected = $state<string | null>(null)
   let busy = $state<string | null>(null)
+
+  let selectedBill = $derived(bills.find((bill) => bill.id === selected) ?? null)
 
   /** The pad's control total: what every unstamped line adds up to. */
   let owedTotal = $derived(outstanding.reduce((acc, row) => acc + row.outstanding, 0))
@@ -304,10 +309,163 @@
     // state is otherwise only reachable by tapping and a screenshot cannot tap.
     if (import.meta.env.DEV && isDemo() && bills.length > 0) {
       open = bills[0].id
+      selected = bills[0].id
       payOpen = bills[0].id
     }
   })
 </script>
+
+{#snippet billPanel(bill: BillWithShares)}
+  {@const settled = allPaid(bill)}
+  {#each bill.shares as share (share.person)}
+    <!--
+      The tick is the stored flag, not the arithmetic. It is what the
+      tap toggles, and it means one thing: the operator says this is
+      settled. `.partial` is the arithmetic disagreeing with it, and
+      that gets said in words rather than by half-filling a checkbox,
+      which would read as a control in an in-between state.
+    -->
+    {@const paid = share.status === 'lunas'}
+    {@const state = shareState(share)}
+    {@const remaining = shareRemaining(share)}
+    <button
+      class="row tappable pay"
+      class:paid
+      class:partial={state === 'sebagian'}
+      aria-pressed={paid}
+      aria-label="{share.person}: {state === 'lunas'
+        ? 'sudah lunas'
+        : state === 'sebagian'
+          ? `kurang ${rupiah(remaining)}`
+          : 'belum lunas'}"
+      onclick={() => toggleShare(bill, share.person, !paid)}
+    >
+      <span class="check" aria-hidden="true"></span>
+      <span class="stack">
+        <span class="strong" class:faint={paid}>{share.person}</span>
+        {#if paid}
+          <!--
+            The line carries the stamp, lettered, pressed askew — the
+            same mark the operator has put on a kwitansi a thousand
+            times. The square at the leading edge is the control; this
+            is what the control records.
+          -->
+          <span class="stamp-mark">Lunas</span>
+        {:else if state === 'sebagian'}
+          <!--
+            The original amount is kept beside what has landed, not
+            replaced by it. "Kurang 27.050" on its own is a number
+            with no denominator, and the first question anyone asks
+            is "out of how much?".
+          -->
+          <span class="faint small">
+            sudah {rupiah(share.amount_paid)} dari {rupiah(share.amount_owed)}
+          </span>
+        {/if}
+      </span>
+      <span class="row-value num" class:faint={paid}>
+        {rupiah(state === 'sebagian' ? remaining : share.amount_owed)}
+      </span>
+    </button>
+  {/each}
+
+  <div class="row faint small meta">
+    <span class="num">{bill.ref_code}</span>
+    {#if bill.notes}<span>· {bill.notes}</span>{/if}
+  </div>
+
+  {#if bill.account_number}
+    <div class="row dest">
+      <span class="faint small">Transfer ke</span>
+      <span class="row-value small num">
+        {bill.bank_name} {bill.account_number}
+        {#if bill.account_holder}· {bill.account_holder}{/if}
+      </span>
+    </div>
+  {/if}
+
+  <div class="row actions">
+    {#if bill.receipt_path}
+      <button class="plain" onclick={() => openReceipt(bill.receipt_path!)}>
+        Lihat struk
+      </button>
+    {/if}
+    <button class="plain" onclick={() => openNota(bill)}>Nota &amp; WA</button>
+  </div>
+
+  <!--
+    How this bill can be paid. Collapsed behind a disclosure rather
+    than always shown, because most bills keep whatever the last one
+    was and a control that is always open is a control that gets
+    scrolled past.
+  -->
+  <button class="row tappable" onclick={() => (payOpen = payOpen === bill.id ? null : bill.id)}>
+    <div class="stack">
+      <span class="strong">Cara bayar</span>
+      <span class="faint small">{methodLabel(bill)}</span>
+    </div>
+    <span class="chevron" class:up={payOpen === bill.id}></span>
+  </button>
+
+  {#if payOpen === bill.id}
+    <div class="row pay-choice">
+      <span class="dim small">Yang ditampilin ke yang bayar</span>
+      <div class="segments">
+        {#each PAY_METHODS as option (option.value)}
+          <button
+            class="segment"
+            class:on={bill.payment_method === option.value}
+            disabled={busy === bill.id}
+            onclick={() => chooseMethod(bill, option.value)}
+          >
+            {option.label}
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="row actions">
+      <label class="plain qris-pick">
+        <input
+          type="file"
+          accept="image/*"
+          disabled={busy === bill.id}
+          onchange={(e) => attachQris(bill, e)}
+        />
+        <span>{busy === bill.id ? '…' : bill.qris_path ? 'Ganti QRIS' : 'Upload QRIS'}</span>
+      </label>
+      {#if bill.qris_path}
+        <button class="plain destructive-text" disabled={busy === bill.id} onclick={() => removeQris(bill)}>
+          Hapus QRIS
+        </button>
+      {/if}
+    </div>
+
+    {#if bill.qris_path}
+      <div class="row qris-preview">
+        <img src={qrisUrl(bill.qris_path)} alt="QRIS tagihan ini" />
+      </div>
+    {/if}
+  {/if}
+
+  <div class="row actions">
+    <button
+      class="plain"
+      class:destructive-text={settled}
+      disabled={busy === bill.id}
+      onclick={() => togglePaid(bill, !settled)}
+    >
+      {busy === bill.id ? '…' : settled ? 'Batalkan semua' : 'Tandai semua lunas'}
+    </button>
+    <button
+      class="plain destructive-text"
+      disabled={busy === bill.id}
+      onclick={() => removeBill(bill)}
+    >
+      Hapus
+    </button>
+  </div>
+{/snippet}
 
 {#if status === 'error'}
   <div class="group">
@@ -317,6 +475,7 @@
   <p class="pad dim">Memuat…</p>
 {:else}
   <div class="screen">
+    <div class="ledger-col">
     <!--
       Errors from a refresh or a receipt link used to be set and then never
       shown: the only place that rendered `message` was the full-screen error
@@ -341,7 +500,7 @@
       <div class="list">
         <div class="row">
           <span class="field-label">Operator</span>
-          <span class="row-value serial--ink">{session.email ?? '—'}</span>
+          <span class="row-value serial">{session.email ?? '—'}</span>
         </div>
         <div class="row">
           <span class="field-label">Belum lunas</span>
@@ -388,13 +547,13 @@
     {#if flagged.length > 0}
       <h3 class="group-title">Bukti perlu dicek</h3>
       <div class="group">
-        <div class="list tint-carbon">
+        <div class="list tint-attention">
           {#each flagged as p (p.id)}
             <div class="proof">
               <div class="proof-who">
                 <span class="strong">{p.person}</span>
                 <span class="faint small">
-                  {p.place} · <span class="serial--ink">{p.ref_code}</span>
+                  {p.place} · <span class="serial">{p.ref_code}</span>
                 </span>
               </div>
 
@@ -455,9 +614,17 @@
       {@const isOpen = open === bill.id}
 
       <div class="group">
-        <div class="list stub-card">
+        <div class="list stub-card" class:selected={desktop.current && selected === bill.id}>
           <span class="stub" aria-hidden="true">{bill.ref_code}</span>
-          <button class="row tappable" onclick={() => (open = isOpen ? null : bill.id)}>
+          <button
+            class="row tappable"
+            onclick={() => {
+              // Wide screen: the row opens the form in the right pane. Phone:
+              // it expands in place, where there is no second column.
+              if (desktop.current) selected = bill.id
+              else open = isOpen ? null : bill.id
+            }}
+          >
             <div class="stack">
               <span class="strong">{bill.place}</span>
               <span class="faint small">
@@ -465,167 +632,42 @@
                 {#if settled}
                   · <span class="ok">Lunas</span>
                 {:else}
-                  · <span class="warn">{unpaid} belum lunas</span>
+                  · <span class="attention">{unpaid} belum lunas</span>
                 {/if}
               </span>
             </div>
             <span class="row-value num">{rupiah(bill.total)}</span>
-            <span class="chevron" class:up={isOpen}></span>
+            <span class="chevron" class:up={isOpen || (desktop.current && selected === bill.id)}></span>
           </button>
 
-          {#if isOpen}
-            {#each bill.shares as share (share.person)}
-              <!--
-                The tick is the stored flag, not the arithmetic. It is what the
-                tap toggles, and it means one thing: the operator says this is
-                settled. `.partial` is the arithmetic disagreeing with it, and
-                that gets said in words rather than by half-filling a checkbox,
-                which would read as a control in an in-between state.
-              -->
-              {@const paid = share.status === 'lunas'}
-              {@const state = shareState(share)}
-              {@const remaining = shareRemaining(share)}
-              <button
-                class="row tappable pay"
-                class:paid
-                class:partial={state === 'sebagian'}
-                aria-pressed={paid}
-                aria-label="{share.person}: {state === 'lunas'
-                  ? 'sudah lunas'
-                  : state === 'sebagian'
-                    ? `kurang ${rupiah(remaining)}`
-                    : 'belum lunas'}"
-                onclick={() => toggleShare(bill, share.person, !paid)}
-              >
-                <span class="check" aria-hidden="true"></span>
-                <span class="stack">
-                  <span class="strong" class:faint={paid}>{share.person}</span>
-                  {#if paid}
-                    <!--
-                      The line carries the stamp, lettered, pressed askew — the
-                      same mark the operator has put on a kwitansi a thousand
-                      times. The square at the leading edge is the control; this
-                      is what the control records.
-                    -->
-                    <span class="stamp-mark">Lunas</span>
-                  {:else if state === 'sebagian'}
-                    <!--
-                      The original amount is kept beside what has landed, not
-                      replaced by it. "Kurang 27.050" on its own is a number
-                      with no denominator, and the first question anyone asks
-                      is "out of how much?".
-                    -->
-                    <span class="faint small">
-                      sudah {rupiah(share.amount_paid)} dari {rupiah(share.amount_owed)}
-                    </span>
-                  {/if}
-                </span>
-                <span class="row-value num" class:faint={paid}>
-                  {rupiah(state === 'sebagian' ? remaining : share.amount_owed)}
-                </span>
-              </button>
-            {/each}
-
-            <div class="row faint small meta">
-              <span class="num">{bill.ref_code}</span>
-              {#if bill.notes}<span>· {bill.notes}</span>{/if}
-            </div>
-
-            {#if bill.account_number}
-              <div class="row dest">
-                <span class="faint small">Transfer ke</span>
-                <span class="row-value small num">
-                  {bill.bank_name} {bill.account_number}
-                  {#if bill.account_holder}· {bill.account_holder}{/if}
-                </span>
-              </div>
-            {/if}
-
-            <div class="row actions">
-              {#if bill.receipt_path}
-                <button class="plain" onclick={() => openReceipt(bill.receipt_path!)}>
-                  Lihat struk
-                </button>
-              {/if}
-              <button class="plain" onclick={() => openNota(bill)}>Nota &amp; WA</button>
-            </div>
-
-            <!--
-              How this bill can be paid. Collapsed behind a disclosure rather
-              than always shown, because most bills keep whatever the last one
-              was and a control that is always open is a control that gets
-              scrolled past.
-            -->
-            <button class="row tappable" onclick={() => (payOpen = payOpen === bill.id ? null : bill.id)}>
-              <div class="stack">
-                <span class="strong">Cara bayar</span>
-                <span class="faint small">{methodLabel(bill)}</span>
-              </div>
-              <span class="chevron" class:up={payOpen === bill.id}></span>
-            </button>
-
-            {#if payOpen === bill.id}
-              <div class="row pay-choice">
-                <span class="dim small">Yang ditampilin ke yang bayar</span>
-                <div class="segments">
-                  {#each PAY_METHODS as option (option.value)}
-                    <button
-                      class="segment"
-                      class:on={bill.payment_method === option.value}
-                      disabled={busy === bill.id}
-                      onclick={() => chooseMethod(bill, option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  {/each}
-                </div>
-              </div>
-
-              <div class="row actions">
-                <label class="plain qris-pick">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={busy === bill.id}
-                    onchange={(e) => attachQris(bill, e)}
-                  />
-                  <span>{busy === bill.id ? '…' : bill.qris_path ? 'Ganti QRIS' : 'Upload QRIS'}</span>
-                </label>
-                {#if bill.qris_path}
-                  <button class="plain destructive-text" disabled={busy === bill.id} onclick={() => removeQris(bill)}>
-                    Hapus QRIS
-                  </button>
-                {/if}
-              </div>
-
-              {#if bill.qris_path}
-                <div class="row qris-preview">
-                  <img src={qrisUrl(bill.qris_path)} alt="QRIS tagihan ini" />
-                </div>
-              {/if}
-            {/if}
-
-            <div class="row actions">
-              <button
-                class="plain"
-                class:destructive-text={settled}
-                disabled={busy === bill.id}
-                onclick={() => togglePaid(bill, !settled)}
-              >
-                {busy === bill.id ? '…' : settled ? 'Batalkan semua' : 'Tandai semua lunas'}
-              </button>
-              <button
-                class="plain destructive-text"
-                disabled={busy === bill.id}
-                onclick={() => removeBill(bill)}
-              >
-                Hapus
-              </button>
-            </div>
+          {#if isOpen && !desktop.current}
+            {@render billPanel(bill)}
           {/if}
         </div>
       </div>
     {/each}
+    </div>
+
+    <!--
+      The wide screen's second pane: the bill the operator selected, as an open
+      form. The ledger stays readable beside it, which is the whole reason the
+      desktop layout exists — no drill-in to answer "which bill is that?".
+    -->
+    {#if desktop.current && selectedBill}
+      <div class="detail-col">
+        <div class="list stub-card">
+          <span class="stub" aria-hidden="true">{selectedBill.ref_code}</span>
+          <div class="form-head">
+            <span class="place">{selectedBill.place}</span>
+            <span class="meta">
+              {formatDate(selectedBill.bill_date)} · {methodLabel(selectedBill)}
+            </span>
+            <span class="ref num">{rupiah(selectedBill.total)}</span>
+          </div>
+          {@render billPanel(selectedBill)}
+        </div>
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -634,6 +676,38 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .ledger-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+  }
+
+  .form-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .form-head .place {
+    font-size: 19px;
+    font-weight: 750;
+    letter-spacing: -0.01em;
+  }
+
+  .form-head .meta {
+    font-size: 13px;
+    color: var(--ink-2);
+  }
+
+  .form-head .ref {
+    margin-left: auto;
+    color: var(--stamp-deep);
+    font-weight: 700;
   }
 
   .group {
@@ -658,11 +732,6 @@
     color: var(--ink-3);
   }
 
-  .owed {
-    color: var(--ink);
-    font-weight: 700;
-  }
-
   .meta {
     gap: 6px;
   }
@@ -672,7 +741,7 @@
     font-family: var(--mono);
     font-size: var(--text-xs);
     letter-spacing: 0.04em;
-    color: var(--serial);
+    color: var(--ink-2);
   }
 
   .actions {
@@ -719,7 +788,7 @@
     height: 24px;
     border-radius: var(--radius-sm);
     border: 1.5px dashed var(--ink-3);
-    background: #fdfef9;
+    background: var(--write-in);
     transition:
       background 0.15s ease,
       border-color 0.15s ease;
@@ -752,7 +821,7 @@
      the press mark — a shape no other row on the screen has. */
   .row.pay.partial .check {
     border: 1.5px solid var(--stamp);
-    background: linear-gradient(180deg, #fdfef9 50%, var(--stamp) 50%);
+    background: linear-gradient(180deg, var(--write-in) 50%, var(--stamp) 50%);
   }
 
   /* Settled rows recede to the counterfoil, so the ones still owing are what
@@ -813,7 +882,7 @@
     font-family: var(--mono);
     font-size: 10px;
     letter-spacing: 0.12em;
-    color: var(--serial);
+    color: var(--ink-2);
     writing-mode: vertical-rl;
     text-orientation: mixed;
     transform: rotate(180deg);
@@ -841,7 +910,7 @@
   }
 
   .proof + .proof {
-    border-top: 1px solid var(--carbon);
+    border-top: 1px solid var(--attention-rule);
   }
 
   /*
@@ -930,5 +999,33 @@
     display: flex;
     gap: 4px;
     margin: 4px 0 0 -10px;
+  }
+
+  /*
+   * The wide screen: the ledger and the selected bill's open form side by
+   * side. The form pane is sticky, so it stays in view while the operator
+   * scrolls who owes what.
+   */
+  @media (min-width: 1100px) {
+    .screen {
+      display: grid;
+      grid-template-columns: 440px minmax(0, 1fr);
+      gap: 22px;
+      align-items: start;
+      max-width: 1360px;
+    }
+
+    /* The selected row wears the wash, so both panes agree on what is open. */
+    .list.selected {
+      background: var(--attention-tint);
+      border-color: var(--stamp);
+    }
+
+    .detail-col {
+      position: sticky;
+      top: 86px;
+      align-self: start;
+      min-width: 0;
+    }
   }
 </style>

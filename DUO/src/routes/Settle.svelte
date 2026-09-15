@@ -182,8 +182,10 @@
       </div>
     </div>
 
+    <div class="people">
     {#each byPerson as person (person.person)}
       {@const overdue = person.days >= threshold}
+      <div class="person">
       <h3 class="group-title">
         <button
           class="who"
@@ -236,7 +238,9 @@
           </div>
         </div>
       </div>
+      </div>
     {/each}
+    </div>
   </div>
 {/if}
 
@@ -245,6 +249,19 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+  }
+
+  .people {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .person {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
   }
 
   .group {
@@ -310,7 +327,7 @@
     font-weight: 500;
     text-transform: none;
     letter-spacing: 0;
-    color: var(--warn);
+    color: var(--stamp-deep);
   }
 
   /*
@@ -323,5 +340,15 @@
     min-height: 34px;
     padding: 0 8px;
     font-size: var(--text-sm);
+  }
+
+  /* The wide screen: collection cards two up. */
+  @media (min-width: 1100px) {
+    .people {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+      align-items: start;
+    }
   }
 </style>

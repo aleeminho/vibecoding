@@ -32,7 +32,7 @@ The stamp: marking a share settled presses an orange LUNAS stamp onto the form's
 ## Direction contract
 THESIS: The app is the pad. Every bill is a serially numbered kwitansi, every share a ruled line, every payment an orange stamp; it refuses the fintech dashboard and the chat feed.
 
-OWN-WORLD: Light form paper, ink blue-black, serial red, one orange stamp, carbon purple on duplicates. Pre-printed field labels, dotted write-in rules, amount boxes, perforated counterfoils. System sans for UI, tabular figures for money.
+OWN-WORLD: White form paper, near-black ink, one orange stamp and its wash for attention, green for settled, red for destruction. Pre-printed field labels, ruled write-in lines, amount boxes, perforated counterfoils. System sans for UI, tabular figures for money.
 
 STORY: The operator recognises the form they have signed a thousand times and trusts it instantly. They read who still owes, fill what is missing, and stamp what has arrived.
 
@@ -41,3 +41,26 @@ FIRST VIEWPORT: A paper sheet headed DUO with the operator's name in a field gri
 FORM: Grounded candidate, ranked first before the roll; the roll assigned Bukti Transfer, the pick card won. Seed key 26292ba6, locked card: model-pick.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+
+## Revision — white-out, orange-forward, and a wide screen
+
+The first build of this world was pale green paper with a navy ink and a
+numbering-machine red; an attended review rejected the cast ("nothing is
+clean"), and the palette was rebuilt as **white paper with the stamp doing the
+work**. What moved: ground `#f0f0ee`, sheets `#ffffff`, ink `#14161c`, the
+attention states moved into the stamp family (`--attention-tint` `#fdf1ea` /
+`--attention-rule` `#eec3ab`) and the separate serial red and carbon purple were
+deleted. The letterhead and tab-bar rules are now the stamp orange, the active
+tab is filled with it, and outstanding money is printed in `--stamp-deep` —
+orange is both the stamp and the attention ink now, which is the one rule the
+world did not have before.
+
+The mark is the **Dua Ply**: a stamped square with its carbon copy behind it
+(`public/favicon.svg`, inline in the letterhead, PNG set for the PWA).
+
+The app is **two scenes at one breakpoint** (`src/lib/viewport.svelte.ts`,
+1100px): the phone column with the index tabs at the bottom edge, and a wide
+screen with a full-width letterhead, the tabs as a left rail, and two-pane
+screens — Tagihan (ledger + the selected bill's open form), Review (work +
+summary/commit), Report (month + outstanding). Phone and desktop were both
+captured and reviewed through the same CDP rig.

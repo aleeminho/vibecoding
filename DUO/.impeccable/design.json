@@ -1,41 +1,36 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-15T16:13:05Z",
+  "generatedAt": "2026-09-16T00:00:00Z",
   "title": "Design System: DUO",
   "extensions": {
     "colorMeta": {
-      "ground": { "role": "neutral", "displayName": "Desk Ground", "canonical": "#e7ebe0", "tonalRamp": ["#0a0c06", "#23261e", "#40443b", "#5f6359", "#80847a", "#a3a79c", "#c7cbc0", "#ecf0e5"] },
-      "sheet": { "role": "neutral", "displayName": "Form Sheet", "canonical": "#f6f8f1", "tonalRamp": ["#0b0c08", "#242621", "#41433d", "#60625c", "#81837d", "#a4a69f", "#c8cac3", "#edefe8"] },
-      "sheet-2": { "role": "neutral", "displayName": "Counterfoil Shade", "canonical": "#eef1e7", "tonalRamp": ["#0a0c06", "#24261f", "#41433b", "#60635a", "#81847b", "#a3a69d", "#c8cbc1", "#edf0e6"] },
-      "sheet-3": { "role": "neutral", "displayName": "Pressed Paper", "canonical": "#e0e5d6", "tonalRamp": ["#0a0d04", "#23271b", "#404438", "#5f6356", "#808477", "#a2a799", "#c7ccbd", "#ecf1e2"] },
-      "paper": { "role": "neutral", "displayName": "Document Paper", "canonical": "#fbfcf7", "tonalRamp": ["#0b0c08", "#252522", "#42433f", "#61625d", "#82837e", "#a4a5a1", "#c9cac5", "#eeefea"] },
-      "write-in": { "role": "neutral", "displayName": "Blank Write-In", "canonical": "#fdfef9", "tonalRamp": ["#0b0c08", "#252522", "#42433f", "#61625e", "#82837e", "#a4a5a1", "#c9cac5", "#eeefea"] },
-      "rule": { "role": "neutral", "displayName": "Hairline Rule", "canonical": "#c6ccba", "tonalRamp": ["#090d03", "#232719", "#404435", "#5f6454", "#7f8574", "#a2a896", "#c6ccba", "#ebf2df"] },
-      "rule-strong": { "role": "neutral", "displayName": "Form Frame", "canonical": "#98a18c", "tonalRamp": ["#080d01", "#212817", "#3e4533", "#5d6551", "#7d8672", "#a0a994", "#c4cdb7", "#e9f3dc"] },
-      "ink": { "role": "neutral", "displayName": "Pre-Printed Ink", "canonical": "#1b2f5e", "tonalRamp": ["#00042f", "#0f214f", "#2a4070", "#486093", "#6881b7", "#8aa4dd", "#adc9ff", "#d1efff"] },
-      "ink-2": { "role": "neutral", "displayName": "Secondary Ink", "canonical": "#4a5a7d", "tonalRamp": ["#020824", "#162342", "#324163", "#516184", "#7182a7", "#93a5cc", "#b6c9f2", "#dbefff"] },
-      "ink-3": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#64708c", "tonalRamp": ["#04091e", "#1b243c", "#37425b", "#55617c", "#76829f", "#98a5c3", "#bcc9e8", "#e0eeff"] },
-      "stamp": { "role": "primary", "displayName": "Stamp Orange", "canonical": "#d04a02", "tonalRamp": ["#3a0000", "#610000", "#880000", "#af2900", "#d75111", "#ff7640", "#ff9b66", "#ffc18c"] },
-      "stamp-deep": { "role": "primary", "displayName": "Stamp Deep", "canonical": "#9e3802", "tonalRamp": ["#320000", "#570000", "#7c1500", "#a23c09", "#c95f35", "#f08258", "#ffa77c", "#ffcca0"] },
-      "stamp-tint": { "role": "primary", "displayName": "Stamp Tint", "canonical": "rgba(208, 74, 2, 0.12)", "tonalRamp": ["#3a0000", "#610000", "#880000", "#af2900", "#d75111", "#ff7640", "#ff9b66", "#ffc18c"] },
-      "stamp-wash": { "role": "primary", "displayName": "Settled Wash", "canonical": "#fbeee5", "tonalRamp": ["#110905", "#2c231c", "#4a4039", "#6a5f57", "#8b8078", "#aea29a", "#d3c7be", "#f9ece3"] },
-      "serial": { "role": "secondary", "displayName": "Numbering-Machine Red", "canonical": "#b0362b", "tonalRamp": ["#360000", "#5c0000", "#830000", "#a92f25", "#d15547", "#f97968", "#ff9e8c", "#ffc3b0"] },
-      "carbon": { "role": "secondary", "displayName": "Carbon Purple", "canonical": "#6b5a86", "tonalRamp": ["#110223", "#2b1b41", "#493862", "#685883", "#8a78a6", "#ad9bcb", "#d1bff1", "#f7e4ff"] },
-      "carbon-tint": { "role": "secondary", "displayName": "Carbon Ply", "canonical": "#efeaf3", "tonalRamp": ["#0d0a0f", "#27232a", "#444047", "#645f67", "#858088", "#a7a3ab", "#ccc7d0", "#f1ecf5"] },
-      "warn": { "role": "tertiary", "displayName": "Attention Amber", "canonical": "#7d5400", "tonalRamp": ["#200000", "#3f1a00", "#603800", "#815808", "#a47935", "#c99c59", "#efc17d", "#ffe6a1"] },
-      "warn-tint": { "role": "tertiary", "displayName": "Amber Notice", "canonical": "#f5eed6", "tonalRamp": ["#100b00", "#2a2512", "#48422e", "#67614c", "#89826d", "#aca58e", "#d0c9b2", "#f6efd7"] },
-      "warn-rule": { "role": "tertiary", "displayName": "Amber Rule", "canonical": "#d8c48c", "tonalRamp": ["#170700", "#332200", "#514002", "#725f29", "#94814b", "#b7a36d", "#dcc890", "#ffedb4"] },
-      "ok": { "role": "tertiary", "displayName": "Settled Green", "canonical": "#1e6b46", "tonalRamp": ["#001500", "#003111", "#00512e", "#26714c", "#4b946c", "#6eb78e", "#93ddb2", "#b7ffd6"] },
-      "ok-tint": { "role": "tertiary", "displayName": "Green Notice", "canonical": "#e5efe7", "tonalRamp": ["#070d08", "#202721", "#3c453e", "#5b645d", "#7c857e", "#9ea8a0", "#c2ccc4", "#e8f2ea"] },
-      "ok-rule": { "role": "tertiary", "displayName": "Green Rule", "canonical": "#aac9b1", "tonalRamp": ["#001003", "#112b19", "#2e4936", "#4d6954", "#6e8b74", "#90ae97", "#b3d3ba", "#d8f8df"] },
-      "bad": { "role": "tertiary", "displayName": "Form Red", "canonical": "#a02a1e", "tonalRamp": ["#360000", "#5b0000", "#810000", "#a83225", "#cf5647", "#f77a68", "#ff9f8c", "#ffc5b0"] },
-      "bad-tint": { "role": "tertiary", "displayName": "Red Notice", "canonical": "#f6e6e2", "tonalRamp": ["#120806", "#2d221f", "#4b3f3c", "#6b5e5a", "#8d7f7b", "#b0a19d", "#d5c5c1", "#faeae6"] },
-      "bad-rule": { "role": "tertiary", "displayName": "Red Rule", "canonical": "#d9aaa1", "tonalRamp": ["#1e0100", "#3c1913", "#5d362f", "#7f554d", "#a2766e", "#c6988f", "#ecbcb3", "#ffe1d8"] }
+      "ground": { "role": "neutral", "displayName": "Desk Ground", "canonical": "#f0f0ee", "tonalRamp": ["#0d0d0d", "#262625", "#424241", "#636362", "#868684", "#ababa9", "#d1d1cf", "#eeeeee"] },
+      "sheet": { "role": "neutral", "displayName": "Form Sheet", "canonical": "#ffffff", "tonalRamp": ["#0d0d0d", "#262626", "#424242", "#636363", "#868686", "#ababab", "#d1d1d1", "#eeeeee"] },
+      "sheet-2": { "role": "neutral", "displayName": "Counterfoil Shade", "canonical": "#f7f7f5", "tonalRamp": ["#0d0d0d", "#262625", "#424241", "#636362", "#868684", "#ababa9", "#d1d1cf", "#eeeeee"] },
+      "sheet-3": { "role": "neutral", "displayName": "Pressed Paper", "canonical": "#ececea", "tonalRamp": ["#0d0d0d", "#262625", "#424241", "#636362", "#868684", "#ababa9", "#d1d1cf", "#eeeeee"] },
+      "write-in": { "role": "neutral", "displayName": "Blank Write-In", "canonical": "#ffffff", "tonalRamp": ["#0d0d0d", "#262626", "#424242", "#636363", "#868686", "#ababab", "#d1d1d1", "#eeeeee"] },
+      "paper": { "role": "neutral", "displayName": "Document Paper", "canonical": "#fffefa", "tonalRamp": ["#0e0d0c", "#272624", "#43423f", "#646360", "#878683", "#acaba7", "#d2d1cd", "#efeeed"] },
+      "rule": { "role": "neutral", "displayName": "Hairline Rule", "canonical": "#e4e4e1", "tonalRamp": ["#0d0d0c", "#272724", "#424240", "#636361", "#868684", "#ababa8", "#d1d1ce", "#eeeeed"] },
+      "rule-strong": { "role": "neutral", "displayName": "Form Frame", "canonical": "#c2c2bc", "tonalRamp": ["#0d0d0b", "#272722", "#43433e", "#64645e", "#868681", "#ababa5", "#d1d1cb", "#eeeeec"] },
+      "ink": { "role": "neutral", "displayName": "Pre-Printed Ink", "canonical": "#14161c", "tonalRamp": ["#0c0d10", "#24262d", "#404249", "#60636b", "#83868e", "#a8abb3", "#ced1d9", "#edeef1"] },
+      "ink-2": { "role": "neutral", "displayName": "Secondary Ink", "canonical": "#565b66", "tonalRamp": ["#0b0d12", "#222630", "#3e424d", "#5e636e", "#818692", "#a5abb7", "#cbd1de", "#eceef3"] },
+      "ink-3": { "role": "neutral", "displayName": "Faint Ink", "canonical": "#7b8089", "tonalRamp": ["#0b0d11", "#23272e", "#3e434b", "#5f636c", "#81868f", "#a6abb5", "#ccd1db", "#eceef2"] },
+      "stamp": { "role": "primary", "displayName": "Stamp Orange", "canonical": "#d04a02", "tonalRamp": ["#280000", "#5d0000", "#810600", "#aa3700", "#d35e2f", "#fd8356", "#ffaa7c", "#ffe3d2"] },
+      "stamp-deep": { "role": "primary", "displayName": "Stamp Deep", "canonical": "#9e3802", "tonalRamp": ["#260000", "#590000", "#7d1500", "#a43e0d", "#cd6339", "#f7885e", "#ffaf84", "#ffe4d5"] },
+      "stamp-tint": { "role": "primary", "displayName": "Stamp Tint", "canonical": "rgba(208, 74, 2, 0.12)", "tonalRamp": ["#280000", "#5d0000", "#810600", "#aa3700", "#d35e2f", "#fd8356", "#ffaa7c", "#ffe3d2"] },
+      "attention-tint": { "role": "primary", "displayName": "Attention Wash", "canonical": "#fdf1ea", "tonalRamp": ["#100c0a", "#2d241f", "#4a403b", "#6b615b", "#8e847d", "#b3a8a2", "#dacec8", "#f2edeb"] },
+      "attention-rule": { "role": "primary", "displayName": "Attention Rule", "canonical": "#eec3ab", "tonalRamp": ["#180902", "#3d1d08", "#5b3924", "#7f5a44", "#a47c66", "#caa189", "#f2c7af", "#fbebe2"] },
+      "ok": { "role": "tertiary", "displayName": "Settled Green", "canonical": "#1c6b47", "tonalRamp": ["#001305", "#003314", "#00512f", "#27744f", "#4e9871", "#73be95", "#99e5ba", "#ddf6e6"] },
+      "ok-tint": { "role": "tertiary", "displayName": "Green Notice", "canonical": "#e6f0e9", "tonalRamp": ["#0b0e0c", "#212923", "#3d453f", "#5d6660", "#808983", "#a4aea7", "#cad4cd", "#ecefed"] },
+      "ok-rule": { "role": "tertiary", "displayName": "Green Rule", "canonical": "#a9c9b3", "tonalRamp": ["#051009", "#112d1c", "#2e4a38", "#4e6b58", "#708f7a", "#94b49e", "#badac4", "#e6f2ea"] },
+      "bad": { "role": "tertiary", "displayName": "Form Red", "canonical": "#a32b1e", "tonalRamp": ["#280000", "#5e0000", "#820000", "#ab3325", "#d45a49", "#ff806d", "#ffa692", "#ffe2d9"] },
+      "bad-tint": { "role": "tertiary", "displayName": "Red Notice", "canonical": "#f7e7e3", "tonalRamp": ["#110c0a", "#2f2320", "#4c3f3c", "#6d605c", "#91827f", "#b6a7a3", "#ddcdc9", "#f3edec"] },
+      "bad-rule": { "role": "tertiary", "displayName": "Red Rule", "canonical": "#d9aca3", "tonalRamp": ["#180806", "#3d1b15", "#5c3730", "#7f5850", "#a57a72", "#cb9f96", "#f3c5bb", "#fbeae7"] }
     },
     "typographyMeta": {
       "document-title": { "displayName": "Document Title", "purpose": "The nota's masthead title; documents set their own sizes inside the same two stacks." },
-      "page-title": { "displayName": "Page Title", "purpose": "The app's screen title; it scrolls away while the letterhead stays." },
-      "lead": { "displayName": "Lead", "purpose": "Hero and notice leads." },
+      "page-title": { "displayName": "Page Title", "purpose": "The app's screen title; it scrolls away while the letterhead stays, and steps aside for the rail on a wide screen." },
+      "lead": { "displayName": "Lead", "purpose": "Hero and notice leads, the desktop detail pane's place name." },
       "body": { "displayName": "Body", "purpose": "Every row, input and paragraph." },
       "small": { "displayName": "Small", "purpose": "Captions, meta, helper text, notice bodies." },
       "label": { "displayName": "Pre-Printed Label", "purpose": "Field and section labels, uppercase and letter-spaced like a form's printed field names." },
@@ -48,9 +43,12 @@
     "motion": [
       { "name": "press", "value": "transform 0.12s ease", "purpose": "A button goes down 1px under the finger; it does not shrink." },
       { "name": "stamp-fill", "value": "background 0.15s ease, border-color 0.15s ease", "purpose": "The stamp square's empty/partial/pressed state change." },
+      { "name": "field-focus", "value": "background 0.15s ease", "purpose": "A field row shades to sheet-2 when its input takes focus." },
       { "name": "spin", "value": "spin 0.8s linear infinite", "purpose": "The receipt-reading spinner; 2s under prefers-reduced-motion." }
     ],
     "breakpoints": [
+      { "name": "dev-frame", "value": "420px", "note": "Dev-only measurement frame, stripped from production; applies up to the two-scenes breakpoint." },
+      { "name": "two-scenes", "value": "1100px" },
       { "name": "app-column", "value": "520px" },
       { "name": "document-narrow", "value": "720px" },
       { "name": "nota-sheet", "value": "830px" },
@@ -72,7 +70,7 @@
       "refersTo": "button-tinted",
       "description": "Secondary action: sheet paper with a stamp border and a stamp-deep label.",
       "html": "<button class='ds-btn-tinted'>Kembali</button>",
-      "css": ".ds-btn-tinted { min-height: 44px; padding: 0 18px; border: 1px solid var(--stamp, #d04a02); border-radius: var(--radius, 4px); background: var(--sheet, #f6f8f1); color: var(--stamp-deep, #9e3802); font: 620 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: background 0.12s ease; } .ds-btn-tinted:hover { background: var(--sheet-2, #eef1e7); } .ds-btn-tinted:active:not(:disabled) { transform: translateY(1px); } .ds-btn-tinted:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
+      "css": ".ds-btn-tinted { min-height: 44px; padding: 0 18px; border: 1px solid var(--stamp, #d04a02); border-radius: var(--radius, 4px); background: var(--sheet, #ffffff); color: var(--stamp-deep, #9e3802); font: 620 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; transition: background 0.12s ease; } .ds-btn-tinted:hover { background: var(--sheet-2, #f7f7f5); } .ds-btn-tinted:active:not(:disabled) { transform: translateY(1px); } .ds-btn-tinted:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
     },
     {
       "name": "Plain Text Action",
@@ -80,15 +78,15 @@
       "refersTo": "button-plain",
       "description": "A label-sized action with no chrome, in stamp-deep ink; destructive variants take the form red.",
       "html": "<button class='ds-btn-plain'>Nota &amp; WA</button>",
-      "css": ".ds-btn-plain { min-height: 36px; padding: 0 10px; background: none; border: 1px solid transparent; border-radius: var(--radius, 4px); color: var(--stamp-deep, #9e3802); font: 620 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-btn-plain:hover { opacity: 0.8; } .ds-btn-plain:active:not(:disabled) { opacity: 0.6; } .ds-btn-plain:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; } .ds-btn-plain.ds-destructive { color: var(--bad, #a02a1e); }"
+      "css": ".ds-btn-plain { min-height: 36px; padding: 0 10px; background: none; border: 1px solid transparent; border-radius: var(--radius, 4px); color: var(--stamp-deep, #9e3802); font: 620 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-btn-plain:hover { opacity: 0.8; } .ds-btn-plain:active:not(:disabled) { opacity: 0.6; } .ds-btn-plain:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; } .ds-btn-plain.ds-destructive { color: var(--bad, #a32b1e); }"
     },
     {
       "name": "Ruled Sheet & Row",
       "kind": "card",
       "refersTo": "sheet",
-      "description": "The form's unit: an opaque sheet, a 1px frame, and hairline-ruled rows with a value column on the right.",
+      "description": "The form's unit: an opaque white sheet, a 1px frame, and hairline-ruled rows with a value column on the right. Tinted variants are the same sheet printed in another ink (attention wash, green, red).",
       "html": "<div class='ds-sheet'><div class='ds-sheet-row'><span class='ds-sheet-key'>Belum lunas</span><span class='ds-sheet-val'>Rp 390.950</span></div><div class='ds-sheet-row'><span class='ds-sheet-key'>Riwayat</span><span class='ds-sheet-val'>Rp 456.225</span></div></div>",
-      "css": ".ds-sheet { background: var(--sheet, #f6f8f1); border: 1px solid var(--rule-strong, #98a18c); border-radius: var(--radius, 4px); overflow: hidden; color: var(--ink, #1b2f5e); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-sheet-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; } .ds-sheet-row + .ds-sheet-row::before { content: ''; position: absolute; top: 0; left: 14px; right: 0; height: 1px; background: var(--rule, #c6ccba); } .ds-sheet-key { font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2, #4a5a7d); } .ds-sheet-val { margin-left: auto; flex-shrink: 0; color: var(--ink, #1b2f5e); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }"
+      "css": ".ds-sheet { background: var(--sheet, #ffffff); border: 1px solid var(--rule-strong, #c2c2bc); border-radius: var(--radius, 4px); overflow: hidden; color: var(--ink, #14161c); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-sheet-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; } .ds-sheet-row + .ds-sheet-row::before { content: ''; position: absolute; top: 0; left: 14px; right: 0; height: 1px; background: var(--rule, #e4e4e1); } .ds-sheet-key { font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2, #565b66); } .ds-sheet-val { margin-left: auto; flex-shrink: 0; color: var(--ink, #14161c); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; } .ds-sheet-attention { background: var(--attention-tint, #fdf1ea); border-color: var(--attention-rule, #eec3ab); } .ds-sheet-ok { background: var(--ok-tint, #e6f0e9); border-color: var(--ok-rule, #a9c9b3); } .ds-sheet-bad { background: var(--bad-tint, #f7e7e3); border-color: var(--bad-rule, #d9aca3); }"
     },
     {
       "name": "Field Row",
@@ -96,29 +94,29 @@
       "refersTo": "input",
       "description": "A settings field with no box: a fixed label column and a chrome-less right-aligned input; focus-within shades the row.",
       "html": "<label class='ds-field-row'><span class='ds-field-key'>Nomor tujuan</span><input class='ds-field-input' type='text' value='1234567890' /></label>",
-      "css": ".ds-field-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; background: var(--sheet, #f6f8f1); border-bottom: 1px solid var(--rule, #c6ccba); transition: background 0.15s ease; color: var(--ink, #1b2f5e); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-field-row:focus-within { background: var(--sheet-2, #eef1e7); } .ds-field-key { flex: none; width: 116px; font-size: 13px; color: var(--ink, #1b2f5e); } .ds-field-input { flex: 1; min-width: 0; border: none; background: none; padding: 0; min-height: auto; text-align: right; font: inherit; color: var(--ink, #1b2f5e); outline: none; } .ds-field-input:focus { outline: none; box-shadow: none; }"
+      "css": ".ds-field-row { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px; background: var(--sheet, #ffffff); border-bottom: 1px solid var(--rule, #e4e4e1); transition: background 0.15s ease; color: var(--ink, #14161c); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-field-row:focus-within { background: var(--sheet-2, #f7f7f5); } .ds-field-key { flex: none; width: 116px; font-size: 13px; color: var(--ink, #14161c); } .ds-field-input { flex: 1; min-width: 0; border: none; background: none; padding: 0; min-height: auto; text-align: right; font: inherit; color: var(--ink, #14161c); outline: none; } .ds-field-input:focus { outline: none; box-shadow: none; }"
     },
     {
       "name": "Amount Box",
       "kind": "custom",
       "refersTo": "amount-box",
-      "description": "The kwitansi's printed box around a figure that is a decision: a bordered write-in blank, ink, tabular, never wrapped.",
+      "description": "The kwitansi's printed box around a figure that is a decision: a bordered write-in blank, ink, tabular, never wrapped. 32px on the payer page.",
       "html": "<span class='ds-amount-box'>Rp 390.950</span>",
-      "css": ".ds-amount-box { display: inline-block; padding: 3px 9px 2px; border: 1px solid var(--rule-strong, #98a18c); border-radius: var(--radius-sm, 3px); background: var(--write-in, #fdfef9); color: var(--ink, #1b2f5e); font: 700 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }"
+      "css": ".ds-amount-box { display: inline-block; padding: 3px 9px 2px; border: 1px solid var(--rule-strong, #c2c2bc); border-radius: var(--radius-sm, 3px); background: var(--write-in, #ffffff); color: var(--ink, #14161c); font: 700 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }"
     },
     {
       "name": "Stamp Square",
       "kind": "custom",
       "refersTo": "stamp-square",
-      "description": "The 24px control that replaces a switch: dashed empty, half-pressed partial, solid pressed.",
+      "description": "The 24px control that replaces a switch: dashed empty, half-pressed partial, solid pressed. Leading edge of a share row, whole row tappable.",
       "html": "<div class='ds-stamp-row'><span class='ds-stamp-square'></span><span class='ds-stamp-square ds-stamp-square-partial'></span><span class='ds-stamp-square ds-stamp-square-paid'></span></div>",
-      "css": ".ds-stamp-row { display: flex; align-items: center; gap: 14px; } .ds-stamp-square { width: 24px; height: 24px; border-radius: var(--radius-sm, 3px); border: 1.5px dashed var(--ink-3, #64708c); background: var(--write-in, #fdfef9); transition: background 0.15s ease, border-color 0.15s ease; } .ds-stamp-square-partial { border: 1.5px solid var(--stamp, #d04a02); background: linear-gradient(180deg, var(--write-in, #fdfef9) 50%, var(--stamp, #d04a02) 50%); } .ds-stamp-square-paid { border: 1.5px solid var(--stamp-deep, #9e3802); background: var(--stamp, #d04a02); }"
+      "css": ".ds-stamp-row { display: flex; align-items: center; gap: 14px; } .ds-stamp-square { width: 24px; height: 24px; border-radius: var(--radius-sm, 3px); border: 1.5px dashed var(--ink-3, #7b8089); background: var(--write-in, #ffffff); transition: background 0.15s ease, border-color 0.15s ease; } .ds-stamp-square-partial { border: 1.5px solid var(--stamp, #d04a02); background: linear-gradient(180deg, var(--write-in, #ffffff) 50%, var(--stamp, #d04a02) 50%); } .ds-stamp-square-paid { border: 1.5px solid var(--stamp-deep, #9e3802); background: var(--stamp, #d04a02); }"
     },
     {
       "name": "LUNAS Stamp Mark",
       "kind": "custom",
       "refersTo": "stamp-mark",
-      "description": "The lettered rubber stamp pressed beside a settled name: outlined, letter-spaced, rotated -2deg.",
+      "description": "The lettered rubber stamp pressed beside a settled name: outlined, letter-spaced, rotated -2deg; the saved form scales it to a 60px filled square.",
       "html": "<span class='ds-stamp-mark'>Lunas</span>",
       "css": ".ds-stamp-mark { display: inline-block; padding: 0 5px 1px; border: 1.5px solid var(--stamp-deep, #9e3802); border-radius: var(--radius-sm, 3px); color: var(--stamp-deep, #9e3802); font: 800 10px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; transform: rotate(-2deg); }"
     },
@@ -126,17 +124,9 @@
       "name": "Counterfoil Bill Row",
       "kind": "card",
       "refersTo": "sheet",
-      "description": "A bill torn from the pad: a 29px counterfoil carrying the serial bottom-up, closed by a dashed tear line.",
+      "description": "A bill torn from the pad: a 29px counterfoil carrying the serial bottom-up in ink-2, closed by a dashed tear line.",
       "html": "<div class='ds-stub-row'><span class='ds-stub' aria-hidden='true'>YQ3HWJDM</span><span class='ds-stub-body'><span class='ds-stub-title'>Lucky Cat Coffee &amp; Kitchen</span><span class='ds-stub-meta'>26 Jun 2026 · 3 belum lunas</span></span><span class='ds-stub-amount'>Rp 456.225</span></div>",
-      "css": ".ds-stub-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px 10px 44px; background: var(--sheet, #f6f8f1); border: 1px solid var(--rule-strong, #98a18c); border-radius: var(--radius, 4px); color: var(--ink, #1b2f5e); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-stub { position: absolute; left: 0; top: 0; bottom: 0; width: 29px; display: grid; place-items: center; border-right: 1px dashed var(--rule-strong, #98a18c); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--serial, #b0362b); writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); } .ds-stub-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; } .ds-stub-title { font-weight: 650; } .ds-stub-meta { font-size: 13px; color: var(--ink-3, #64708c); } .ds-stub-amount { margin-left: auto; flex-shrink: 0; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }"
-    },
-    {
-      "name": "Index Tabs",
-      "kind": "nav",
-      "refersTo": "tab",
-      "description": "The pad's index tabs: flat, ruled off from content, the active one pulled forward with a stamp-orange edge across its top.",
-      "html": "<nav class='ds-tabs'><button class='ds-tab ds-tab-active'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M4 6h16M4 12h16M4 18h10' stroke-linecap='round'/></svg><span>Tagihan</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1.5 1.5 0 0 0 1.25-.67l.6-.9A1.5 1.5 0 0 1 9.8 4.8h4.4a1.5 1.5 0 0 1 1.25.67l.6.9A1.5 1.5 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z'/><circle cx='12' cy='13' r='3.3'/></svg><span>Foto</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M4 8h12M13 5l3 3-3 3M20 16H8M11 13l-3 3 3 3' stroke-linecap='round' stroke-linejoin='round'/></svg><span>Tagih</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M5 19V11M12 19V5M19 19v-5' stroke-linecap='round'/></svg><span>Report</span></button></nav>",
-      "css": ".ds-tabs { display: flex; gap: 4px; padding: 6px 10px; background: var(--sheet, #f6f8f1); border-top: 2px solid var(--ink, #1b2f5e); } .ds-tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; padding: 5px 0 4px; background: none; border: 1px solid transparent; border-top: 2px solid transparent; border-radius: 0 0 var(--radius-sm, 3px) var(--radius-sm, 3px); color: var(--ink-2, #4a5a7d); font: 600 10px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-tab svg { width: 23px; height: 23px; } .ds-tab-active { color: var(--ink, #1b2f5e); background: var(--ground, #e7ebe0); border-color: var(--rule, #c6ccba); border-top-color: var(--stamp, #d04a02); } .ds-tab:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
+      "css": ".ds-stub-row { position: relative; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 14px 10px 44px; background: var(--sheet, #ffffff); border: 1px solid var(--rule-strong, #c2c2bc); border-radius: var(--radius, 4px); color: var(--ink, #14161c); font: 400 16px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-stub { position: absolute; left: 0; top: 0; bottom: 0; width: 29px; display: grid; place-items: center; border-right: 1px dashed var(--rule-strong, #c2c2bc); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--ink-2, #565b66); writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); } .ds-stub-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; } .ds-stub-title { font-weight: 650; } .ds-stub-meta { font-size: 13px; color: var(--ink-3, #7b8089); } .ds-stub-amount { margin-left: auto; flex-shrink: 0; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }"
     },
     {
       "name": "Person Pick Chip",
@@ -144,66 +134,86 @@
       "refersTo": "pick",
       "description": "A name written onto the form's line, not a capsule: a small ruled box; chosen takes the stamp tint.",
       "html": "<div class='ds-picks'><button class='ds-pick ds-pick-on'>Budi <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2' stroke-linecap='round'><path d='M6 6l12 12M18 6L6 18'/></svg></button><button class='ds-pick'>Sarah</button></div>",
-      "css": ".ds-picks { display: flex; flex-wrap: wrap; gap: 8px; } .ds-pick { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px; background: var(--sheet, #f6f8f1); border: 1px solid var(--rule-strong, #98a18c); border-radius: var(--radius-sm, 3px); color: var(--ink, #1b2f5e); font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-pick svg { width: 13px; height: 13px; opacity: 0.75; } .ds-pick-on { background: var(--stamp-tint, rgba(208, 74, 2, 0.12)); border-color: var(--stamp, #d04a02); color: var(--stamp-deep, #9e3802); font-weight: 650; } .ds-pick:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
+      "css": ".ds-picks { display: flex; flex-wrap: wrap; gap: 8px; } .ds-pick { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; padding: 0 12px; background: var(--sheet, #ffffff); border: 1px solid var(--rule-strong, #c2c2bc); border-radius: var(--radius-sm, 3px); color: var(--ink, #14161c); font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-pick svg { width: 13px; height: 13px; opacity: 0.75; } .ds-pick-on { background: var(--stamp-tint, rgba(208, 74, 2, 0.12)); border-color: var(--stamp, #d04a02); color: var(--stamp-deep, #9e3802); font-weight: 650; } .ds-pick:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
+    },
+    {
+      "name": "Index Tabs & Left Rail",
+      "kind": "nav",
+      "refersTo": "tab",
+      "description": "The same four tabs in the two scenes: welded to the bottom edge on a phone, a 92px left rail at 1100px and up. The active tab is filled with the stamp and labelled white in both.",
+      "html": "<div class='ds-navs'><nav class='ds-rail'><button class='ds-rail-tab ds-rail-tab-active'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M4 6h16M4 12h16M4 18h10' stroke-linecap='round'/></svg><span>Tagihan</span></button><button class='ds-rail-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1.5 1.5 0 0 0 1.25-.67l.6-.9A1.5 1.5 0 0 1 9.8 4.8h4.4a1.5 1.5 0 0 1 1.25.67l.6.9A1.5 1.5 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z'/><circle cx='12' cy='13' r='3.3'/></svg><span>Foto</span></button></nav><nav class='ds-tabs'><button class='ds-tab ds-tab-active'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M4 6h16M4 12h16M4 18h10' stroke-linecap='round'/></svg><span>Tagihan</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2a1.5 1.5 0 0 0 1.25-.67l.6-.9A1.5 1.5 0 0 1 9.8 4.8h4.4a1.5 1.5 0 0 1 1.25.67l.6.9A1.5 1.5 0 0 0 17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z'/><circle cx='12' cy='13' r='3.3'/></svg><span>Foto</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M4 8h12M13 5l3 3-3 3M20 16H8M11 13l-3 3 3 3' stroke-linecap='round' stroke-linejoin='round'/></svg><span>Tagih</span></button><button class='ds-tab'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.9'><path d='M5 19V11M12 19V5M19 19v-5' stroke-linecap='round'/></svg><span>Report</span></button></nav></div>",
+      "css": ".ds-navs { display: flex; align-items: flex-end; gap: 18px; } .ds-rail { display: flex; flex-direction: column; gap: 6px; width: 92px; flex: none; padding: 18px 10px; background: var(--sheet, #ffffff); border: 1px solid var(--rule, #e4e4e1); } .ds-rail-tab { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 0 10px; background: none; color: var(--ink-2, #565b66); font: 650 10.5px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; border: 1px solid transparent; border-top: 2px solid transparent; border-radius: var(--radius, 4px); cursor: pointer; } .ds-rail-tab svg { width: 24px; height: 24px; } .ds-rail-tab-active { color: #fff; background: var(--stamp, #d04a02); border-color: var(--stamp-deep, #9e3802); } .ds-tabs { display: flex; flex: 1; gap: 4px; padding: 6px 10px; background: var(--sheet, #ffffff); border-top: 2px solid var(--stamp, #d04a02); } .ds-tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 50px; padding: 5px 0 4px; background: none; border: 1px solid transparent; border-top: 2px solid transparent; border-radius: 0 0 var(--radius-sm, 3px) var(--radius-sm, 3px); color: var(--ink-2, #565b66); font: 600 10px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; cursor: pointer; } .ds-tab svg { width: 23px; height: 23px; } .ds-tab-active { color: #fff; background: var(--stamp, #d04a02); border-color: var(--stamp-deep, #9e3802); } .ds-tab:focus-visible, .ds-rail-tab:focus-visible { outline: 2px solid var(--stamp, #d04a02); outline-offset: 2px; }"
     },
     {
       "name": "Notice Sheet",
       "kind": "card",
-      "refersTo": "sheet-warn",
-      "description": "A notice printed in another ink: opaque tinted paper, matching rule colour, an 18px drawn mark, 13px text.",
+      "refersTo": "sheet-attention",
+      "description": "A notice printed in another ink: opaque tinted paper, matching rule colour, an 18px drawn mark, 13px text. Attention is the stamp wash; green is settled; red is destruction.",
       "html": "<div class='ds-notice'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3.6 21 19.2H3z'/><path d='M12 9.6v4'/><path d='M12 16.4h.01'/></svg><span>Angka service charge agak buram, kemungkinan 19.750.</span></div>",
-      "css": ".ds-notice { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--warn-tint, #f5eed6); border: 1px solid var(--warn-rule, #d8c48c); border-radius: var(--radius, 4px); color: var(--warn, #7d5400); font: 400 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-notice svg { flex: none; width: 18px; height: 18px; margin-top: 1px; } .ds-notice-ok { background: var(--ok-tint, #e5efe7); border-color: var(--ok-rule, #aac9b1); color: var(--ok, #1e6b46); } .ds-notice-bad { background: var(--bad-tint, #f6e6e2); border-color: var(--bad-rule, #d9aaa1); color: var(--bad, #a02a1e); } .ds-notice-carbon { background: var(--carbon-tint, #efeaf3); border-color: var(--carbon, #6b5a86); color: var(--ink-2, #4a5a7d); }"
+      "css": ".ds-notice { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; background: var(--attention-tint, #fdf1ea); border: 1px solid var(--attention-rule, #eec3ab); border-radius: var(--radius, 4px); color: var(--stamp-deep, #9e3802); font: 400 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-notice svg { flex: none; width: 18px; height: 18px; margin-top: 1px; } .ds-notice-ok { background: var(--ok-tint, #e6f0e9); border-color: var(--ok-rule, #a9c9b3); color: var(--ok, #1c6b47); } .ds-notice-bad { background: var(--bad-tint, #f7e7e3); border-color: var(--bad-rule, #d9aca3); color: var(--bad, #a32b1e); }"
     },
     {
       "name": "Document Slip",
       "kind": "card",
       "refersTo": "sheet",
-      "description": "The nota's carbon copy: one slip per person, Pay link against the right edge, itemised lines, and a due band bled to the card's edges.",
+      "description": "The nota's carbon copy: one slip per person on #fffefa paper, Pay link against the right edge, itemised lines, and a due band bled to the card's edges above a 2px ink rule.",
       "html": "<article class='ds-slip'><div class='ds-slip-head'><h3 class='ds-slip-name'>Budi</h3><a class='ds-slip-pay' href='#'>Pay</a></div><ul class='ds-slip-lines'><li><span>Long Black</span><span class='num'>35.000</span></li><li><span>Lychee Tea 1/2</span><span class='num'>40.000</span></li></ul><dl class='ds-slip-sub'><dt>Subtotal</dt><dd class='num'>110.000</dd><dt>Tax + service</dt><dd class='num'>17.050</dd></dl><div class='ds-slip-due'><span class='ds-slip-label'>Rp 27.050 left</span><span class='ds-slip-amount'>Rp 127.050</span></div></article>",
-      "css": ".ds-slip { display: flex; flex-direction: column; max-width: 320px; padding: 15px 14px 0; background: var(--paper, #fbfcf7); border: 1px solid var(--rule, #c6ccba); border-radius: var(--radius, 4px); color: var(--ink, #1b2f5e); font: 400 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-slip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 11px; } .ds-slip-name { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.2; } .ds-slip-pay { flex: none; padding: 3px 11px; border: 1.5px solid var(--stamp, #d04a02); border-radius: var(--radius-sm, 3px); color: var(--stamp-deep, #9e3802); font-size: 12px; font-weight: 650; line-height: 1.5; text-decoration: none; } .ds-slip-lines { margin: 0; padding: 0; list-style: none; } .ds-slip-lines li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; } .ds-slip-lines .num { font-variant-numeric: tabular-nums; } .ds-slip-sub { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: auto 0 13px; padding-top: 9px; border-top: 1px solid var(--sheet-2, #eef1e7); font-size: 13px; } .ds-slip-sub dt { color: var(--ink-2, #4a5a7d); } .ds-slip-sub dd { margin: 0; font-variant-numeric: tabular-nums; } .ds-slip-due { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 -14px; padding: 11px 14px 12px; border-top: 2px solid var(--ink, #1b2f5e); border-radius: 0 0 3px 3px; background: var(--sheet-2, #eef1e7); } .ds-slip-label { font-size: 12px; font-weight: 600; color: var(--ink-2, #4a5a7d); } .ds-slip-amount { font: 700 21px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--stamp-deep, #9e3802); }"
+      "css": ".ds-slip { display: flex; flex-direction: column; max-width: 320px; padding: 15px 14px 0; background: var(--paper, #fffefa); border: 1px solid var(--rule, #e4e4e1); border-radius: var(--radius, 4px); color: var(--ink, #14161c); font: 400 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; } .ds-slip-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 11px; } .ds-slip-name { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.2; } .ds-slip-pay { flex: none; padding: 3px 11px; border: 1.5px solid var(--stamp, #d04a02); border-radius: var(--radius-sm, 3px); color: var(--stamp-deep, #9e3802); font-size: 12px; font-weight: 650; line-height: 1.5; text-decoration: none; } .ds-slip-lines { margin: 0; padding: 0; list-style: none; } .ds-slip-lines li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 4px 0; font-size: 13px; } .ds-slip-lines .num { font-variant-numeric: tabular-nums; } .ds-slip-sub { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: auto 0 13px; padding-top: 9px; border-top: 1px solid var(--sheet-2, #f7f7f5); font-size: 13px; } .ds-slip-sub dt { color: var(--ink-2, #565b66); } .ds-slip-sub dd { margin: 0; font-variant-numeric: tabular-nums; } .ds-slip-due { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 -14px; padding: 11px 14px 12px; border-top: 2px solid var(--ink, #14161c); border-radius: 0 0 3px 3px; background: var(--sheet-2, #f7f7f5); } .ds-slip-label { font-size: 12px; font-weight: 600; color: var(--ink-2, #565b66); } .ds-slip-amount { font: 700 21px/1 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--stamp-deep, #9e3802); }"
+    },
+    {
+      "name": "Dua Ply Mark",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "The brand mark: a stamped orange square with its carbon copy outlined behind it. 36px in the phone letterhead, 40px wide, #d04a02 in the raster sets.",
+      "html": "<svg class='ds-duaply' viewBox='0 0 64 64' aria-hidden='true'><rect x='17' y='17' width='39' height='39' rx='6' fill='none' stroke='var(--stamp, #d04a02)' stroke-width='3' opacity='0.4'/><rect x='8' y='8' width='39' height='39' rx='6' fill='var(--stamp, #d04a02)'/><path fill='#fff' fill-rule='evenodd' d='M19 16h9a12.5 12.5 0 0 1 0 25h-9V16Zm5.5 6v13h3a6.5 6.5 0 0 0 0-13h-3Z'/></svg>",
+      "css": ".ds-duaply { width: 36px; height: 36px; display: block; }"
     }
   ],
   "narrative": {
     "northStar": "The Kwitansi Pad",
-    "overview": "DUO is an Indonesian carbon-copy receipt pad, not a dashboard. Every bill is a serially numbered kwitansi torn from the pad: pre-printed labels, ruled write-in lines, an amount box for the one figure that is a decision, a perforated counterfoil carrying the numbering-machine serial, and one orange rubber stamp pressed onto a line when the money arrives. The carbon copy underneath takes the same mark, so the payer's page and the nota read as the second ply of the form the operator filled in.\n\nThe material is flat paper on a table. Surfaces are opaque and one step lighter than the ground they sit on; separation is a hairline rule or a 2px ink rule; nothing blurs, nothing floats, nothing is translucent. Orange has exactly one meaning — the stamp, and the commit that does the same thing (\"this happened\") — and is spent accordingly: the primary button, the pressed stamp square, the brand mark, the focus ring, the active index tab's top edge. Everything else is printed ink on paper: blue-black for text, numbering-machine red for serials, carbon purple for duplicates, amber/green/red for the printed notices.\n\nThe world also decides what the app is not. It is not a fintech dashboard (no cards floating over gradients, no charts, no pills), not a chat feed, and not glass — an earlier pass dressed it in Apple's Liquid Glass and was rejected twice. The two documents (the nota and the payer page) are light and paint their own colours, because they leave the app as links pasted into a WhatsApp group, as screenshots, and as paper.",
+    "overview": "DUO is an Indonesian carbon-copy receipt pad, not a dashboard. Every bill is a serially numbered kwitansi torn from the pad: pre-printed labels, ruled write-in lines, an amount box for the one figure that is a decision, a perforated counterfoil carrying the numbering-machine serial, and one orange rubber stamp pressed onto a line when the money arrives. The carbon copy underneath takes the same mark, so the payer's page and the nota read as the second ply of the form the operator filled in — which is also why the mark is a stamped square with its carbon copy behind it.\n\nThe material is white paper on a grey desk, flat by construction. An earlier build of this world used pale green-grey paper, a navy ink, a numbering-machine red and a carbon purple; an attended review rejected the cast (\"nothing is clean\"), and the palette was rebuilt white-out, orange-forward. The forms are pure white, the ink is near-black, and the stamp orange now does two jobs at once: it is the stamped mark and the attention ink — the pressed square and the unpaid money, the commit and the proof still to read. Green stays functional (settled); red stays functional (destruction); there is no separate warning hue. The Liquid Glass pass this app was dressed in even earlier is likewise still banned: nothing blurs, nothing floats, nothing is translucent.\n\nThe world also decides what the app is not. It is not a fintech dashboard (no cards floating over gradients, no charts, no pills), and not a chat feed. The two documents (the nota and the payer page) are light and paint their own colours, because they leave the app as links pasted into a WhatsApp group, as screenshots, and as paper.",
     "keyCharacteristics": [
-      "A pale green-grey ground with near-white forms on it; blue-black pre-printed ink; one orange stamp; numbering-machine red; carbon purple.",
-      "Money is ink, tabular and right-aligned; orange never colours an amount.",
+      "A grey desk with pure white forms on it; near-black pre-printed ink; one orange that is both the stamp and the attention ink; green for settled, red for destruction.",
+      "The mark is the Dua Ply — the stamped square with its outlined carbon copy behind it.",
       "State is carried by shape and word as well as colour: dashed square → half-pressed → solid stamp, lettered LUNAS, printed notices.",
       "Flat by construction — depth is tonal, never a shadow.",
-      "Phone-width pad: a 520px centred column of form on any viewport; a separate 830px sheet for the nota.",
-      "Documents are light, self-painted and webfont-free; the app's chrome stops at the paper."
+      "Two scenes at one breakpoint (1100px): a 520px phone column with the index tabs welded to the bottom edge; a wide screen with a full-width letterhead, the same four tabs as a left rail, and two-pane screens.",
+      "Documents (the 830px nota and the 480px payer page) are light, self-painted and webfont-free; the app's chrome stops at the paper."
     ],
     "rules": [
-      { "name": "The One-Stamp Rule", "body": "Orange means \"this happened\" — the stamp and the commit. It never decorates: no orange headings, no orange ornament, no orange money in a ledger.", "section": "colors" },
-      { "name": "The Ledger-Is-Ink Rule", "body": "In the app's ledgers an amount is ink: an outstanding figure is --ink at 700, a part-paid remainder the same ink heavier. The only orange on a share row is the stamp square. (The nota's due band is the documents' deliberate exception: the figure the reader must act on sits in --stamp-deep, the small-ink weight, beside its Pay control.)", "section": "colors" },
-      { "name": "The Two-Ply Rule", "body": "Carbon purple is a duplicate, never a warning. A warning is amber.", "section": "colors" },
+      { "name": "The One Orange Rule", "body": "Orange means the stamp (\"this happened\": the commit, the pressed square, the active tab, the mark) and it means attention (\"this needs you\": the money still out, the proof to read, the work not done). Those are the same meaning — the thing to act on — so it is one ink, and it never decorates: no orange headings, no orange ornament.", "section": "colors" },
+      { "name": "The Owed-Is-Attention Rule", "body": "Outstanding money is the one figure allowed to take the stamp ink outside the stamp itself: .owed at --stamp-deep 700 (the Tagihan ledger, Report's all-time panel, in an amount box), the Orang screen's remaining figure, the nota's due figures.", "section": "colors" },
+      { "name": "The Functional-Colour Rule", "body": "Green is settled and red is destruction; there is no third state hue. Everything that needs attention prints in the stamp family, and everything finished recedes to grey or green. The first build's amber warning family, serial red and carbon purple were deleted with the green-grey palette and do not come back.", "section": "colors" },
       { "name": "The No-Webfont Rule", "body": "System sans and system mono only, in the app and in the documents. A webfont is a third-party round trip before the first paint of a page someone is standing in a restaurant waiting for, and the form's character comes from its print, not its face.", "section": "typography" },
       { "name": "The Money-Never-Wraps Rule", "body": "Every amount carries tabular figures and white-space: nowrap. A figure that breaks after \"Rp\" prints as two numbers, and a column of figures that does not align cannot be added up by eye.", "section": "typography" },
-      { "name": "The Pad-Is-Phone-Width Rule", "body": "App chrome and content never exceed the 520px column; only documents get widths of their own (830px nota, 480px payer page). A wide screen is a wider table around the same pad, never a wider pad.", "section": "layout" },
+      { "name": "The Two-Scenes Rule", "body": "One breakpoint, 1100px. Below it the app is a phone pad: a 520px column with the index tabs at the bottom edge. At and above it the letterhead runs full width, the same four tabs become a left rail, and the screens that can use the room go two-pane. There is no third layout.", "section": "layout" },
+      { "name": "The Pad-Is-Phone-Width Rule", "body": "The phone column never widens. Only documents get widths of their own (830px nota, 480px payer page); a wide screen re-composes the phone column into panes around it, never a wider pad.", "section": "layout" },
       { "name": "The Flat-By-Construction Rule", "body": "If something must stand out it gets a rule, a frame, or a deeper sheet. Nothing blurs, nothing floats, nothing is translucent: no backdrop-filter, no raised cards, no drop shadows, no alpha fills except --stamp-tint as a state wash.", "section": "elevation" },
       { "name": "The Press-Mark Radius Rule", "body": "Corners are 4px, or 3px on small parts. Printed forms are square; a capsule or pill is a different world.", "section": "shapes" },
       { "name": "The State-Is-Shape Rule", "body": "Every state is carried by shape and word as well as colour: dashed/filled stamps, a lettered LUNAS, a bordered notice, \"Belum dibagi\", \"kurang Rp …\". Reading it in greyscale must still work.", "section": "shapes" }
     ],
     "dos": [
-      "Keep --stamp for the stamp and the commit only — one primary button per screen, the pressed square, the mark, the focus ring, the tab edge.",
-      "Use --stamp-deep for small orange ink; the base --stamp is a fill and a border, never small text (4.25:1 on the ground fails AA).",
-      "Keep money in tabular figures, right-aligned, nowrap; outstanding figures in ink, part-paid remainders in heavier ink.",
+      "Keep --stamp for the stamp, the commit and the chrome — one primary button per screen, the pressed square, the active tab and rail fill, the mark, the 2px letterhead and tab-bar rules, the focus ring.",
+      "Use --stamp-deep for small orange ink; the base --stamp is a fill and a border, never small text (it fails AA on paper).",
+      "Print the money that needs action in the stamp ink — .owed, .attention, the Orang remainder, the nota's due figures — and keep a bill's own ledger amounts in ink.",
+      "Keep money in tabular figures, right-aligned, nowrap.",
       "Carry state by shape and word as well as colour: dashed/half/solid stamp square, lettered LUNAS, a bordered notice, \"Belum dibagi\".",
       "Keep controls at least 44px tall and make the whole row the target when the row is the control (buttons, inputs, selects, rows).",
       "Keep documents light, self-painted, and webfont-free; they are read in chats, as screenshots, and on paper.",
       "Keep labels small, uppercase, and letter-spaced (0.09em) — they are pre-printed on the form, not headlines.",
-      "Keep depth tonal: a rule, a frame, or a deeper sheet."
+      "Keep depth tonal: a rule, a frame, or a deeper sheet.",
+      "Keep the two scenes at the one breakpoint: below 1100px the phone column with the tabs at the bottom edge, at 1100px and up the rail and the two-pane screens, with the same four tabs either way."
     ],
     "donts": [
-      "Don't put orange on a heading, a decoration, or a money figure in a ledger. Orange that is not the stamp or the commit dilutes the one thing it means.",
+      "Don't put orange on a heading, a decoration, or an amount inside a bill — orange that is not the stamp or an attention figure dilutes both meanings.",
       "Don't blur, float, or use translucent fills: no backdrop-filter, no raised cards, no drop shadows, no alpha washes except --stamp-tint as state.",
       "Don't use capsules, 999px radii, or pill chips — corners are 4px (--radius) or 3px (--radius-sm), because printed forms are square.",
       "Don't use a coloured side stripe as state; a dashed sheet, a dotted write-in line and a word say it without shouting.",
       "Don't use glyph characters as icons; draw SVG strokes (the chip's ×, the chevron, the tab icons, the notice triangle are all drawn).",
       "Don't add webfonts, and don't give the nota or the payer page dark chrome.",
       "Don't replace the stamp square with a switch or a tick-in-a-box; a tick is a checkbox, and a stamp is an event that happened.",
-      "Don't let a money figure wrap or break mid-number; each amount is one unbreakable token."
+      "Don't let a money figure wrap or break mid-number; each amount is one unbreakable token.",
+      "Don't reintroduce the rejected palette: no green-grey paper, no navy ink, no serial red, no carbon purple, no amber. The world is white paper and one orange that also carries attention."
     ]
   }
 }

@@ -8,10 +8,11 @@
    * security keyed on auth.uid(), so an unauthenticated app shows empty lists
    * and refuses every commit. Signing in is what makes the data layer work.
    *
-   * The chrome is two flat opaque bars — a branded header at the top and a tab
-   * bar at the bottom, each separated from the content by a hairline. Nothing
-   * is translucent and nothing blurs; see the note at the top of app.css for
-   * why that is deliberate rather than unfinished.
+   * Two chromes for two scenes. On a phone the tabs are index tabs welded to
+   * the bottom edge; on a wide screen the same four tabs move into a left
+   * rail and the letterhead grows the operator and the sign-out. Both are flat
+   * opaque bars ruled off with the stamp-orange 2px line; nothing is
+   * translucent and nothing blurs.
    */
   import { onMount } from 'svelte'
   import { supabaseConfigured } from './lib/supabase'
@@ -108,12 +109,12 @@
   /**
    * Paint the page white on the document routes.
    *
-   * The app is dark, but the nota and the payment page leave it — as a PDF, a
-   * print, or a screenshot in a group chat — and a dark document is worse in
-   * all three. Done here rather than inside those components because a
-   * `:global()` rule in a component's style block is in the stylesheet for the
-   * whole session the moment the component is bundled, which would take the
-   * app's own background with it everywhere else.
+   * The nota and the payment page leave the app — as a print, or as a
+   * screenshot in a group chat — so they sit on the cleanest paper the world
+   * has. Done here rather than inside those components because a `:global()`
+   * rule in a component's style block is in the stylesheet for the whole
+   * session the moment the component is bundled, which would take every other
+   * screen with it.
    */
   $effect(() => {
     document.body.classList.toggle('paper', PAPER.includes(route))
@@ -158,20 +159,32 @@
   <!--
     The nota is not a screen in the app, it is a document that leaves it. No
     header and no tab bar, so printing has nothing to hide and the page that
-    reaches the PDF is only the report.
+    reaches the print dialog is only the report.
   -->
   {#if !PAPER.includes(route)}
   <header class="app-header">
     <div class="brand">
-      <span class="mark">D</span>
+      <!--
+        The Dua Ply mark: the stamped square with its carbon copy behind it.
+        Drawn here rather than loaded as an image so it inherits the stamp ink
+        and stays crisp at any size.
+      -->
+      <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="17" y="17" width="39" height="39" rx="6" fill="none" stroke="var(--stamp)" stroke-width="3" opacity="0.4" />
+        <rect x="8" y="8" width="39" height="39" rx="6" fill="var(--stamp)" />
+        <path fill="#fff" fill-rule="evenodd" d="M19 16h9a12.5 12.5 0 0 1 0 25h-9V16Zm5.5 6v13h3a6.5 6.5 0 0 0 0-13h-3Z" />
+      </svg>
       <span class="brand-text">
         <strong>DUO</strong>
         <small>Split Bill</small>
       </span>
     </div>
-    {#if session.email}
-      <button class="plain nav-action" onclick={() => session.signOut()}>Keluar</button>
-    {/if}
+    <div class="header-actions">
+      {#if session.email}
+        <span class="operator">operator <b>{session.email}</b></span>
+        <button class="plain nav-action" onclick={() => session.signOut()}>Keluar</button>
+      {/if}
+    </div>
   </header>
   {/if}
 
@@ -216,29 +229,44 @@
   {:else if !demo && !session.current}
     <main><SignIn /></main>
   {:else}
-    <main>
-      <!--
-        The person screen writes its own title, because for that one the title
-        is a name rather than a word — "Orang" above "Budi" says the same thing
-        twice.
-      -->
-      {#if route !== 'orang'}
-        <h1 class="page-title">{TITLES[route]}</h1>
-      {/if}
-      {#if route === 'bills'}
-        <Bills />
-      {:else if route === 'capture'}
-        <Capture onReview={() => go('review')} />
-      {:else if route === 'settle'}
-        <Settle />
-      {:else if route === 'review'}
-        <Review onDone={() => go('bills')} />
-      {:else if route === 'orang'}
-        <Orang />
-      {:else}
-        <Report />
-      {/if}
-    </main>
+    <div class="workspace">
+      <!-- The same four tabs, moved to the pad's edge on a wide screen. -->
+      <nav class="rail">
+        {#each tabs as tab (tab.id)}
+          <button class="rail-tab" class:active={route === tab.id} onclick={() => go(tab.id)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9">
+              {@html tab.icon}
+            </svg>
+            <span>{tab.label}</span>
+          </button>
+        {/each}
+      </nav>
+
+      <main>
+        <!--
+          The person screen writes its own title, because for that one the title
+          is a name rather than a word — "Orang" above "Budi" says the same thing
+          twice. On a wide screen the rail carries the orientation, so the title
+          steps aside.
+        -->
+        {#if route !== 'orang'}
+          <h1 class="page-title">{TITLES[route]}</h1>
+        {/if}
+        {#if route === 'bills'}
+          <Bills />
+        {:else if route === 'capture'}
+          <Capture onReview={() => go('review')} />
+        {:else if route === 'settle'}
+          <Settle />
+        {:else if route === 'review'}
+          <Review onDone={() => go('bills')} />
+        {:else if route === 'orang'}
+          <Orang />
+        {:else}
+          <Report />
+        {/if}
+      </main>
+    </div>
 
     <nav class="tab-bar">
       {#each tabs as tab (tab.id)}
@@ -263,11 +291,9 @@
 
   /*
    * The pad's letterhead. Flat sheet, ruled edge, opaque — so the content
-   * scrolling under it is hidden rather than showing through.
-   *
-   * Capped and centred like the content: this is a phone-width object, and a
-   * wide screen gets a centred column of pad rather than a kilometre of ruled
-   * line. The documents are not capped — they have widths of their own.
+   * scrolling under it is hidden rather than showing through. Capped and
+   * centred on a phone; full width on a wide screen, where it also carries the
+   * operator and the sign-out.
    */
   .app-header {
     position: sticky;
@@ -283,7 +309,7 @@
     min-height: 56px;
     padding: calc(6px + env(safe-area-inset-top)) 16px 6px;
     background: var(--sheet);
-    border-bottom: 2px solid var(--ink);
+    border-bottom: 2px solid var(--stamp);
   }
 
   .brand {
@@ -292,19 +318,10 @@
     gap: 10px;
   }
 
-  /* The mark is the stamp itself: one flat orange square, pressed askew. */
   .mark {
     width: 36px;
     height: 36px;
-    border-radius: var(--radius-sm);
-    background: var(--stamp);
-    border: 1px solid var(--stamp-deep);
-    color: #fff;
-    font-size: 19px;
-    font-weight: 750;
-    display: grid;
-    place-items: center;
-    transform: rotate(-2deg);
+    flex: none;
   }
 
   .brand-text {
@@ -324,12 +341,36 @@
     color: var(--ink-2);
   }
 
-  .nav-action {
-    min-height: 36px;
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
   }
 
-  /* The page title: large, in the content, and it scrolls away. The letterhead
-     above it stays. */
+  /* The operator is bookkeeping for the letterhead, not for the thumb. */
+  .operator {
+    display: none;
+    font-size: 13px;
+    color: var(--ink-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .operator b {
+    font-family: var(--mono);
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .nav-action {
+    min-height: 36px;
+    padding: 0 8px;
+  }
+
+  /* The page title: large, in the content, and it scrolls away. Hidden on a
+     wide screen, where the rail already says which screen this is. */
   .page-title {
     font-size: var(--text-xl);
     font-weight: 750;
@@ -344,9 +385,9 @@
     margin: 16px;
     padding: 12px 14px;
     border-radius: var(--radius);
-    background: var(--warn-tint);
-    border: 1px solid var(--warn-rule);
-    color: var(--warn);
+    background: var(--attention-tint);
+    border: 1px solid var(--attention-rule);
+    color: var(--stamp-deep);
     font-size: var(--text-sm);
   }
 
@@ -358,6 +399,12 @@
     font-size: 13px;
   }
 
+  .workspace {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+  }
+
   main {
     flex: 1;
     width: 100%;
@@ -366,11 +413,15 @@
     padding: 16px 0 0;
   }
 
+  /* The rail exists only on a wide screen. */
+  .rail {
+    display: none;
+  }
+
   /*
-   * The pad's index tabs: a flat bar welded to the bottom edge, ruled off from
-   * the content by the same 2px ink line the letterhead wears. The active tab
-   * is the one pulled forward — desk ground behind it, ruled sides, and a
-   * stamp-orange edge across its top.
+   * The pad's index tabs: a flat bar welded to the bottom edge, ruled off with
+   * the stamp-orange 2px line the letterhead wears. The active tab is the one
+   * pulled forward, filled with the stamp.
    *
    * sticky rather than fixed, deliberately: both keep it in view, but fixed
    * positions against the viewport — so inside the 390px dev preview frame it
@@ -391,7 +442,7 @@
     min-height: var(--tab-space);
     padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
     background: var(--sheet);
-    border-top: 2px solid var(--ink);
+    border-top: 2px solid var(--stamp);
   }
 
   .tab {
@@ -423,9 +474,88 @@
   }
 
   .tab.active {
-    color: var(--ink);
-    background: var(--ground);
-    border-color: var(--rule);
-    border-top-color: var(--stamp);
+    color: #fff;
+    background: var(--stamp);
+    border-color: var(--stamp-deep);
+  }
+
+  /*
+   * The wide screen: the letterhead runs the full width, the tabs move to the
+   * left rail, and the content stops being a phone column. Each route decides
+   * what to do with the room; the shell only stops constraining it.
+   */
+  @media (min-width: 1100px) {
+    .app-header {
+      max-width: none;
+      min-height: 64px;
+      padding: 8px 28px;
+      gap: 16px;
+    }
+
+    .mark {
+      width: 40px;
+      height: 40px;
+    }
+
+    .operator {
+      display: inline;
+    }
+
+    .page-title {
+      display: none;
+    }
+
+    main {
+      max-width: none;
+      margin: 0;
+      padding: 22px 28px 28px;
+    }
+
+    .rail {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      width: 92px;
+      flex: none;
+      padding: 18px 10px;
+      background: var(--sheet);
+      border-right: 1px solid var(--rule);
+    }
+
+    .rail-tab {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 12px 0 10px;
+      background: none;
+      color: var(--ink-2);
+      font-size: 10.5px;
+      font-weight: 650;
+      border: 1px solid transparent;
+      border-top: 2px solid transparent;
+      border-radius: var(--radius);
+    }
+
+    .rail-tab:active:not(:disabled) {
+      opacity: 0.7;
+      transform: none;
+    }
+
+    .rail-tab svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .rail-tab.active {
+      color: #fff;
+      background: var(--stamp);
+      border-color: var(--stamp-deep);
+      border-top-color: var(--stamp-deep);
+    }
+
+    .tab-bar {
+      display: none;
+    }
   }
 </style>

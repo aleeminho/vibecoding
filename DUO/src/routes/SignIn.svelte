@@ -113,6 +113,9 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
+    width: 100%;
+    max-width: 440px;
+    margin: 0 auto;
   }
 
   /* The gaps live here, not only on .screen. The form is a single child of
