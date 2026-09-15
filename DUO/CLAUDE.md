@@ -161,6 +161,12 @@ except these, all deliberate:
 a key a `VITE_` prefix** — that puts it in the browser bundle. Never ask for a
 key in chat.
 
+`.env.local` and Supabase secrets hold `DEEPSEEK_API_KEY` separately: rotating
+one does not update the other, and an edge function keeps using the old value
+until `supabase secrets set` runs again (next invocation picks it up, no
+redeploy). To see what production holds without printing the key, sha256 the
+`.env.local` value and compare it to the digest in `supabase secrets list`.
+
 ---
 
 ## Keep this file current — it is part of the change
