@@ -16,6 +16,7 @@ them.
 | `dd8b7d6` | Cleanup migration `20260916000000_clean_run_data.sql`: run data deleted, `bills_ref_code_was` dropped, `receipts` bucket recreated |
 | `69f28d1` | Edge Function logs DeepSeek's `usage` for every scan (Supabase → Edge Functions → Logs) |
 | `edd47f9` | The log line prices the scan in USD — `pricing.ts` carries the per-token rates and the peak/off-peak rule, `scripts/pricing.test.ts` pins the math, and `test:extract` prints the same cost |
+| `ab80f94` + `887080d` | Item editor fields lined up: the amount regains its JUMLAH label, and both fields became identical label/6px/input blocks — measured `deltaTop: 0` at 390px and 1440px |
 
 ## Production state
 
