@@ -535,6 +535,7 @@
                   />
                 </label>
                 <MoneyInput
+                  label="Jumlah"
                   value={item.line_total}
                   onchange={(v) => draft.updateItem(item.position, { line_total: v })}
                 />
