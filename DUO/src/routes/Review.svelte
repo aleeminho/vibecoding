@@ -924,6 +924,17 @@
     margin-bottom: 6px;
   }
 
+  /*
+   * A field is a block, not a text line: label above, input below. Without
+   * this the input is inline in the label's line box, its baseline adds a few
+   * pixels of leading, and the next field in the row — a MoneyInput, which is
+   * already a flex column — starts at a different height.
+   */
+  .fields label {
+    display: flex;
+    flex-direction: column;
+  }
+
   .grid {
     display: grid;
     grid-template-columns: 1fr 1fr;

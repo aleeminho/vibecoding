@@ -63,10 +63,15 @@
 </label>
 
 <style>
+  /*
+   * The same block a plain field draws: label, 6px, input. This is the gap a
+   * `.field-label` gets from its own margin-bottom, so a MoneyInput and a
+   * labelled input sitting in one grid row line their inputs up exactly.
+   */
   label {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 6px;
   }
 
   .label {
