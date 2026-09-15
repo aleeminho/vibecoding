@@ -6,10 +6,11 @@
  * from a phone, which is exactly how it gets tested during development. The
  * textarea fallback exists for that case, not for old browsers.
  *
- * This file used to hold a WhatsApp message builder as well. That was deleted:
- * a wall of numbers in a proportional font is unreadable and uncheckable in a
- * group chat, and it has been replaced by a document (routes/Nota.svelte) that
- * people can actually read and that carries the arithmetic with it.
+ * The group-chat message lives in routes/Nota.svelte now (`notaMessage`): a
+ * summary, one line per person, the payment details and the nota link. It is
+ * deliberately not a full itemisation — a wall of numbers in a proportional
+ * font is unreadable and uncheckable in a group chat, and the nota page it
+ * links to is where the arithmetic is meant to be argued with.
  */
 export async function copyText(text: string): Promise<boolean> {
   try {

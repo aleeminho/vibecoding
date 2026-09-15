@@ -40,35 +40,65 @@
   let note = $state<string | null>(null)
 
   /**
-   * Hand the group this page's address.
+   * The message the operator pastes into the group chat.
    *
-   * The document stopped being a PDF and became a link, and that was the whole
-   * argument for it: a link keeps working. The Pay button on each card is a
-   * real destination rather than a printed word that cannot be tapped, the
-   * screen it opens is the one the payer's own share lives on, and no part of
-   * the document has to be redrawn in a format that has forgotten it was ever
-   * a page.
+   * The nota is a link, and this is what carries it: the bill's summary, one
+   * line per person with what they owe — and what has already landed — and
+   * where to send the money. Composed here rather than handed to the OS share
+   * sheet, because the confirmed flow is one tap to copy and a manual paste
+   * into the group (PRD §4).
    *
-   * This is the operator's copy of the address. Everyone else gets it in the
-   * message.
+   * `bandLabel` is deliberately not reused: it is written for the document's
+   * English slips, and this message is the operator talking to the group in
+   * Indonesian.
    */
-  async function shareNota() {
-    const url = location.href
-    note = null
+  function notaMessage(): string {
+    if (!bill) return ''
 
-    try {
-      if (navigator.share) {
-        await navigator.share({ url, title: `Nota ${bill?.place ?? ''}` })
-        return
+    const lines: string[] = [
+      `Nota ${bill.place} — ${formatDate(bill.bill_date)}`,
+      `Total ${rupiah(bill.total)}`,
+      '',
+      'Bagiannya:',
+    ]
+
+    for (const p of breakdown) {
+      let state = ''
+      if (p.is_payer) state = ' — udah dibayar di kasir'
+      else if (p.status === 'lunas') state = ' — udah lunas'
+      else if (p.amount_paid > 0) {
+        state = ` — udah masuk ${rupiah(p.amount_paid)}, sisa ${rupiah(p.total - p.amount_paid)}`
       }
-    } catch (err) {
-      // Dismissing the share sheet is a decision, not a failure.
-      if ((err as Error).name === 'AbortError') return
+      lines.push(`- ${p.person}: ${rupiah(p.total)}${state}`)
     }
 
-    note = (await copyText(url))
-      ? 'Link notanya udah disalin.'
-      : 'Nggak bisa nyalin otomatis — tekan lama link di address bar.'
+    lines.push('', 'Buka notanya di sini, tiap orang ada tombol Pay di kartunya:', location.href)
+
+    const pay: string[] = []
+    if (offersBank(bill)) {
+      pay.push(
+        `transfer ke ${bill.bank_name} ${bill.account_number}` +
+          (bill.account_holder ? ` a.n. ${bill.account_holder}` : ''),
+      )
+    }
+    if (offersQris(bill)) pay.push('atau scan QRIS di halaman bayarnya')
+    if (pay.length > 0) lines.push('', `Bayarnya: ${pay.join(', ')}.`)
+
+    lines.push('', 'Upload bukti transfernya di halaman itu ya — nanti dicek otomatis.')
+
+    return lines.join('\n')
+  }
+
+  /**
+   * One tap: the whole message on the clipboard, ready to paste. No share
+   * sheet — the operator's path is copy then paste into the group, and a share
+   * sheet would only add a second, different path to the same place.
+   */
+  async function copyNota() {
+    note = null
+    note = (await copyText(notaMessage()))
+      ? 'Teks buat WA-nya udah disalin. Tinggal paste di grupnya.'
+      : 'Nggak bisa nyalin otomatis. Coba pencet sekali lagi.'
   }
 
   let summed = $derived(breakdown.reduce((acc, p) => acc + p.total, 0))
@@ -205,15 +235,15 @@
 {:else}
   <div class="screen">
     <div class="controls">
-      <button class="go" onclick={shareNota}>Bagikan link nota</button>
+      <button class="go" onclick={copyNota}>Copy teks buat WA</button>
       <button class="back" onclick={() => history.back()}>Kembali</button>
       <p class="hint">
         {#if note}
           {note}
         {:else}
-          Kirim link ini ke grupnya. Tiap orang buka notanya sendiri dan pencet
-          tombol <strong>Pay</strong> di kartunya — langsung masuk halaman
-          bayarnya.
+          Pencet tombolnya, terus paste teksnya di grup WA. Tiap orang buka
+          notanya sendiri dan pencet tombol <strong>Pay</strong> di kartunya —
+          langsung masuk halaman bayarnya.
         {/if}
       </p>
     </div>
