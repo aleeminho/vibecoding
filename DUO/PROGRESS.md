@@ -59,3 +59,22 @@ Demo routes (dev build only): `#/bills?demo`, `#/report?demo`, `#/preview`,
 `#/preview?done`, `#/preview?fresh`, `#/preview?crowd`,
 `#/nota?id=demo-1&demo`,
 `#/bayar?t=00000000-0000-4000-8000-000000000003&demo`.
+
+## Seeing what a scan costs
+
+- **Per scan, as it happens** — Supabase → Edge Functions → extract-receipt →
+  Logs (dashboard: `supabase.com/dashboard/project/xkjtzthsqorqyyqkbrzb/functions/extract-receipt/logs`).
+  Every 200-response logs one line, searchable by the prefix `extract-receipt cost`:
+
+  ```
+  extract-receipt cost $0.002104 (off-peak) · in-hit 1200 tok $0.000004 · in-miss 2000 tok $0.000300 · out 3000 tok $0.001800
+  ```
+
+  The Edge Function has no CLI log command; the dashboard is the way in.
+- **Locally, before committing anything** — `bun run test:extract <foto>` prints
+  the same Token + Biaya lines, using the shared `pricing.ts` module. A real
+  scan measured this way: 2,534 in / 780 out → **$0.000509** off-peak.
+- **Cumulative spend** — DeepSeek platform → Usage (`platform.deepseek.com`),
+  by model and date. Prices and the peak/off-peak rule live in
+  `supabase/functions/extract-receipt/pricing.ts`; a change there is pinned by
+  `scripts/pricing.test.ts`.
