@@ -21,6 +21,7 @@
  */
 
 import { MODEL, PROMPT } from './prompt.ts'
+import { priceCall } from './pricing.ts'
 
 /**
  * A receipt is dense small text read off a phone photo at an angle, and the
@@ -218,12 +219,18 @@ Deno.serve(async (req: Request) => {
   }
 
   // What this scan cost, where the wallet can see it: Supabase → Edge Functions
-  // → Logs. The reasoning tokens are inside completion_tokens, so this is the
-  // whole spend; the cache fields say which half of the input was re-paid for.
-  // Logged before the failure branches below so a capped or empty answer still
-  // shows what it burned.
+  // → Logs. The reasoning tokens are inside completion_tokens, so the output
+  // line is the whole spend; the cache split says which half of the input was
+  // re-paid for and at which rate. Logged before the failure branches below so
+  // a capped or empty answer still shows what it burned.
   if (body.usage) {
-    console.log('extract-receipt usage', MODEL, JSON.stringify(body.usage))
+    const cost = priceCall(body.usage)
+    console.log(
+      `extract-receipt cost $${cost.total.toFixed(6)} (${cost.tier})` +
+        ` · in-hit ${cost.hit} tok $${cost.inputHit.toFixed(6)}` +
+        ` · in-miss ${cost.miss} tok $${cost.inputMiss.toFixed(6)}` +
+        ` · out ${cost.out} tok $${cost.output.toFixed(6)}`,
+    )
   }
 
   const choice = body.choices?.[0]

@@ -34,6 +34,7 @@
 import { readFileSync } from 'node:fs'
 import { basename, extname } from 'node:path'
 import { MODEL, PROMPT } from '../supabase/functions/extract-receipt/prompt.ts'
+import { priceCall } from '../supabase/functions/extract-receipt/pricing.ts'
 import { normalizeExtraction, stripCodeFence } from '../src/lib/normalize.ts'
 import { checkGate1, checkGate2, computeSplit } from '../src/lib/split.ts'
 import type { AssignedItem } from '../src/lib/types.ts'
@@ -227,7 +228,12 @@ async function callModel(): Promise<string> {
 
   const body = JSON.parse(raw) as {
     choices?: { message?: { content?: string }; finish_reason?: string }[]
-    usage?: { prompt_tokens?: number; completion_tokens?: number }
+    usage?: {
+      prompt_tokens?: number
+      completion_tokens?: number
+      prompt_cache_hit_tokens?: number
+      prompt_cache_miss_tokens?: number
+    }
   }
 
   const choice = body.choices?.[0]
@@ -242,9 +248,18 @@ async function callModel(): Promise<string> {
     )
   }
 
+  // The same math the Edge Function logs, so a scan measured here and a scan in
+  // production agree on the rupiah-to-dollar question.
   if (body.usage) {
+    const cost = priceCall(body.usage)
     console.log(
       `Token   : ${body.usage.prompt_tokens} masuk, ${body.usage.completion_tokens} keluar`,
+    )
+    console.log(
+      `Biaya   : $${cost.total.toFixed(6)} (${cost.tier})` +
+        ` · in-hit ${cost.hit} $${cost.inputHit.toFixed(6)}` +
+        ` · in-miss ${cost.miss} $${cost.inputMiss.toFixed(6)}` +
+        ` · out ${cost.out} $${cost.output.toFixed(6)}`,
     )
   }
 
