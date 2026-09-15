@@ -71,7 +71,10 @@
 
   .label {
     font-size: var(--text-xs);
-    color: var(--label-2);
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-2);
   }
 
   input {

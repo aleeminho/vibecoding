@@ -130,7 +130,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   .group {
@@ -139,57 +139,71 @@
     gap: 8px;
   }
 
+  /*
+   * The blank form: a dashed frame where a photo will be written in, with the
+   * head of the pad's stamp square. It is the one place in the app that invites
+   * rather than reports.
+   */
   .hero {
     flex-direction: column;
     align-items: center;
     text-align: center;
     gap: 6px;
-    padding: 32px 24px;
+    padding: 30px 24px;
   }
 
   .hero-icon {
-    color: var(--brand-light);
-    margin-bottom: 4px;
+    width: 64px;
+    height: 64px;
+    display: grid;
+    place-items: center;
+    margin-bottom: 8px;
+    border: 1.5px dashed var(--rule-strong);
+    border-radius: var(--radius);
+    background: #fdfef9;
+    color: var(--stamp-deep);
   }
 
   .hero-icon svg {
-    width: 46px;
-    height: 46px;
+    width: 38px;
+    height: 38px;
   }
 
   .hero-title {
     font-size: var(--text-lg);
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-weight: 700;
+    letter-spacing: -0.015em;
   }
 
   .hero-sub {
     font-size: var(--text-sm);
-    color: var(--label-2);
+    color: var(--ink-2);
     max-width: 30ch;
   }
 
+  /* The photo is clipped to the form like a print in a paper frame. */
   .preview {
-    width: 100%;
     max-height: 46dvh;
     object-fit: contain;
     border-radius: var(--radius);
     background: #000;
     margin: 0 16px;
     width: calc(100% - 32px);
+    border: 6px solid #fff;
+    outline: 1px solid var(--rule-strong);
   }
 
   .working {
     gap: 10px;
-    color: var(--label-2);
+    color: var(--ink-2);
     font-size: var(--text-sm);
   }
 
   .spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.12);
-    border-top-color: var(--brand);
+    border: 2px solid var(--rule);
+    border-top-color: var(--stamp);
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
     flex-shrink: 0;
@@ -202,7 +216,13 @@
   }
 
   .error-text {
-    color: var(--red);
+    color: var(--bad);
     font-size: var(--text-sm);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner {
+      animation-duration: 2s;
+    }
   }
 </style>

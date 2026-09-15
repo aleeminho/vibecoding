@@ -1,100 +1,89 @@
 /*
- * Flat, dark, in PwC orange.
+ * DUO — the pad.
  *
- * The look, in one line: opaque surfaces one step lighter than the page, a
- * hairline border, rounded rectangles. Nothing blurs, nothing floats, nothing
- * is translucent.
+ * The world, in one line: an Indonesian carbon-copy kwitansi pad. Light form
+ * paper, a blue-black pre-printed ink, a numbering-machine red for the serial,
+ * and one orange rubber stamp that means the money arrived. Paper on a table,
+ * so separation is a ruled line and a frame — nothing floats, nothing blurs,
+ * nothing is translucent.
  *
- * That last part is worth stating plainly because it has been undone twice. An
- * earlier pass dressed this app in Apple's Liquid Glass — backdrop blur,
- * translucent fills, a specular highlight along every top edge, and chrome that
- * hovered over the content — and it was rejected. Do not reintroduce it. The
- * tells are `backdrop-filter`, `rgba(255,255,255,0.0x)` fills, `inset 0 1px 0`
- * highlights, and bars with side margins and a 999px radius.
+ * The ground is the form's pale green-grey rather than cream on purpose. A warm
+ * cream ground is what every model reaches for when it is handed "paper", and
+ * the kwitansi pad this world is named after is printed on green.
  *
- * What is left is the original structure: grouped lists, captions, hairlines,
- * per-item cards, a flat branded header, a flat tab bar.
+ * Orange is the stamp and the commit action, and both mean the same thing: this
+ * happened. It is never decoration. Identity is the serial red, attention the
+ * amber, a duplicate the carbon purple, destruction the form red.
  *
- * The background still carries two soft light sources. They are not there to be
- * refracted by anything — they keep a large dark screen from reading as a flat
- * void.
- *
- * Token names are role-based (--brand, --surface, --warn), not hue-based or
- * material-based. That is deliberate: the palette has been indigo and orange
- * within one sitting, and the material has changed twice; names that describe
- * the current answer turn every change into a rename across six files.
+ * Token names are role-based (--sheet, --ink, --stamp), never hue-based: the
+ * palette has changed under this app twice, and names that describe the current
+ * answer turn every change into a rename across every file.
  */
 
 :root {
-  /* PwC black. Neutral rather than navy — a cool background fights a warm
-     accent, and the orange needs somewhere honest to sit. */
-  --bg: #0d0c0b;
+  /* The desk the pad sits on, and the forms that sit on the desk. */
+  --ground: #e7ebe0;
+  --sheet: #f6f8f1;
+  --sheet-2: #eef1e7;
+  --sheet-3: #e0e5d6;
+
+  --rule: #c6ccba;
+  --rule-strong: #98a18c;
+
+  /* Pre-printed form ink. */
+  --ink: #1b2f5e;
+  --ink-2: #4a5a7d;
+  --ink-3: #64708c;
 
   /*
-   * Flat surfaces. Opaque, no blur, no translucency, no bevel.
-   *
-   * A card is one step lighter than the page and outlined with a hairline; that
-   * is the whole separation mechanism, and it costs nothing to paint. The
-   * previous version ran a 30px backdrop blur behind every card, row and
-   * button, which is real work for the GPU on a phone — for an effect that was
-   * not wanted in the first place.
+   * PwC orange, kept as the brand and spent here as the stamp. #d04a02 carries
+   * white labels at 4.5:1, so it fills the primary button; as small ink on
+   * paper it needs its darker sibling, which is what --stamp-deep is for.
    */
-  --surface: #1a1918;
-  --surface-2: #242220;
-  --border: rgba(255, 255, 255, 0.09);
+  --stamp: #d04a02;
+  --stamp-deep: #9e3802;
+  --stamp-tint: rgba(208, 74, 2, 0.12);
 
-  --label: #f4f4f5;
-  --label-2: #a1a1aa;
-  --label-3: #71717a;
+  /* The numbering-machine red, and the second ply. */
+  --serial: #b0362b;
+  --carbon: #6b5a86;
+  --carbon-tint: #efeaf3;
 
-  /*
-   * The PwC palette. Orange #D04A02 is the brand colour and the fill; Tangerine
-   * #EB8C00 is its lighter sibling, which is what text has to use here — plain
-   * #D04A02 is 4.25:1 on this background, under the 4.5:1 that body text needs,
-   * so it is never used as small text. White on #D04A02 is 4.50:1, which is why
-   * the filled buttons carry white labels.
-   */
-  --brand: #d04a02;
-  --brand-deep: #a83a02;
-  --brand-light: #eb8c00;
-  --brand-glow: rgba(208, 74, 2, 0.40);
-  --brand-tint: rgba(208, 74, 2, 0.18);
+  --warn: #7d5400;
+  --warn-tint: #f5eed6;
+  --warn-rule: #d8c48c;
 
-  --green: #10b981;
-  --green-tint: rgba(16, 185, 129, 0.14);
-  /* Yellow rather than amber: PwC pair orange with yellow deliberately, and
-     "not done yet" has to stay legible next to an orange accent. */
-  --warn: #ffb600;
-  --warn-tint: rgba(255, 182, 0, 0.14);
-  /* PwC red is #E0301E, which only reaches 4.2:1 here. Lightened for text;
-     it is the same hue, just legible. */
-  --red: #f0563f;
-  --red-tint: rgba(240, 86, 63, 0.14);
+  --ok: #1e6b46;
+  --ok-tint: #e5efe7;
+  --ok-rule: #aac9b1;
 
-  --radius: 12px;
-  --radius-lg: 18px;
+  --bad: #a02a1e;
+  --bad-tint: #f6e6e2;
+  --bad-rule: #d9aaa1;
+
+  /* Printed forms are square. The radius is a press mark, not a capsule. */
+  --radius: 4px;
+  --radius-sm: 3px;
 
   --font: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui,
     sans-serif;
+  /* Serial numbers, account numbers and reference codes: machine-issued data. */
+  --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
-  --text-xs: 13px;
-  --text-sm: 15px;
-  --text-base: 17px;
-  --text-lg: 20px;
-  --text-xl: 28px;
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 16px;
+  --text-lg: 19px;
+  --text-xl: 26px;
 
   /*
    * How much room the tab bar occupies.
    *
    * The commit bar in Review is sticky at `bottom: var(--tab-space)` so the two
-   * never overlap. That only works if this number equals the tab bar's real
-   * height — and it did not: the bar measured 64px while this said 78, leaving
-   * a 14px stripe of scrolling content wedged between them.
-   *
-   * .tab-bar now sets `min-height: var(--tab-space)` as well, so this is the
-   * single source of truth and the two cannot drift apart again.
+   * never overlap, and .tab-bar sets `min-height: var(--tab-space)` so this is
+   * the single source of truth and the two cannot drift apart.
    */
-  --tab-space: calc(64px + env(safe-area-inset-bottom));
+  --tab-space: calc(62px + env(safe-area-inset-bottom));
 }
 
 * {
@@ -110,16 +99,16 @@ body {
 
 body {
   font-family: var(--font);
-  background-color: var(--bg);
-  background-image:
-    radial-gradient(at 8% 0%, rgba(208, 74, 2, 0.32) 0px, transparent 55%),
-    radial-gradient(at 92% 92%, rgba(235, 140, 0, 0.14) 0px, transparent 55%);
-  background-attachment: fixed;
-  color: var(--label);
+  background-color: var(--ground);
+  color: var(--ink);
   font-size: var(--text-base);
-  line-height: 1.35;
+  line-height: 1.4;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+}
+
+::selection {
+  background: var(--stamp-tint);
 }
 
 #app {
@@ -130,17 +119,16 @@ body {
 
 /*
  * Routes that are documents rather than screens — the nota, and the payment
- * page a payer opens from a link. Both leave the app: through a PDF, a print,
- * or a screenshot in a group chat. A dark document is worse in all three.
+ * page a payer opens from a link. Both leave the app: through a print, or a
+ * screenshot in a group chat, so they sit on the cleanest sheet the world has.
  *
  * Applied as a class by App.svelte rather than as a :global() rule inside the
  * components, because a global rule is in the stylesheet for the whole session
- * the moment the component is bundled, and would take the app's own dark
- * background with it on every other screen.
+ * the moment the component is bundled, and would take every other screen with
+ * it.
  */
 body.paper {
-  background-color: #ffffff;
-  background-image: none;
+  background-color: #fbfcf7;
 }
 
 h1,
@@ -154,78 +142,80 @@ h1,
 h2,
 h3 {
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
+}
+
+/*
+ * A drawn focus ring for keyboard users, in stamp orange so it is legible on
+ * every ground in the world.
+ */
+:focus-visible {
+  outline: 2px solid var(--stamp);
+  outline-offset: 2px;
 }
 
 /* ---------------------------------------------------------------------------
  * Controls
  * ------------------------------------------------------------------------ */
 
-/*
- * Rounded rectangles, NOT capsules.
- *
- * 999px was the single change that made the previous pass read as an Apple app
- * rather than as this one. The radius is the design; the material is the
- * accent. They are not interchangeable.
- */
 button {
   font: inherit;
   cursor: pointer;
   min-height: 44px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--label);
-  padding: 0 20px;
-  font-weight: 510;
+  border: 1px solid var(--rule-strong);
+  background: var(--sheet);
+  color: var(--ink);
+  padding: 0 18px;
+  font-weight: 560;
   transition:
-    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
-    opacity 0.15s ease;
+    transform 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
+/* A paper control goes down under the finger, it does not shrink. */
 button:active:not(:disabled) {
-  transform: scale(0.98);
-  opacity: 0.85;
+  transform: translateY(1px);
 }
 
 button:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-/* Flat fill, not a gradient with a lit top edge. */
+/* The commit: solid stamp ink, white label. */
 button.primary {
-  background: var(--brand);
-  border-color: transparent;
+  background: var(--stamp);
+  border-color: var(--stamp-deep);
   color: #fff;
-  font-weight: 640;
+  font-weight: 650;
 }
 
 button.tinted {
-  background: var(--brand-tint);
-  border-color: rgba(208, 74, 2, 0.32);
-  color: var(--brand-light);
-  font-weight: 600;
+  background: var(--sheet);
+  border-color: var(--stamp);
+  color: var(--stamp-deep);
+  font-weight: 620;
 }
 
 button.plain {
   background: none;
   border-color: transparent;
-  box-shadow: none;
-  color: var(--brand-light);
+  color: var(--stamp-deep);
   padding: 0 10px;
   min-height: 36px;
   font-size: var(--text-sm);
-  font-weight: 500;
+  font-weight: 620;
 }
 
 button.plain:active:not(:disabled) {
-  opacity: 0.45;
   transform: none;
+  opacity: 0.6;
 }
 
 button.destructive-text {
-  color: var(--red);
+  color: var(--bad);
 }
 
 input,
@@ -233,89 +223,85 @@ select {
   font: inherit;
   min-height: 44px;
   border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: #121110;
-  color: var(--label);
-  padding: 0 14px;
+  border: 1px solid var(--rule-strong);
+  background: #fdfef9;
+  color: var(--ink);
+  padding: 0 12px;
   width: 100%;
   font-size: var(--text-base);
 }
 
 input::placeholder {
-  color: var(--label-3);
+  color: var(--ink-3);
 }
 
 input:focus,
 select:focus {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px var(--brand-tint);
+  border-color: var(--stamp);
+  box-shadow: 0 0 0 3px var(--stamp-tint);
 }
 
 /* ---------------------------------------------------------------------------
- * Grouped list
+ * The form
  * ------------------------------------------------------------------------ */
 
 .group {
   margin: 0 16px;
 }
 
+/* A pre-printed section label, not a heading. */
 .group-title {
   margin: 0 16px 8px;
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--label-2);
+  letter-spacing: 0.09em;
+  color: var(--ink-2);
 }
 
 .list {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  /* A soft shadow for depth against the page, which is the one thing the flat
-     treatment still wants — the border alone reads a little stencilled. */
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: var(--sheet);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
   overflow: hidden;
 }
 
 /*
- * Coloured surfaces, opaque like every other one.
- *
- * A status banner that is the same grey as every other card has to be read.
- * Coloured, it is seen — and these say whether the bill can be committed, which
- * is the one thing on the screen worth noticing without looking.
- *
- * The colours are mixed into the surface rather than laid over it as a
- * translucent wash. At 14% alpha over an opaque card the wash disappeared
- * entirely, which is how a card that used to look tinted turns grey the moment
- * the glass goes.
+ * Notices are the same paper, printed in another ink. Opaque, always: a
+ * translucent wash over paper is glass, and glass is the thing this world was
+ * asked to replace.
  */
 .list.tint-warn {
-  background: #2a2113;
-  border-color: rgba(255, 182, 0, 0.30);
+  background: var(--warn-tint);
+  border-color: var(--warn-rule);
 }
 
 .list.tint-ok {
-  background: #12241d;
-  border-color: rgba(16, 185, 129, 0.28);
+  background: var(--ok-tint);
+  border-color: var(--ok-rule);
 }
 
 .list.tint-bad {
-  background: #2a1412;
-  border-color: rgba(240, 86, 63, 0.30);
+  background: var(--bad-tint);
+  border-color: var(--bad-rule);
 }
 
-/* Rows are transparent so the glass is the surface, not each row. */
+/* The carbon copy: a duplicate, not a warning. */
+.list.tint-carbon {
+  background: var(--carbon-tint);
+  border-color: var(--carbon);
+}
+
 .row {
   position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 44px;
-  padding: 11px 16px;
+  padding: 10px 14px;
   background: transparent;
-  color: var(--label);
+  color: var(--ink);
   /* Resets that only matter when the row is a <button>: buttons centre their
      text, and a button with display:flex does not stretch to its container the
      way a div does — so the trailing value ends up mid-card. */
@@ -323,16 +309,15 @@ select:focus {
   width: 100%;
 }
 
+/* The ruled line between two fields on the same form. */
 .row + .row::before {
   content: '';
   position: absolute;
   top: 0;
-  left: 16px;
+  left: 14px;
   right: 0;
   height: 1px;
-  background: rgba(255, 255, 255, 0.09);
-  transform: scaleY(0.5);
-  transform-origin: top;
+  background: var(--rule);
 }
 
 .row.tappable {
@@ -340,27 +325,20 @@ select:focus {
 }
 
 .row.tappable:active {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--sheet-2);
 }
 
 /* The two-column part of a row: a label that gives way, and a value that does
-   not.
- *
- * Shared rather than repeated per route, because the bug below is a property of
- * the pair and fixing it in one copy while the other drifts is how it comes
- * back. */
+   not. Shared rather than repeated per route, so the truncation rule cannot
+   drift between copies. */
 .stack {
   display: flex;
   flex-direction: column;
   gap: 1px;
   min-width: 0;
-  /* Takes the slack, so a long name is what gives way when the row runs out of
-     room — not the amount. */
   flex: 1;
 }
 
-/* A long place name truncates rather than wrapping. Two lines of name pushes
-   the row height around and makes a list of bills look ragged. */
 .stack > .strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -369,18 +347,17 @@ select:focus {
 
 .row-value {
   margin-left: auto;
-  color: var(--label-2);
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
   /* An amount is one token. Without these it shrinks and breaks after "Rp",
-     printing the number across two lines — which reads as two numbers. Found
-     at 390px wide with "Lucky Cat Coffee & Kitchen" beside it. */
+     printing the number across two lines — which reads as two numbers. */
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .row-value.strong {
-  color: var(--label);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 650;
 }
 
 .chevron::after {
@@ -388,8 +365,8 @@ select:focus {
   display: block;
   width: 7px;
   height: 7px;
-  border-right: 2px solid var(--label-3);
-  border-bottom: 2px solid var(--label-3);
+  border-right: 2px solid var(--ink-3);
+  border-bottom: 2px solid var(--ink-3);
   transform: rotate(-45deg);
   margin-left: 6px;
 }
@@ -397,6 +374,46 @@ select:focus {
 .chevron.up::after {
   transform: rotate(45deg);
   margin-bottom: 4px;
+}
+
+/* ---------------------------------------------------------------------------
+ * The printed parts
+ * ------------------------------------------------------------------------ */
+
+/* A pre-printed field label, for a form row that has no heading of its own. */
+.field-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+/* The amount box a kwitansi prints around a figure that is a decision. */
+.amount-box {
+  display: inline-block;
+  padding: 3px 9px 2px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  background: #fdfef9;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* The numbering machine: ref codes, account numbers, tokens. */
+.serial {
+  font-family: var(--mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  color: var(--serial);
+}
+
+.serial--ink {
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
 }
 
 /* ---------------------------------------------------------------------------
@@ -408,15 +425,15 @@ select:focus {
 }
 
 .dim {
-  color: var(--label-2);
+  color: var(--ink-2);
 }
 
 .faint {
-  color: var(--label-3);
+  color: var(--ink-3);
 }
 
 .error {
-  color: var(--red);
+  color: var(--bad);
 }
 
 .warn {
@@ -424,18 +441,27 @@ select:focus {
 }
 
 .ok {
-  color: var(--green);
+  color: var(--ok);
 }
 
+/*
+ * Outstanding money is plain ink, bold: the attention belongs to the empty
+ * stamp square on the line, which is the one channel orange never shares.
+ */
 .owed {
-  color: var(--red);
-  font-weight: 600;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
 }
 
 @media print {
   body {
     background: #fff;
-    background-image: none;
     color: #000;
   }
 
@@ -448,12 +474,11 @@ select:focus {
   .list,
   .row {
     background: none !important;
-    border-color: #ddd !important;
-    box-shadow: none !important;
+    border-color: #ccc !important;
   }
 
   .row-value,
   .group-title {
-    color: #444 !important;
+    color: #333 !important;
   }
 }

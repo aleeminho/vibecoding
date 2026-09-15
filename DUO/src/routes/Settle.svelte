@@ -228,7 +228,7 @@
               onclick={() => copyChase(person.person, person.bills, person.total, overdue)}
             >
               {copied === person.person
-                ? 'Tersalin ✓'
+                ? 'Tersalin'
                 : overdue
                   ? 'Copy teks reminder'
                   : 'Copy buat nagih'}
@@ -244,7 +244,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   .group {
@@ -262,18 +262,20 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   .actions {
     justify-content: flex-end;
   }
 
-  /* The remainder, on a bill that has had something paid against it. Marked,
-     because it is a different quantity from every other figure in the column. */
+  /* The remainder, on a bill that has had something paid against it. Heavier
+     ink marks it as a different quantity from every other figure in the
+     column; orange stays the stamp's, and the caption above carries what has
+     already landed. */
   .row-value.partial {
-    color: var(--brand-light);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
   }
 
   /* The name is a link, but it has to keep reading as the section heading it

@@ -1,0 +1,188 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned Bukti Transfer. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Bukti Transfer",
+      "kicker": "THE ROLL",
+      "lineage": "Indonesian mobile-banking confirmations and ATM slips",
+      "thesis": "The app is a stack of transfer receipts: every bill, every share, every proof is a confirmation with a verdict band, an amount hero, and details in a rigid grid.",
+      "palette": ["#0e2a5a", "#ffffff", "#16233a", "#1e7a4d", "#d04a02"],
+      "materials": ["thermal slip", "security print", "verdict band"],
+      "viewport": "The outstanding figure stands as the amount hero under its label; a status band states the position in words; each person below is a detail row with a lettered verdict; bills follow as receipt slips keyed by reference.",
+      "risk": "A banking look is the category's comfort zone — only the confirmation's own grammar (verdict, reference, perforation) keeps it from being a generic fintech dashboard.",
+      "raised": [
+        {
+          "from": "operate-c-cracktro-scroller-queue",
+          "raise": "Rank as depth: lanes still owing hold the highest contrast and widest tracking on the sheet, settled ones recede, and no box is needed to separate them."
+        },
+        {
+          "from": "signals-instruments-drum-machine-step-row",
+          "raise": "A now-line: exactly one row wears the chase marker — the oldest unpaid share — so attention has a position, not a sort order."
+        },
+        {
+          "from": "clouds-storms-auroras-iridescent-cloud-edge",
+          "raise": "Colour only at the edges: the slip body stays achromatic, and state lives in a hairline fringe plus the lettered verdict band, never a tinted card."
+        },
+        {
+          "from": "textiles-weave-drape-fashion-sneaker-box-stacks",
+          "raise": "End-label grid: place, date, and amount lock to one column axis across every bill, so a stack of slips reads as one column."
+        },
+        {
+          "from": "pop-culture-shelf-doujin-event-catalog",
+          "raise": "Struck-through settled: a settled share keeps its figure and gets a struck line with the word, so the history stays readable instead of vanishing."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "bank bar — mark + masked account", "x": 0, "y": 0, "w": 12, "h": 1 },
+          { "label": "status band — 3 dari 4 belum lunas", "x": 0, "y": 1, "w": 12, "h": 1, "accent": true },
+          { "label": "amount hero — belum masuk", "x": 0, "y": 2, "w": 12, "h": 3, "accent": true },
+          { "label": "detail grid heads", "x": 0, "y": 5, "w": 12, "h": 1 },
+          { "label": "detail row — name / amount / verdict", "x": 0, "y": 6, "w": 12, "h": 1 },
+          { "label": "detail row", "x": 0, "y": 7, "w": 12, "h": 1 },
+          { "label": "detail row", "x": 0, "y": 8, "w": 12, "h": 1 },
+          { "label": "detail row", "x": 0, "y": 9, "w": 12, "h": 1 },
+          { "label": "perforation + nomor referensi", "x": 0, "y": 10, "w": 12, "h": 1 },
+          { "label": "bill slip — verdict band + details", "x": 0, "y": 11, "w": 12, "h": 3 },
+          { "label": "action bar", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Kwitansi",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "the carbon-copy kwitansi pad",
+      "thesis": "Every bill is a kwitansi: a serially numbered form stating who paid whom, signed once, copied in carbon.",
+      "palette": ["#eef4ee", "#1b2f5e", "#b0362b", "#d04a02", "#6b5a86"],
+      "materials": ["carbon copy", "perforated edge", "rubber stamp"],
+      "viewport": "A numbered form: serial top right, 'sudah terima dari' filled in the operator's hand, the amount in figures and words, the duplicate beneath.",
+      "risk": "The form is the first thing anyone would draw for a split bill; only craft separates it from a souvenir.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "serial + letterhead", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "sudah terima dari", "x": 0, "y": 1, "w": 12, "h": 2 },
+          { "label": "amount in figures + words", "x": 0, "y": 3, "w": 12, "h": 2, "accent": true },
+          { "label": "untuk pembayaran — bill list", "x": 0, "y": 5, "w": 12, "h": 4 },
+          { "label": "perforation", "x": 0, "y": 9, "w": 12, "h": 1 },
+          { "label": "carbon copy — same form", "x": 0, "y": 10, "w": 12, "h": 3 },
+          { "label": "stamp + signature line", "x": 0, "y": 13, "w": 12, "h": 1, "accent": true },
+          { "label": "tabs", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-hardware-bench",
+      "label": "Creator Hardware Bench",
+      "verdict": "competitive",
+      "lineage": "creator-gear bench instruments",
+      "thesis": "The app is a bench instrument: rows are keycells that click, one safety-orange key is the only commit, and one amber screen reports the live value.",
+      "palette": ["#e6e2d9", "#304248", "#171a1e", "#ff6a00", "#ffc24d"],
+      "materials": ["anodized aluminum", "knurled knob", "dye-sub legends"],
+      "viewport": "A grid of keycells for bills, one orange commit key pinned at the corner, the outstanding figure on the amber readout.",
+      "risk": "Keycap physics without keyboard parity is cosplay, and a second orange key would fake the certainty.",
+      "case": "Holds product clarity — one commit key and a single-value readout suit this product's few actions — but loses identification: a gear desk is not a dinner table.",
+      "board": "https://impeccable.style/worlds/cards/design-canon-creator-hardware-bench.webp",
+      "hero": "https://impeccable.style/worlds/cards/design-canon-creator-hardware-bench-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "amber readout — outstanding", "x": 0, "y": 0, "w": 12, "h": 2, "accent": true },
+          { "label": "keycell grid — bills", "x": 0, "y": 2, "w": 12, "h": 7 },
+          { "label": "knob — rounding", "x": 0, "y": 9, "w": 4, "h": 3 },
+          { "label": "mono readout — total", "x": 4, "y": 9, "w": 8, "h": 3 },
+          { "label": "one orange commit key", "x": 0, "y": 12, "w": 12, "h": 2, "accent": true },
+          { "label": "action bar", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-cracktro",
+      "label": "Cracktro Queue",
+      "verdict": "declined",
+      "lineage": "demoscene cracktro title screens",
+      "thesis": "The queue is the product: one bitmap line on a black void, depth is rank, nothing is ever boxed.",
+      "palette": ["#000000", "#1a1a1a", "#4a4a4a", "#e6e2d6", "#ffb000"],
+      "materials": ["bitmap face", "dust field", "baseline"],
+      "viewport": "One ivory line of bills over drifting dust, the frontmost brightest.",
+      "risk": "A 2am demoscene is a costume, and no enclosure is a poor fit for label/value money.",
+      "case": "Fuses poorly: nobody's group chat is a cracktro, and money rows want their grid.",
+      "kept": "Rank as depth."
+    },
+    {
+      "id": "challenger-drum-machine",
+      "label": "Drum Machine Step Row",
+      "verdict": "declined",
+      "lineage": "early-80s rhythm machine step rows",
+      "thesis": "Time is a step row: sixteen keys, a chase light, accents lighting deeper as the loop comes round.",
+      "palette": ["#2b2b2b", "#c0392b", "#e67e22", "#f1c40f", "#ffffff"],
+      "materials": ["keycaps", "LED glow", "silkscreen"],
+      "viewport": "A single unbroken row of steps, the chase light telling you where now is.",
+      "risk": "A sixteen-step row fights variable-length money lists, and non-musicians have no pulse to read it with.",
+      "case": "Fuses poorly: the audience is not gear people, and a sequencer explains nothing about a bill.",
+      "kept": "The now-line."
+    },
+    {
+      "id": "challenger-cloud-edge",
+      "label": "Iridescent Cloud Edge",
+      "verdict": "declined",
+      "lineage": "cloud-edge diffraction bands",
+      "thesis": "The body is achromatic; state lives in a hairline spectral fringe at the edge.",
+      "palette": ["#ffffff", "#6b7280", "#a7f3d0", "#fda4af", "#c4b5fd"],
+      "materials": ["cloud white", "hairline band", "droplet model"],
+      "viewport": "A plain white field with one thin coloured fringe at the edge of the active band.",
+      "risk": "A physics model in a dinner app; the fringe without the model is a mood.",
+      "case": "Fuses poorly: clouds are nobody's ledger, and the hypothesis tooling is science-app work.",
+      "kept": "Colour only at the edges."
+    },
+    {
+      "id": "challenger-sneaker-box",
+      "label": "Sneaker Box Stacks",
+      "verdict": "declined",
+      "lineage": "stacked sneaker box end labels",
+      "thesis": "Bills are box ends: silhouette ink, colorway name as verse, size run in mono.",
+      "palette": ["#c25a2b", "#1a1a1a", "#f2efe9", "#8a8f99"],
+      "materials": ["box board", "tissue paper", "3D hinge"],
+      "viewport": "A wall of end labels, one box slid half out, its lid hinged open.",
+      "risk": "Sneaker culture is real but not universal, and hinged lids in a task list are theatre.",
+      "case": "Fuses poorly: browsing box stacks is not collecting money, and the 3D ritual slows the operator.",
+      "kept": "The end-label grid."
+    },
+    {
+      "id": "challenger-doujin-catalog",
+      "label": "Doujin Event Catalog",
+      "verdict": "declined",
+      "lineage": "convention circle catalogs on newsprint",
+      "thesis": "The catalog is the app: stamp-sized bill cells, table codes, hand-circled states.",
+      "palette": ["#e6e2d8", "#111111", "#6a6a6a", "#c8322d"],
+      "materials": ["newsprint", "halftone", "single ink"],
+      "viewport": "A packed thumbnail grid of bills with circled and struck-through cells.",
+      "risk": "Packed thumbnails leave no room for money, and the hall-map metaphor is a con's world, not a table's.",
+      "case": "Fuses poorly: nobody reads their dinner bill as a convention catalog.",
+      "kept": "Settled rows struck through in ink."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "code"
+  },
+  "steer": true,
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean fintech split-bill dashboard, executed impeccably: balance card, bill list, blue accent.",
+    "palette": ["#ffffff", "#111827", "#2563eb"],
+    "materials": ["clean grid", "soft shadow"],
+    "viewport": "The arrangement a visitor expects — balance, list, tab bar — at full craft.",
+    "risk": "Indistinguishable from the competition by design."
+  }
+}

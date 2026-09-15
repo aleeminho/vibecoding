@@ -39,7 +39,7 @@ export function applyPhoneFrame(): void {
       #app {
         max-width: 390px;
         margin: 0 auto;
-        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+        box-shadow: 0 0 0 1px rgba(27, 47, 94, 0.18);
       }
     }
   `

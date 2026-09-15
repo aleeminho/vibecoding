@@ -49,9 +49,10 @@
 </script>
 
 <div class="screen">
-  <!-- No card. The mark and the title are the screen's anchor, not a panel. -->
+  <!-- No card. The title is the screen's anchor, not a panel — and no second
+       stamp mark, because the letterhead above already prints the one the pad
+       owns. -->
   <div class="hero">
-    <div class="mark">D</div>
     <h1 class="hero-title">Masuk ke DUO</h1>
     <p class="hero-sub">Split the bill. Not the friendship.</p>
   </div>
@@ -111,7 +112,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   /* The gaps live here, not only on .screen. The form is a single child of
@@ -138,47 +139,32 @@
     text-align: center;
   }
 
-  .mark {
-    width: 72px;
-    height: 72px;
-    border-radius: 20px;
-    background: linear-gradient(180deg, var(--brand), var(--brand-deep));
-    color: #fff;
-    font-size: 36px;
-    font-weight: 700;
-    display: grid;
-    place-items: center;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.28),
-      0 10px 30px var(--brand-glow);
-  }
-
   .hero-title {
     font-size: var(--text-xl);
-    font-weight: 700;
-    letter-spacing: -0.03em;
+    font-weight: 750;
+    letter-spacing: -0.02em;
   }
 
   .hero-sub {
     max-width: 36ch;
     font-size: var(--text-sm);
-    color: var(--label-2);
+    color: var(--ink-2);
   }
 
-  /* The label column and the field on one row, which is how iOS lays out a
-     settings form. */
+  /* The label column and the field on one row, which is how a settings form is
+     laid out. */
   .key {
     width: 88px;
     flex-shrink: 0;
-    color: var(--label);
+    color: var(--ink);
     font-size: var(--text-base);
   }
 
   /*
    * A field with no chrome of its own.
    *
-   * `border: none` is the line that was missing. Without it the global `input`
-   * rule drew its rounded outline here, inside a card that already had one.
+   * `border: none` is the line that matters. Without it the global `input`
+   * rule draws its rounded outline here, inside a card that already has one.
    */
   .flex {
     flex: 1;
@@ -200,7 +186,7 @@
   }
 
   .flex::placeholder {
-    color: var(--label-3);
+    color: var(--ink-3);
   }
 
   .field {
@@ -208,7 +194,7 @@
   }
 
   .field:focus-within {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--sheet-2);
   }
 
   .error-row {
@@ -219,6 +205,6 @@
 
   .error-hint {
     font-size: var(--text-sm);
-    color: var(--label-2);
+    color: var(--ink-2);
   }
 </style>

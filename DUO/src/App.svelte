@@ -258,13 +258,16 @@
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
-    background: var(--bg);
+    background: var(--ground);
   }
 
   /*
-   * Flat and full-width. Opaque, so the content scrolling under it is hidden
-   * rather than showing through — which is the whole reason the previous
-   * translucent version needed a blur to stay readable.
+   * The pad's letterhead. Flat sheet, ruled edge, opaque — so the content
+   * scrolling under it is hidden rather than showing through.
+   *
+   * Capped and centred like the content: this is a phone-width object, and a
+   * wide screen gets a centred column of pad rather than a kilometre of ruled
+   * line. The documents are not capped — they have widths of their own.
    */
   .app-header {
     position: sticky;
@@ -274,10 +277,13 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     min-height: 56px;
     padding: calc(6px + env(safe-area-inset-top)) 16px 6px;
-    background: var(--bg);
-    border-bottom: 1px solid var(--border);
+    background: var(--sheet);
+    border-bottom: 2px solid var(--ink);
   }
 
   .brand {
@@ -286,19 +292,19 @@
     gap: 10px;
   }
 
+  /* The mark is the stamp itself: one flat orange square, pressed askew. */
   .mark {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    background: linear-gradient(180deg, var(--brand), var(--brand-deep));
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm);
+    background: var(--stamp);
+    border: 1px solid var(--stamp-deep);
     color: #fff;
     font-size: 19px;
-    font-weight: 700;
+    font-weight: 750;
     display: grid;
     place-items: center;
-    box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.28),
-      0 4px 14px var(--brand-glow);
+    transform: rotate(-2deg);
   }
 
   .brand-text {
@@ -309,25 +315,25 @@
 
   .brand-text strong {
     font-size: var(--text-base);
-    font-weight: 700;
+    font-weight: 750;
     letter-spacing: -0.01em;
   }
 
   .brand-text small {
     font-size: 12px;
-    color: var(--label-2);
+    color: var(--ink-2);
   }
 
   .nav-action {
     min-height: 36px;
   }
 
-  /* The page title from the original design: large, in the content, and it
-     scrolls away. The bar above it stays. */
+  /* The page title: large, in the content, and it scrolls away. The letterhead
+     above it stays. */
   .page-title {
     font-size: var(--text-xl);
-    font-weight: 700;
-    letter-spacing: -0.03em;
+    font-weight: 750;
+    letter-spacing: -0.02em;
     padding: 0 16px 4px;
   }
 
@@ -338,36 +344,38 @@
     margin: 16px;
     padding: 12px 14px;
     border-radius: var(--radius);
-    background: #2a2113;
+    background: var(--warn-tint);
+    border: 1px solid var(--warn-rule);
     color: var(--warn);
     font-size: var(--text-sm);
   }
 
   .banner code {
-    background: rgba(255, 255, 255, 0.12);
+    background: var(--sheet-3);
+    color: var(--ink);
     padding: 1px 5px;
-    border-radius: 4px;
+    border-radius: 3px;
     font-size: 13px;
   }
 
   main {
     flex: 1;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     padding: 16px 0 0;
   }
 
   /*
-   * A flat bar across the bottom edge. It does not hover, it does not blur, and
-   * it has no side margins — the floating capsule was part of the look that was
-   * asked to be removed, and a bar welded to the edge is what a bar does.
+   * The pad's index tabs: a flat bar welded to the bottom edge, ruled off from
+   * the content by the same 2px ink line the letterhead wears. The active tab
+   * is the one pulled forward — desk ground behind it, ruled sides, and a
+   * stamp-orange edge across its top.
    *
-   * Opaque, so content scrolling underneath is hidden rather than showing
-   * through it.
-   *
-   * sticky rather than fixed, deliberately. Both keep it in view, but fixed
+   * sticky rather than fixed, deliberately: both keep it in view, but fixed
    * positions against the viewport — so inside the 390px dev preview frame it
    * would stretch the full width of the browser window and the preview would
-   * lie about the layout. sticky stays inside its container and behaves
-   * identically in the real app.
+   * lie about the layout.
    */
   .tab-bar {
     position: sticky;
@@ -375,12 +383,15 @@
     z-index: 10;
     display: flex;
     gap: 4px;
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto;
     /* Pinned to the same value the commit bar reserves, so the two bars can
        never overlap or leave a stripe of content wedged between them. */
     min-height: var(--tab-space);
-    padding: 5px 12px calc(5px + env(safe-area-inset-bottom));
-    background: var(--bg);
-    border-top: 1px solid var(--border);
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    background: var(--sheet);
+    border-top: 2px solid var(--ink);
   }
 
   .tab {
@@ -391,13 +402,14 @@
     justify-content: center;
     gap: 2px;
     min-height: 50px;
-    padding: 6px 0 5px;
+    padding: 5px 0 4px;
     background: none;
     border: 1px solid transparent;
-    border-radius: var(--radius);
-    color: var(--label-2);
+    border-top: 2px solid transparent;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    color: var(--ink-2);
     font-size: 10px;
-    font-weight: 560;
+    font-weight: 600;
   }
 
   .tab:active:not(:disabled) {
@@ -406,13 +418,14 @@
   }
 
   .tab svg {
-    width: 24px;
-    height: 24px;
+    width: 23px;
+    height: 23px;
   }
 
   .tab.active {
-    color: var(--brand-light);
-    background: var(--brand-tint);
-    border-color: rgba(208, 74, 2, 0.32);
+    color: var(--ink);
+    background: var(--ground);
+    border-color: var(--rule);
+    border-top-color: var(--stamp);
   }
 </style>

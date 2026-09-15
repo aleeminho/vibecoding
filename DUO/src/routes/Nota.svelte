@@ -190,25 +190,12 @@
 <svelte:head>
   <title>{bill ? `Nota ${bill.place}` : 'Nota'}</title>
   <!--
-    The document's own two families, loaded here rather than app-wide: nothing
-    outside this route and the payer page uses them, and a font request on the
-    bills screen would be paid on every visit to a screen that does not want it.
-
-    Plex Sans for words, Plex Serif for the figures that carry the document —
-    the title, the totals, the amount each person owes. The serif is not
-    decoration: it is what makes a number read as a stated amount rather than as
-    a value inside a sentence.
-
-    `display=swap` so a slow font never holds up a document somebody is standing
-    in a restaurant waiting for, and the stack falls back to the system serif
-    and sans if the request never lands at all.
+    No webfonts here, and that is a decision rather than an omission. This
+    document's character comes from the form it is: pre-printed labels, ruled
+    detail rows, a serial number, an amount box. A display face would add a
+    third-party round trip before the first paint of a document somebody is
+    standing in a restaurant waiting for, and change nothing about the form.
   -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
-  <link
-    rel="stylesheet"
-    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@400;600&display=swap"
-  />
 </svelte:head>
 
 {#if error}
@@ -245,7 +232,7 @@
           <h1 class="doc__title">Split bill</h1>
           <dl class="doc__meta">
             <dt>Bill</dt>
-            <dd>{bill.ref_code}</dd>
+            <dd class="serial">{bill.ref_code}</dd>
             <dt>Items</dt>
             <dd>{bill.items.length}</dd>
             <dt>Total paid</dt>
@@ -439,45 +426,39 @@
 
 <style>
   /*
-   * The sheet, not the screen. Two families with separate jobs: the system sans
-   * for words, and a serif for the figures that state an amount. Everything
-   * else here is structure — rules, a wash, and one accent spent twice.
+   * The sheet, not the screen. Same world as the app — the pad's form — with
+   * one difference: this document leaves the app and has to stand on its own,
+   * so it is printed in full rather than at phone density.
    *
-   * Flat by construction: opaque surfaces, hairline borders, no blur and no
-   * translucency anywhere. The one shadow is on the sheet itself, and it exists
-   * to lift paper off a desk, which is a thing paper does.
+   * Flat by construction: opaque paper, ruled lines, one orange stamp ink.
    */
   .screen {
     min-height: 100dvh;
-    background: var(--desk, #eceef1);
+    background: var(--ground, #e7ebe0);
   }
 
   .sheet {
-    --paper: #ffffff;
-    --ink: #14171c;
-    --ink-2: #5a616e;
-    --ink-3: #868d99;
-    --rule: #dce0e6;
-    --rule-soft: #eef0f3;
+    --paper: #fbfcf7;
+    --rule-soft: #eef1e7;
     --accent: #d04a02;
-    --accent-deep: #a83b00;
-    --accent-wash: #fdf2ea;
+    --accent-deep: #9e3802;
+    --accent-wash: #fbeee5;
 
-    /* The app's own orange already, so the document and the app agree on what
-       the brand colour is without either importing the other. */
-    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
-    --serif: 'IBM Plex Serif', ui-serif, Georgia, serif;
+    /*
+     * The app's own palette, not an import: the document and the app agree on
+     * what the form looks like without either owning the other's classes.
+     */
+    --sans: var(--font, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif);
 
     max-width: 830px;
     margin: 0 auto;
-    padding: 58px 60px 46px;
+    padding: 54px 56px 44px;
     background: var(--paper);
-    color: var(--ink);
+    color: var(--ink, #1b2f5e);
+    border-left: 1px solid var(--rule, #c6ccba);
+    border-right: 1px solid var(--rule, #c6ccba);
     font: 400 15px/1.55 var(--sans);
     -webkit-font-smoothing: antialiased;
-    box-shadow:
-      0 1px 2px rgba(20, 23, 28, 0.06),
-      0 12px 32px rgba(20, 23, 28, 0.09);
   }
 
   /* Every figure on this page is money or a count. Align it. */
@@ -500,30 +481,30 @@
     width: 100%;
     min-height: 48px;
     font: inherit;
-    font-weight: 600;
-    border-radius: 8px;
+    font-weight: 650;
+    border-radius: var(--radius, 4px);
     cursor: pointer;
   }
 
   .go {
-    border: 1px solid var(--brand, #d04a02);
-    background: var(--brand, #d04a02);
+    border: 1px solid var(--stamp, #d04a02);
+    background: var(--stamp, #d04a02);
     color: #fff;
   }
 
   .back {
     margin-top: 8px;
-    border: 1px solid #dce0e6;
-    background: none;
-    color: #5a616e;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink-2);
     min-height: 44px;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .hint {
     margin: 10px 0 0;
     font-size: 12px;
-    color: #c8ccd4;
+    color: var(--ink-2);
   }
 
   /* ---- masthead ---- */
@@ -534,12 +515,13 @@
     align-items: flex-start;
     gap: 40px;
     padding-bottom: 34px;
-    border-bottom: 3px solid var(--accent);
+    /* The letterhead rule, same 2px ink the app's header wears. */
+    border-bottom: 2px solid var(--ink);
   }
 
   .brand__mark {
     margin: 0;
-    font: 600 23px/1.1 var(--serif);
+    font: 700 23px/1.1 var(--sans);
     letter-spacing: -0.015em;
   }
 
@@ -564,8 +546,8 @@
 
   .doc__title {
     margin: 0 0 14px;
-    font: 400 30px/1 var(--serif);
-    letter-spacing: -0.01em;
+    font: 700 30px/1 var(--sans);
+    letter-spacing: -0.02em;
   }
 
   .doc__meta {
@@ -609,7 +591,7 @@
   .warn {
     margin: 14px 0 0;
     font-size: 13px;
-    color: var(--accent-deep);
+    color: var(--warn, #7d5400);
   }
 
   /* ---- the ledger ---- */
@@ -628,7 +610,7 @@
    */
   .ledger-wrap {
     border: 1px solid var(--rule);
-    border-radius: 6px;
+    border-radius: var(--radius, 4px);
     overflow: hidden;
   }
 
@@ -668,10 +650,12 @@
     /* Down from the card's top edge, which nothing else provides now that the
        wrapper has no padding of its own. */
     padding: 20px 0 10px;
-    font: 500 12px/1 var(--sans);
+    font: 700 12px/1 var(--sans);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     color: var(--ink-3);
     text-align: left;
-    border-bottom: 2px solid var(--accent);
+    border-bottom: 2px solid var(--ink);
   }
 
   .ledger tbody th,
@@ -713,18 +697,20 @@
     color: var(--ink-2);
   }
 
+  /* The total: the form's double rule under the column, and the counterfoil
+     shade behind it. */
   .ledger--people tfoot th,
   .ledger--people tfoot td {
     padding: 17px 0;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 700;
     text-align: left;
-    border-top: 3px solid var(--accent);
-    background: var(--accent-wash);
+    border-top: 3px double var(--ink);
+    background: var(--rule-soft);
   }
 
   .ledger--people tfoot th {
-    color: var(--accent-deep);
+    color: var(--ink);
   }
 
   .ledger--people tfoot td {
@@ -753,7 +739,7 @@
     flex-direction: column;
     padding: 15px 14px 0;
     border: 1px solid var(--rule);
-    border-radius: 6px;
+    border-radius: var(--radius, 4px);
   }
 
   /* The name and its button on one line, the button against the right edge. */
@@ -840,9 +826,9 @@
     gap: 6px;
     margin: auto -14px 0;
     padding: 11px 14px 12px;
-    border-top: 3px solid var(--accent);
-    border-radius: 0 0 5px 5px;
-    background: var(--accent-wash);
+    border-top: 2px solid var(--ink);
+    border-radius: 0 0 3px 3px;
+    background: var(--rule-soft);
   }
 
   .slip__due-row {
@@ -855,20 +841,21 @@
 
   .slip__due-label {
     font-size: 12px;
-    font-weight: 500;
-    color: var(--accent-deep);
+    font-weight: 600;
+    color: var(--ink-2);
   }
 
   .slip__amount {
-    font: 600 21px/1 var(--serif);
-    letter-spacing: -0.02em;
-    color: var(--accent);
+    font: 700 21px/1 var(--sans);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--accent-deep);
   }
 
   .cur {
     margin-right: 3px;
-    font: 400 12px/1 var(--sans);
-    color: var(--accent-deep);
+    font: 500 12px/1 var(--sans);
+    color: var(--ink-2);
   }
 
   /* The payer paid the bill — their slip states a fact, not a debt. */
@@ -898,10 +885,10 @@
   .slip__pay {
     flex: none;
     padding: 3px 11px;
-    border: 1px solid var(--accent);
-    border-radius: 4px;
-    font: 500 12px/1.5 var(--sans);
-    color: var(--accent-deep);
+    border: 1.5px solid var(--stamp, #d04a02);
+    border-radius: var(--radius-sm, 3px);
+    font: 650 12px/1.5 var(--sans);
+    color: var(--stamp-deep, #9e3802);
     text-decoration: none;
     cursor: pointer;
   }
@@ -959,7 +946,7 @@
 
   .colophon p {
     margin: 0;
-    font: 400 15px/1.4 var(--serif);
+    font: 600 15px/1.4 var(--sans);
   }
 
   .colophon__fine {
@@ -971,7 +958,7 @@
   .msg {
     padding: 3rem 1.5rem;
     text-align: center;
-    color: #6b6560;
+    color: var(--ink-2, #4a5a7d);
   }
 
   /* ---- narrow screens ---- */

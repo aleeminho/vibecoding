@@ -203,15 +203,16 @@
 <style>
   /*
    * The page is not the app. Someone opening a link from a group chat has never
-   * seen DUO, so the chrome would be noise and the dark theme would read as a
-   * different product from the nota that sent them here.
+   * seen DUO, so the chrome would be noise — this is the carbon copy of the
+   * form the operator filled in, handed to the person named on it.
    */
   .sheet {
-    --paper: #ffffff;
-    --ink: #1c1917;
-    --soft: #6b6560;
-    --rule: #e3ded8;
+    --paper: #fbfcf7;
+    --ink: #1b2f5e;
+    --soft: #4a5a7d;
+    --rule: #c6ccba;
     --accent: #d04a02;
+    --accent-deep: #9e3802;
     --fig: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 
     min-height: 100dvh;
@@ -232,7 +233,7 @@
   .who {
     margin: 0;
     font-size: 22px;
-    font-weight: 650;
+    font-weight: 700;
     letter-spacing: -0.02em;
   }
 
@@ -242,14 +243,19 @@
     color: var(--soft);
   }
 
+  /* The amount box, at the size the kwitansi prints its figure. */
   .amount {
+    display: inline-block;
     margin: 1.25rem 0 0;
-    font-family: var(--fig);
+    padding: 4px 12px 3px;
+    border: 1.5px solid var(--rule);
+    border-radius: var(--radius-sm, 3px);
+    background: #fdfef9;
     font-variant-numeric: tabular-nums;
-    font-size: 34px;
-    font-weight: 600;
+    font-size: 32px;
+    font-weight: 700;
     letter-spacing: -0.02em;
-    color: var(--accent);
+    color: var(--ink);
   }
 
   /* Only present once something has landed, so it never explains a number that
@@ -266,7 +272,7 @@
   }
 
   /*
-   * White behind the code even on a page that is already white, and a margin
+   * White behind the code even on a page that is already paper, and a margin
    * on all four sides. That margin is the quiet zone a scanner needs to find
    * the code's edges; cropping it is the commonest way to make a QR that reads
    * fine on screen and fails on a phone camera.
@@ -279,7 +285,7 @@
     padding: 12px;
     background: #fff;
     border: 1px solid var(--rule);
-    border-radius: 12px;
+    border-radius: var(--radius, 4px);
   }
 
   .qris-hint {
@@ -288,15 +294,17 @@
     color: var(--soft);
   }
 
+  /* The destination details, set like the detail rows of a transfer receipt. */
   .dest {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 12px;
     margin-top: 1.5rem;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border: 1px solid var(--rule);
-    border-radius: 12px;
+    border-radius: var(--radius, 4px);
+    background: #fdfef9;
   }
 
   .dest-label {
@@ -306,30 +314,32 @@
 
   .dest-value {
     font-family: var(--fig);
+    letter-spacing: 0.02em;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 650;
     text-align: right;
   }
 
+  /* The one commit on this page: stamp ink, white label. */
   .upload {
     display: block;
     margin-top: 1.5rem;
-    padding: 16px;
-    border: none;
-    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid var(--accent-deep);
+    border-radius: var(--radius, 4px);
     background: var(--accent);
     color: #fff;
     text-align: center;
-    font-weight: 640;
+    font-weight: 650;
     cursor: pointer;
   }
 
   .upload.secondary {
     margin-top: 8px;
-    background: none;
+    background: var(--paper);
     border: 1px solid var(--rule);
-    color: var(--soft);
-    font-weight: 500;
+    color: var(--ink);
+    font-weight: 600;
   }
 
   .upload input {
@@ -344,51 +354,68 @@
   .notice {
     margin-top: 1.5rem;
     padding: 14px 16px;
-    border-radius: 12px;
+    border: 1px solid;
+    border-radius: var(--radius, 4px);
   }
 
   .notice.bad {
-    background: #fdf0ee;
-    border: 1px solid #f3c9c2;
+    background: var(--bad-tint, #f6e6e2);
+    border-color: var(--bad-rule, #d9aaa1);
   }
 
   .notice.warn {
-    background: #fdf6e6;
-    border: 1px solid #f0dfb4;
+    background: var(--warn-tint, #f5eed6);
+    border-color: var(--warn-rule, #d8c48c);
   }
 
   .notice-title {
     margin: 0 0 4px;
-    font-weight: 640;
+    font-weight: 700;
     font-size: 14px;
+  }
+
+  .notice.bad .notice-title {
+    color: var(--bad, #a02a1e);
+  }
+
+  .notice.warn .notice-title {
+    color: var(--warn, #7d5400);
   }
 
   .notice-body {
     margin: 0;
     font-size: 14px;
-    color: #5a534e;
+    color: var(--ink);
   }
 
+  /* The settled verdict, as the stamp it is. */
   .done {
     margin-top: 2rem;
-    padding: 24px 20px;
-    border-radius: 14px;
-    background: #eef8f2;
-    border: 1px solid #c4e6d4;
+    padding: 22px 20px;
+    border: 2px solid var(--accent-deep);
+    border-radius: var(--radius, 4px);
+    background: #fbeee5;
     text-align: center;
   }
 
   .done-title {
+    display: inline-block;
     margin: 0;
+    padding: 2px 10px 1px;
+    border: 2px solid var(--accent-deep);
+    border-radius: var(--radius-sm, 3px);
+    color: var(--accent-deep);
     font-size: 20px;
-    font-weight: 650;
-    color: #14603c;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transform: rotate(-2deg);
   }
 
   .done-body {
-    margin: 6px 0 0;
+    margin: 10px 0 0;
     font-size: 14px;
-    color: #3d6b55;
+    color: var(--ink);
   }
 
   .hint {

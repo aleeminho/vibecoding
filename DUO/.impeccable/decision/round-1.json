@@ -1,0 +1,209 @@
+{
+  "title": "Choose the visual world",
+  "question": "The roll assigned Batik Cap. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Batik Cap",
+      "kicker": "THE ROLL",
+      "lineage": "Indonesian batik cap — carved stamps, wax resist, indigo and sogan",
+      "thesis": "The bill is a printed cloth: every mark on it was stamped, and what is not yet stamped is still wax.",
+      "palette": ["#1d2a5e", "#f3ead8", "#d04a02", "#b0362b", "#8aa0cf"],
+      "materials": ["wax resist", "carved block", "hand-dyed indigo cotton"],
+      "viewport": "A head-of-cloth band carries the outstanding total; below it the table stamps down the lanes, one printed row per person, and the tool rail sits at the cloth's foot.",
+      "risk": "Pattern without a task is costume — if the stamps do not carry every state, the world is wallpaper.",
+      "raised": [
+        {
+          "from": "stagecraft-theater-lighting-cyclorama-dawn",
+          "raise": "A tonal arc: the balance sits in the deepest ink and the cloth lightens as bills settle; state is always lettered, never carried by light alone."
+        },
+        {
+          "from": "textiles-weave-drape-fashion-drawcord-transforming-cape",
+          "raise": "One pull per surface: exactly one decisive primary control (Simpan, Bagikan nota, Tandai semua), never a row of equal buttons."
+        },
+        {
+          "from": "emigre-bitmap-specimen",
+          "raise": "Amounts are display type: tabular, integer-scaled, never shrunk to caption size."
+        },
+        {
+          "from": "pop-culture-shelf-industrial-starship-terminal",
+          "raise": "Machine codes get a plate: ref codes, tokens, and account numbers are set as stencilled plates, and destructive actions carry a hazard tick."
+        }
+      ],
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "kepala kain — outstanding total", "x": 0, "y": 0, "w": 12, "h": 2, "accent": true },
+          { "label": "monogram + title", "x": 0, "y": 2, "w": 8, "h": 1 },
+          { "label": "keluar", "x": 9, "y": 2, "w": 3, "h": 1 },
+          { "label": "person lane — stamped mark + amount", "x": 0, "y": 3, "w": 12, "h": 1, "accent": true },
+          { "label": "person lane — half print", "x": 0, "y": 4, "w": 12, "h": 1 },
+          { "label": "person lane — wax ring", "x": 0, "y": 5, "w": 12, "h": 1 },
+          { "label": "wax crack divider", "x": 0, "y": 6, "w": 12, "h": 1 },
+          { "label": "bill band — stamped", "x": 0, "y": 7, "w": 12, "h": 2 },
+          { "label": "bill band", "x": 0, "y": 9, "w": 12, "h": 2 },
+          { "label": "bill band", "x": 0, "y": 11, "w": 12, "h": 2 },
+          { "label": "tool rail", "x": 0, "y": 14, "w": 12, "h": 2, "accent": true }
+        ]
+      }
+    },
+    {
+      "id": "model-pick",
+      "label": "Buku Kas",
+      "kicker": "IMPECCABLE'S PICK",
+      "lineage": "the warung's ruled cash book",
+      "thesis": "The app is the cash book: ruled columns that have to add up, and a red pen for what is settled.",
+      "palette": ["#f7f3e8", "#2a2f45", "#b0362b", "#d04a02", "#ded5c0"],
+      "materials": ["ruled paper", "blue-black ink", "red pen"],
+      "viewport": "One ruled page: name and amount columns, the total under a double rule, red ticks in the margin.",
+      "risk": "It is the answer most runs would reach — a ruled ledger is the first thing anyone would draw, and only craft separates it.",
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "title + balance", "x": 0, "y": 0, "w": 12, "h": 2 },
+          { "label": "column heads: nama / jumlah", "x": 0, "y": 2, "w": 12, "h": 1 },
+          { "label": "nama + amount", "x": 0, "y": 3, "w": 12, "h": 1, "accent": true },
+          { "label": "nama + amount", "x": 0, "y": 4, "w": 12, "h": 1 },
+          { "label": "nama + amount", "x": 0, "y": 5, "w": 12, "h": 1 },
+          { "label": "double rule under total", "x": 0, "y": 6, "w": 12, "h": 2, "accent": true },
+          { "label": "riwayat: date | place | amount", "x": 0, "y": 8, "w": 12, "h": 5 },
+          { "label": "margin tick", "x": 11, "y": 8, "w": 1, "h": 5 },
+          { "label": "tabs", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-teletext",
+      "label": "Teletext Service",
+      "verdict": "competitive",
+      "lineage": "broadcast teletext magazines",
+      "thesis": "The app is a broadcast index: every bill is a numbered page, every state a REVEAL away.",
+      "palette": ["#000000", "#00ffff", "#ffff00", "#ffffff", "#ff0000"],
+      "materials": ["block mosaic", "phosphor glow", "40×24 cell grid"],
+      "viewport": "A page header counts the balance as top story; bills are an index you key into, and REVEAL answers a proof.",
+      "risk": "Reads retro-novelty when the grid is not strict, and a fixed 40-cell row fights long Indonesian names.",
+      "case": "Fuses cleanly — bills and proofs become numbered pages with REVEAL holding the verdict — but loses on identification: nobody's group chat is a teletext.",
+      "board": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service.webp",
+      "hero": "https://impeccable.style/worlds/cards/broadcast-programming-teletext-service-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "page 100 · TAGIHAN", "x": 0, "y": 0, "w": 12, "h": 1, "accent": true },
+          { "label": "top story — outstanding", "x": 0, "y": 1, "w": 12, "h": 2, "accent": true },
+          { "label": "index rows 101–104", "x": 0, "y": 3, "w": 12, "h": 5 },
+          { "label": "bill subpage", "x": 0, "y": 8, "w": 12, "h": 5 },
+          { "label": "REVEAL", "x": 0, "y": 13, "w": 12, "h": 1, "accent": true },
+          { "label": "fastext nav digits", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-jackfield",
+      "label": "Normalled Jackfield",
+      "verdict": "competitive",
+      "lineage": "machine-room patchbay schedules",
+      "thesis": "Every share is a lane tied to its default by a link line whose shape — not colour — says what state it is in.",
+      "palette": ["#0a0a0a", "#ffb000", "#7a5200", "#3a2600"],
+      "materials": ["black glass", "etched lines", "silkscreen amber"],
+      "viewport": "An overview strip sits over a lane grid; every share's state is a drawn tie line, unbroken, ticked, gapped, or open-ended.",
+      "risk": "A machine-room aesthetic is nobody's group chat; the state grammar must survive translation or it is cosplay.",
+      "case": "Fuses cleanly — one drawn link state per share, no colour carrying meaning — but loses on identification and on phone density.",
+      "board": "https://impeccable.style/worlds/cards/operate-b-normalled-jackfield.webp",
+      "hero": "https://impeccable.style/worlds/cards/operate-b-normalled-jackfield-hero.webp",
+      "wireframe": {
+        "cols": 12,
+        "rows": 16,
+        "regions": [
+          { "label": "overview: total / out / alerts", "x": 0, "y": 0, "w": 12, "h": 2 },
+          { "label": "lane — name, link line, state", "x": 0, "y": 2, "w": 12, "h": 6, "accent": true },
+          { "label": "secondary — tandai lunas", "x": 0, "y": 8, "w": 12, "h": 1 },
+          { "label": "lane grid", "x": 0, "y": 9, "w": 12, "h": 5 },
+          { "label": "nav rail", "x": 0, "y": 14, "w": 12, "h": 2 }
+        ]
+      }
+    },
+    {
+      "id": "challenger-cyclorama",
+      "label": "Cyclorama Dawn",
+      "verdict": "declined",
+      "lineage": "stage lighting cyclorama, night into day",
+      "thesis": "The ledger is a stage at dawn: the bill darkens while it is owed and lightens as it resolves.",
+      "palette": ["#0a0c12", "#2447a8", "#d78a8f", "#f4f6f8"],
+      "materials": ["washed horizon", "light blending"],
+      "viewport": "Horizon bands stacked dark to light, the balance riding the cobalt line.",
+      "risk": "Atmosphere has no column for money; the arc must be lettered or it implies state by light.",
+      "case": "Fuses poorly: a stage technician's world, and money needs a column, not a cue.",
+      "kept": "A tonal progression the direction will letter, never colour alone."
+    },
+    {
+      "id": "challenger-cape",
+      "label": "Drawcord Cape",
+      "verdict": "declined",
+      "lineage": "silk cape gathered by one hidden cord",
+      "thesis": "One pull gathers the flat bill into shares; one release settles it.",
+      "palette": ["#101014", "#c9a227", "#4a4d55", "#8a8f99"],
+      "materials": ["matte silk", "gold drawcord", "channel stitching"],
+      "viewport": "A flat plane of the bill, one gold cord, gathered rib rows beneath.",
+      "risk": "A fashionable gesture in a task UI is decoration unless the pull is the primary action.",
+      "case": "Fuses poorly: couture is not this audience's world, and the transformation explains nothing about money.",
+      "kept": "One decisive control per surface."
+    },
+    {
+      "id": "challenger-emigre",
+      "label": "Emigre Bitmap Specimen",
+      "verdict": "declined",
+      "lineage": "bitmap type specimens at poster scale",
+      "thesis": "Money set at specimen scale: the amount is the headline, in whole-pixel type.",
+      "palette": ["#f2efe6", "#111111", "#2b6cff"],
+      "materials": ["dot-matrix", "newsprint", "halftone"],
+      "viewport": "The outstanding figure at poster scale over a grid of bill rows.",
+      "risk": "Specimen type is a designer's nostalgia; bitmap money must stay perfectly legible at 390px.",
+      "case": "Fuses poorly: an art-school world, and the specimen says nothing about who owes whom.",
+      "kept": "Amounts as display type at integer scale."
+    },
+    {
+      "id": "challenger-starship",
+      "label": "Starship Crew Terminal",
+      "verdict": "declined",
+      "lineage": "used-future ship's paperwork",
+      "thesis": "The bill as ship's paperwork: stencilled codes, typed readouts, hazard plates on anything destructive.",
+      "palette": ["#050505", "#7cff9e", "#1f3f2e", "#e6e1cf", "#ffc24a"],
+      "materials": ["curved crt", "grimy panels", "stencil paint"],
+      "viewport": "A typed readout over stencilled plates, hazard pictograms on the destructive row.",
+      "risk": "The sci-fi frame is a costume; only the plate discipline is worth keeping.",
+      "case": "Fuses poorly: nobody's dinner bill is a starship log, and a typewriter reveal slows an operator down.",
+      "kept": "A plate vocabulary for machine codes and destructive actions."
+    }
+  ],
+  "reroll": {
+    "registers": ["safer", "bolder"]
+  },
+  "buildPath": {
+    "value": "code"
+  },
+  "steer": true,
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean fintech split-bill dashboard, executed impeccably: balance card, bill list, blue accent.",
+    "palette": ["#ffffff", "#111827", "#2563eb"],
+    "materials": ["clean grid", "soft shadow"],
+    "viewport": "The arrangement a visitor expects — balance, list, tab bar — at full craft.",
+    "risk": "Indistinguishable from the competition by design.",
+    "wireframe": {
+      "cols": 12,
+      "rows": 16,
+      "regions": [
+        { "label": "header + avatar", "x": 0, "y": 0, "w": 12, "h": 1 },
+        { "label": "balance card", "x": 0, "y": 1, "w": 12, "h": 3, "accent": true },
+        { "label": "filter chips", "x": 0, "y": 4, "w": 12, "h": 1 },
+        { "label": "bill list", "x": 0, "y": 5, "w": 12, "h": 7 },
+        { "label": "empty-safe footer", "x": 0, "y": 12, "w": 12, "h": 2 },
+        { "label": "tab bar", "x": 0, "y": 14, "w": 12, "h": 2, "accent": true }
+      ]
+    }
+  }
+}

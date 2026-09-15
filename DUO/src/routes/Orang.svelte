@@ -178,7 +178,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   /* Matches `.page-title` in the shell, minus the container padding — this one
@@ -186,7 +186,8 @@
   .name {
     padding: 0 16px 4px;
     font-size: var(--text-xl);
-    letter-spacing: -0.03em;
+    font-weight: 750;
+    letter-spacing: -0.02em;
   }
 
   .group {
@@ -204,7 +205,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   /* The second figure in the summary row, right-aligned so the two numbers sit
@@ -224,7 +225,7 @@
   }
 
   .row-value.sisa {
-    color: var(--brand-light);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
   }
 </style>

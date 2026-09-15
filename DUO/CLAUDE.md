@@ -61,22 +61,37 @@ each; `validate-payment` is public on purpose, `extract-receipt` is not.
 
 ---
 
-## Design: do not reintroduce Liquid Glass
+## Design: the kwitansi pad
 
-Flat, dark, PwC orange. Opaque surfaces one step lighter than the page, a
-hairline border, rounded rectangles. **Nothing blurs, nothing floats, nothing is
-translucent.** An earlier pass dressed this in Apple's Liquid Glass and it was
-rejected twice — the tells are `backdrop-filter`, `rgba(255,255,255,0.0x)` fills,
-`inset 0 1px 0` highlights, and bars with side margins and a 999px radius. See
-the note at the top of `src/app.css`.
+Flat, light, paper on a table. The world is an Indonesian carbon-copy receipt
+pad: pale green-grey ground, near-white form sheets, blue-black pre-printed ink,
+numbering-machine red serials, carbon purple for duplicates, and **one orange
+stamp** (`--stamp`, `#d04a02`) that means "this happened" — the stamp square,
+the commit button, the focus ring, the active tab's top edge, and nothing else.
+**Money is ink; orange never colours a ledger figure.** State is carried by
+shape and word as well as colour (dashed square → half-pressed → solid stamp,
+lettered LUNAS, "Belum dibagi").
 
-Tokens are role-based (`--brand`, `--surface`), never hue-based. `--brand`
-`#d04a02` is a fill only — it is 4.25:1 on the background and fails AA as small
-text. Text uses `--brand-light`.
+Nothing blurs, nothing floats, nothing is translucent. The Liquid Glass pass
+this app was dressed in earlier was rejected twice, and those bans survived the
+redesign: no `backdrop-filter`, no translucent fills, no `inset 0 1px 0`
+highlights, no capsule chrome. Printed forms are square — 4px radius, 3px on
+small parts. No webfonts, in the app or the documents.
 
-Documents (the nota, the payer page) are **light**, always, and paint their own
-colours rather than inheriting. They arrive as a link pasted into a group chat,
-and a dark document is worse there.
+`DESIGN.md` is the full system (tokens, type, layout, components, do's and
+don'ts) and `src/app.css` carries the same tokens in code; token names are
+role-based (`--sheet`, `--ink`, `--stamp`), never hue-based.
+
+Everything on screen is a phone-width pad: the app chrome and content cap at
+520px and centre, and only the documents get widths of their own — the nota is
+an 830px sheet, the payer page 480px. Both documents stay light and paint their
+own colours rather than inheriting, because they arrive as a link pasted into a
+group chat; a dark document is worse there.
+
+The other rules live in the file that owns them — read them before touching a
+surface: the counterfoil and stamp-square grammar on `src/routes/Bills.svelte`,
+the 2px-double total rule and the due band on `src/routes/Nota.svelte`, the
+"one primary commit" rule on `src/routes/Review.svelte` and `src/routes/Bayar.svelte`.
 
 ---
 

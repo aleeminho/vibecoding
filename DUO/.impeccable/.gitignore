@@ -1,0 +1,4 @@
+# Question-server runtime state. The .answer.json files are the durable part
+# — what the round decided — while these are the server's own bookkeeping.
+questions/*.log
+questions/*.state.json

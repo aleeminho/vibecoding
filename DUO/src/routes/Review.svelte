@@ -332,7 +332,11 @@
 
 {#if committed}
   <div class="done">
-    <div class="done-mark">✓</div>
+    <div class="done-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4.5 12.5 9.5 17.5 19.5 6.5" />
+      </svg>
+    </div>
     <h2>Tersimpan</h2>
     <p class="dim num">{committed}</p>
     <button class="primary full" onclick={finish}>Selesai</button>
@@ -345,7 +349,13 @@
       <div class="group">
         <div class="list tint-warn">
           <div class="row notice-row">
-            <span class="warn">⚠</span>
+            <span class="notice-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3.6 21 19.2H3z" />
+                <path d="M12 9.6v4" />
+                <path d="M12 16.4h.01" />
+              </svg>
+            </span>
             <span class="notice-text">{ext.confidence_notes}</span>
           </div>
         </div>
@@ -362,7 +372,13 @@
       <div class="group">
         <div class="list tint-warn">
           <div class="row notice-row">
-            <span class="warn">⚠</span>
+            <span class="notice-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3.6 21 19.2H3z" />
+                <path d="M12 9.6v4" />
+                <path d="M12 16.4h.01" />
+              </svg>
+            </span>
             <span class="notice-text">
               Struk ini kayak yang udah pernah dicatat:
               {#each duplicate as d, i (d.id)}
@@ -562,7 +578,15 @@
           <div class="row wrap">
             {#each roster as person (person)}
               <button class="pick on" onclick={() => draft.removePerson(person)}>
-                {person}<span class="x">×</span>
+                {person}<span class="x" aria-hidden="true"
+                  ><svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.2"
+                    stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg
+                  ></span
+                >
               </button>
             {/each}
           </div>
@@ -679,14 +703,14 @@
                   {/if}
                 </span>
               </div>
-              <span class="row-value strong num">{rupiah(share.amount_owed)}</span>
+              <span class="row-value strong num amount-box">{rupiah(share.amount_owed)}</span>
             </div>
           {/each}
           <div class="row">
             <span class={gap === 0 ? 'ok' : 'error'}>
               {gap === 0 ? 'Pas — sama dengan total struk' : 'Selisih'}
             </span>
-            <span class="row-value num">{gap === 0 ? rupiah(ext.total) : rupiah(gap)}</span>
+            <span class="row-value num amount-box">{gap === 0 ? rupiah(ext.total) : rupiah(gap)}</span>
           </div>
         </div>
       </div>
@@ -738,7 +762,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
     padding-bottom: 8px;
   }
 
@@ -751,7 +775,7 @@
   /* ---- rows ---- */
 
   .strong {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   .small {
@@ -775,31 +799,32 @@
   }
 
   /*
-   * An unassigned item gets an accent bar down its left edge.
-   *
-   * Drawn rather than set as a border-left, because a border on a rounded
-   * rectangle tapers into the corners and reads as a rendering mistake. Inset
-   * from the top and bottom, it reads as a deliberate marker.
+   * An unassigned item is a form with a blank field, not a card with a stripe:
+   * the sheet is dashed where the others are solid, and the name carries the
+   * dotted write-in line that is waiting for someone to be written on it.
+   * There is no coloured border-left here on purpose — an unmatched item says
+   * so in words, in the field, at full size.
    */
-  .item.unassigned::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 16px;
-    bottom: 16px;
-    width: 3px;
-    border-radius: 0 3px 3px 0;
-    background: var(--brand);
+  .item.unassigned {
+    border-style: dashed;
+  }
+
+  .item.unassigned .strong {
+    display: inline-block;
+    border-bottom: 1px dotted var(--rule-strong);
+    padding-bottom: 1px;
   }
 
   .thumb {
     width: 44px;
     height: 44px;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     object-fit: cover;
     object-position: top;
     background: #000;
     flex-shrink: 0;
+    border: 3px solid #fff;
+    outline: 1px solid var(--rule-strong);
   }
 
   .notice-row {
@@ -808,13 +833,27 @@
     padding-bottom: 12px;
   }
 
+  .notice-mark {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    color: var(--warn);
+  }
+
+  .notice-mark svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
   .notice-text {
     font-size: var(--text-sm);
     color: var(--warn);
   }
 
   .assignees {
-    color: var(--brand-light);
+    color: var(--stamp-deep);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -826,22 +865,29 @@
     object-fit: contain;
     border-radius: var(--radius);
     background: #000;
+    border: 6px solid #fff;
+    outline: 1px solid var(--rule-strong);
   }
 
   /* ---- inline editors ---- */
 
+  /* The opened item is the counterfoil: the same sheet, one shade deeper. */
   .fields {
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 12px 16px 16px;
-    background: rgba(255, 255, 255, 0.03);
+    padding: 12px 14px 16px;
+    background: var(--sheet-2);
+    border-top: 1px solid var(--rule);
   }
 
   .field-label {
     display: block;
     font-size: var(--text-xs);
-    color: var(--label-2);
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--ink-2);
     margin-bottom: 6px;
   }
 
@@ -875,13 +921,21 @@
     align-items: flex-start;
   }
 
+  /*
+   * A roster chip is a name box on the form, not a capsule: a small ruled
+   * square with the name beside it. Selected names take the stamp tint and
+   * border, because a name written onto a line is the act of assignment.
+   */
   .pick {
-    min-height: 34px;
-    border-radius: 999px;
-    padding: 0 14px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    border-radius: var(--radius-sm);
+    padding: 0 12px;
     font-size: var(--text-sm);
-    background: rgba(255, 255, 255, 0.09);
-    color: var(--label);
+    background: var(--sheet);
+    border-color: var(--rule-strong);
+    color: var(--ink);
   }
 
   .pick:active:not(:disabled) {
@@ -889,14 +943,24 @@
   }
 
   .pick.on {
-    background: var(--brand);
-    color: #fff;
-    font-weight: 600;
+    background: var(--stamp-tint);
+    border-color: var(--stamp);
+    color: var(--stamp-deep);
+    font-weight: 650;
   }
 
   .x {
+    display: inline-flex;
+    width: 13px;
+    height: 13px;
+    margin-left: 7px;
     opacity: 0.75;
-    margin-left: 6px;
+  }
+
+  .x svg {
+    width: 13px;
+    height: 13px;
+    display: block;
   }
 
   /* ---- destination fields ---- */
@@ -906,7 +970,7 @@
   .key {
     width: 116px;
     flex-shrink: 0;
-    color: var(--label);
+    color: var(--ink);
     font-size: var(--text-sm);
   }
 
@@ -929,13 +993,13 @@
   }
 
   .row:focus-within {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--sheet-2);
   }
 
   .hint {
     padding: 0 16px;
     font-size: var(--text-sm);
-    color: var(--label-2);
+    color: var(--ink-2);
   }
 
   .rounding {
@@ -983,7 +1047,9 @@
   /* ---- commit bar ---- */
 
   /*
-   * A flat bar that stacks directly on top of the flat tab bar.
+   * The signature strip: a flat bar that stacks directly on top of the index
+   * tabs, ruled off from the form with the same 2px ink line the letterhead
+   * wears — all three read as the pad's chrome.
    *
    * `--tab-space` is the room the tab bar occupies, so the two never overlap —
    * the failure mode that once put the commit button underneath the nav with
@@ -998,17 +1064,13 @@
     gap: 8px;
     margin: 0;
     padding: 10px 16px;
-    /* The page colour, not the card colour. At --surface it was the exact same
-       shade as the item cards behind it, so it read as one more card floating
-       in the middle of the list rather than as a bar welded above the tab bar.
-       Matching the header and the tab bar makes all three read as chrome. */
-    background: var(--bg);
-    border-top: 1px solid var(--border);
+    background: var(--sheet);
+    border-top: 2px solid var(--ink);
   }
 
   .blocker {
     font-size: var(--text-sm);
-    color: var(--red);
+    color: var(--bad);
   }
 
   .full {
@@ -1022,20 +1084,27 @@
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 64px 16px;
+    padding: 56px 16px;
     text-align: center;
   }
 
+  /* The saved form takes the stamp, pressed askew like the mark it imitates. */
   .done-mark {
-    width: 64px;
-    height: 64px;
-    border-radius: 50%;
-    background: #12241d;
-    color: var(--green);
-    font-size: 32px;
+    width: 60px;
+    height: 60px;
+    border-radius: var(--radius);
+    background: var(--stamp);
+    border: 1.5px solid var(--stamp-deep);
+    color: #fff;
     display: grid;
     place-items: center;
     margin-bottom: 8px;
+    transform: rotate(-3deg);
+  }
+
+  .done-mark svg {
+    width: 32px;
+    height: 32px;
   }
 
   .empty {

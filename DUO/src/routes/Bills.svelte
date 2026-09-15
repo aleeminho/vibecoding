@@ -43,6 +43,7 @@
     type Outstanding,
   } from '../lib/api'
   import { isDemo } from '../lib/demo'
+  import { session } from '../lib/session.svelte'
   import { prepareReceiptImage } from '../lib/image'
 
   let outstanding = $state<Outstanding[]>([])
@@ -52,6 +53,9 @@
   let message = $state('')
   let open = $state<string | null>(null)
   let busy = $state<string | null>(null)
+
+  /** The pad's control total: what every unstamped line adds up to. */
+  let owedTotal = $derived(outstanding.reduce((acc, row) => acc + row.outstanding, 0))
 
   /**
    * `silent` reloads without dropping the screen back to "Memuat…".
@@ -328,8 +332,25 @@
       </div>
     {/if}
 
+    <!--
+      The control band: the operator's name in the pad's field grid and the one
+      figure the whole screen exists to answer, printed in the amount box a
+      kwitansi keeps for a decision.
+    -->
+    <div class="group">
+      <div class="list">
+        <div class="row">
+          <span class="field-label">Operator</span>
+          <span class="row-value serial--ink">{session.email ?? '—'}</span>
+        </div>
+        <div class="row">
+          <span class="field-label">Belum lunas</span>
+          <span class="row-value strong num amount-box">{rupiah(owedTotal)}</span>
+        </div>
+      </div>
+    </div>
+
     {#if outstanding.length > 0}
-      <h3 class="group-title">Belum lunas</h3>
       <div class="group">
         <div class="list">
           {#each outstanding as row (row.person)}
@@ -367,12 +388,14 @@
     {#if flagged.length > 0}
       <h3 class="group-title">Bukti perlu dicek</h3>
       <div class="group">
-        <div class="list tint-warn">
+        <div class="list tint-carbon">
           {#each flagged as p (p.id)}
             <div class="proof">
               <div class="proof-who">
                 <span class="strong">{p.person}</span>
-                <span class="faint small">{p.place} · {p.ref_code}</span>
+                <span class="faint small">
+                  {p.place} · <span class="serial--ink">{p.ref_code}</span>
+                </span>
               </div>
 
               <p class="proof-read">
@@ -432,7 +455,8 @@
       {@const isOpen = open === bill.id}
 
       <div class="group">
-        <div class="list">
+        <div class="list stub-card">
+          <span class="stub" aria-hidden="true">{bill.ref_code}</span>
           <button class="row tappable" onclick={() => (open = isOpen ? null : bill.id)}>
             <div class="stack">
               <span class="strong">{bill.place}</span>
@@ -476,7 +500,15 @@
                 <span class="check" aria-hidden="true"></span>
                 <span class="stack">
                   <span class="strong" class:faint={paid}>{share.person}</span>
-                  {#if state === 'sebagian'}
+                  {#if paid}
+                    <!--
+                      The line carries the stamp, lettered, pressed askew — the
+                      same mark the operator has put on a kwitansi a thousand
+                      times. The square at the leading edge is the control; this
+                      is what the control records.
+                    -->
+                    <span class="stamp-mark">Lunas</span>
+                  {:else if state === 'sebagian'}
                     <!--
                       The original amount is kept beside what has landed, not
                       replaced by it. "Kurang 27.050" on its own is a number
@@ -601,7 +633,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   .group {
@@ -615,7 +647,7 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   .small {
@@ -623,16 +655,24 @@
   }
 
   .faint {
-    color: var(--label-3);
+    color: var(--ink-3);
   }
 
   .owed {
-    color: var(--red);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
   }
 
   .meta {
     gap: 6px;
+  }
+
+  /* The ref code is a machine-issued serial, so it is set as one. */
+  .meta .num {
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    color: var(--serial);
   }
 
   .actions {
@@ -647,7 +687,7 @@
   }
 
   .destructive-text {
-    color: var(--red);
+    color: var(--bad);
   }
 
   /* The disclosure indicator points down when the row is open, as on iOS. */
@@ -657,70 +697,76 @@
   }
 
   /*
-   * A checkbox, not a switch.
+   * The stamp square, not a switch.
    *
    * A switch is the right control for a setting that is on or off — something
    * you could reasonably leave either way. "Lunas" is not a setting: it is an
-   * event that either happened or has not. The list is a checklist, and a
-   * checklist is a checkbox.
+   * event that either happened or has not, and on a kwitansi it is exactly one
+   * mark — the stamp pressed into the line's empty square.
    *
-   * It sits at the LEADING edge on purpose. Down the left, the column of ticks
-   * can be read in one pass — how many are still empty is the question the
-   * screen exists to answer. Trailing, beside the amounts, the ticks would be
-   * competing with the numbers for the same glance.
+   * It sits at the LEADING edge on purpose. Down the left, the column of
+   * squares can be read in one pass — how many are still empty is the question
+   * the screen exists to answer. Trailing, beside the amounts, the squares
+   * would be competing with the numbers for the same glance.
    *
-   * The state is carried by shape (a tick is there or it is not) as well as by
-   * colour, so it survives being looked at by someone who cannot separate the
-   * green from the grey.
+   * State is carried by shape (the square is empty, half-pressed, or filled)
+   * as well as by colour, so it survives being looked at by someone who cannot
+   * separate the orange from the paper.
    */
   .check {
-    position: relative;
     flex-shrink: 0;
     width: 24px;
     height: 24px;
-    border-radius: 50%;
-    border: 1.5px solid var(--label-3);
+    border-radius: var(--radius-sm);
+    border: 1.5px dashed var(--ink-3);
+    background: #fdfef9;
     transition:
-      background 0.18s ease,
-      border-color 0.18s ease;
+      background 0.15s ease,
+      border-color 0.15s ease;
   }
 
+  /* Pressed: the square fills with stamp ink. The tick that used to sit in it
+     is gone — a tick is a checkbox, and the lettered stamp beside the name is
+     what this world uses to say a line has been paid. */
   .row.pay.paid .check {
-    background: var(--green);
-    border-color: var(--green);
+    background: var(--stamp);
+    border: 1.5px solid var(--stamp-deep);
   }
 
-  /* A dark tick on the green fill, not a white one: white on this green is
-     2.5:1, which is under the 3:1 that a graphic needs to be legible. */
-  .check::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 5px;
-    height: 10px;
-    margin: -6px 0 0 -2px;
-    border: solid #052e22;
-    border-width: 0 2px 2px 0;
-    transform: rotate(45deg);
-    opacity: 0;
-    transition: opacity 0.15s ease;
+  /* The rubber stamp itself: lettered, outlined, pressed slightly askew. */
+  .stamp-mark {
+    align-self: flex-start;
+    margin-top: 3px;
+    padding: 0 5px 1px;
+    border: 1.5px solid var(--stamp-deep);
+    border-radius: var(--radius-sm);
+    color: var(--stamp-deep);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transform: rotate(-2deg);
   }
 
-  .row.pay.paid .check::after {
-    opacity: 1;
+  /* A partial payment: the stamp is already half down, paper stained below
+     the press mark — a shape no other row on the screen has. */
+  .row.pay.partial .check {
+    border: 1.5px solid var(--stamp);
+    background: linear-gradient(180deg, #fdfef9 50%, var(--stamp) 50%);
   }
 
-  /* Settled rows recede, so the ones still owing are what the eye lands on. */
+  /* Settled rows recede to the counterfoil, so the ones still owing are what
+     the eye lands on. The shade is paper, not a colour: the stamped square is
+     the only settled signal, and it is the one channel orange owns. */
   .row.pay.paid {
-    background: #12241d;
+    background: var(--sheet-2);
   }
 
   .row.pay.paid:active {
-    background: #1b3329;
+    background: var(--sheet-3);
   }
 
-  /* The whole row is the target, not a 51px switch in the corner — this gets
+  /* The whole row is the target, not a 24px stamp in the corner — this gets
      tapped one-handed, standing up, on a phone. */
   /* `.strong` only. Putting `nowrap` on `.stack` as well — which is what the
      first version of this did — clips the "sudah X dari Y" line mid-number
@@ -735,12 +781,49 @@
   }
 
   /* A part-paid row is neither settled nor untouched, and the amount shown is
-     the remainder — a different number from every other row on the screen. The
-     accent is what stops it being read as the original amount by someone
-     scanning the column. */
+     the remainder — a different number from every other row on the screen. It
+     is set in ink, heavier than the column: the half-pressed square is the
+     only orange on the row, because orange means the stamp and nothing else. */
   .row.pay.partial .row-value {
-    color: var(--brand-light);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
+  }
+
+  /*
+   * The counterfoil: every bill is a sheet torn from the pad, and its stub
+   * carries the serial the numbering machine printed. The tear line is dashed;
+   * the serial reads bottom-up, the way a stub is printed to be read when the
+   * sheet is torn away. Hidden from assistive tech because the same code is in
+   * the card's own meta row.
+   */
+  .stub-card {
+    position: relative;
+    padding-left: 30px;
+  }
+
+  .stub {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 29px;
+    display: grid;
+    place-items: center;
+    border-right: 1px dashed var(--rule-strong);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--serial);
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+  }
+
+  /* The stub costs the header the width it used to have, and a truncated
+     "Lucky Cat Coffee & ..." is a worse bill name than one that runs two
+     lines. Place names may wrap; the ragged row height is the stub's price. */
+  .stub-card .stack > .strong {
+    white-space: normal;
   }
 
   /* ---- proofs needing a decision ---- */
@@ -754,11 +837,11 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: 12px 16px;
+    padding: 12px 14px;
   }
 
   .proof + .proof {
-    border-top: 1px solid rgba(255, 182, 0, 0.22);
+    border-top: 1px solid var(--carbon);
   }
 
   /*
@@ -775,17 +858,17 @@
 
   .proof-read {
     font-size: var(--text-sm);
-    color: var(--label-2);
+    color: var(--ink-2);
   }
 
   .proof-read .num {
-    color: var(--label);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 650;
   }
 
   .proof-note {
     font-size: var(--text-xs);
-    color: var(--label-3);
+    color: var(--ink-3);
   }
 
   /* ---- how a bill can be paid ---- */
@@ -801,6 +884,7 @@
    * Three options, one row, no wrapping. A select would be smaller but this is
    * a choice between three things the operator picks at a glance, and three
    * tappable targets show the alternatives where a dropdown hides two of them.
+   * Each option is a field box; the chosen one takes the stamp ink.
    */
   .segments {
     display: flex;
@@ -812,15 +896,15 @@
     min-height: 38px;
     padding: 0 8px;
     font-size: var(--text-sm);
-    background: var(--surface-2);
-    border-color: transparent;
+    background: var(--sheet);
+    border-color: var(--rule-strong);
   }
 
   .segment.on {
-    background: var(--brand-tint);
-    border-color: rgba(208, 74, 2, 0.32);
-    color: var(--brand-light);
-    font-weight: 600;
+    background: var(--stamp-tint);
+    border-color: var(--stamp);
+    color: var(--stamp-deep);
+    font-weight: 650;
   }
 
   /* A file input cannot be styled, so the label is the button and the input is
@@ -838,7 +922,8 @@
     width: 140px;
     padding: 8px;
     background: #fff;
-    border-radius: 10px;
+    border: 1px solid var(--rule-strong);
+    border-radius: var(--radius);
   }
 
   .proof-actions {

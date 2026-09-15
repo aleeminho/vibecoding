@@ -206,18 +206,26 @@
       <div class="list">
         <div class="row stepper">
           <button
-            class="plain"
+            class="plain step-btn"
             onclick={() => step(1)}
             disabled={months.indexOf(month) >= months.length - 1}
             aria-label="Bulan sebelumnya"
-          >‹</button>
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14.5 5.5 8 12l6.5 6.5" />
+            </svg>
+          </button>
           <span class="strong">{monthLabel(month)}</span>
           <button
-            class="plain"
+            class="plain step-btn"
             onclick={() => step(-1)}
             disabled={months.indexOf(month) <= 0}
             aria-label="Bulan berikutnya"
-          >›</button>
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9.5 5.5 16 12l-6.5 6.5" />
+            </svg>
+          </button>
         </div>
       </div>
     </div>
@@ -236,7 +244,7 @@
           {/each}
           <div class="row">
             <span class="strong">Total {rows.length} orang</span>
-            <span class="row-value strong num">{rupiah(monthTotal)}</span>
+            <span class="row-value strong num amount-box">{rupiah(monthTotal)}</span>
           </div>
         {/if}
       </div>
@@ -278,7 +286,7 @@
           {#each outstanding as row (row.person)}
             <div class="row">
               <span class="strong">{row.person}</span>
-              <span class="row-value num owed">{rupiah(row.outstanding)}</span>
+              <span class="row-value num owed amount-box">{rupiah(row.outstanding)}</span>
             </div>
           {/each}
         {/if}
@@ -331,7 +339,7 @@
   .screen {
     display: flex;
     flex-direction: column;
-    gap: 22px;
+    gap: 20px;
   }
 
   .group {
@@ -345,22 +353,28 @@
   }
 
   .strong {
-    font-weight: 600;
+    font-weight: 650;
   }
 
   .owed {
-    color: var(--red);
-    font-weight: 600;
+    color: var(--ink);
+    font-weight: 700;
   }
 
   .stepper {
     justify-content: space-between;
   }
 
-  .stepper button {
-    font-size: 22px;
+  .stepper .step-btn {
+    color: var(--stamp-deep);
     min-width: 44px;
-    color: var(--brand-light);
+  }
+
+  .step-btn svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+    margin: 0 auto;
   }
 
   .actions button {
@@ -377,6 +391,10 @@
   @media print {
     .print-head {
       display: block;
+    }
+
+    .print-head h2 {
+      color: #000;
     }
   }
 </style>
