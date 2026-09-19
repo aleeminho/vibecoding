@@ -18,6 +18,7 @@ them.
 | `edd47f9` | The log line prices the scan in USD — `pricing.ts` carries the per-token rates and the peak/off-peak rule, `scripts/pricing.test.ts` pins the math, and `test:extract` prints the same cost |
 | `ab80f94` + `887080d` | Item editor fields lined up: the amount regains its JUMLAH label, and both fields became identical label/6px/input blocks — measured `deltaTop: 0` at 390px and 1440px |
 | `23326bf` | Tax-inclusive retail receipts: `tax_inclusive` on the client, the prompt, the table constraint and `commit_bill`; the nota prints the contained VAT as DPP (harga jual). Migration `20260918000000` applied to production before the code shipped |
+| `197c4c1` | Notification feed bundled per bill: letterhead bell carrying the unread bundle count, Notifikasi screen with a per-invoice counterfoil, inline `Lihat bukti` / `Tandai lunas` on the proofs still waiting. No notifications table and no push — the feed derives from `payments` and unread is a device-local marker |
 
 ## Production state
 
@@ -32,7 +33,7 @@ them.
 
 ## Verified
 
-- `bun run check` clean; `bun test` 130 pass.
+- `bun run check` clean; `bun test` 152 pass.
 - 22 full-page captures at 390px and 1440px in `.impeccable/review/`, taken
   after the palette change; the desktop pages match the approved mocks.
 - `20260916000000` shows applied in `bunx supabase migration list`.
