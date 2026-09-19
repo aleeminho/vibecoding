@@ -1,0 +1,835 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <title>DUO — Panduan Pakai</title>
+    <!--
+      One A2 landscape sheet, printed on the app's own paper.
+
+      The guide is a document from the kwitansi pad, not a flyer: the same desk
+      grey, white sheets, hairline rules, pre-printed labels, and the stamp
+      orange used only as a rule and as attention ink. No webfonts, nothing
+      blurs, nothing floats — the bans the app lives under hold on paper too.
+
+      Screenshots in img/ are real captures of the current build at 390px.
+    -->
+    <style>
+      :root {
+        --ground: #f0f0ee;
+        --sheet: #ffffff;
+        --sheet-2: #f7f7f5;
+        --sheet-3: #ececea;
+        --rule: #e4e4e1;
+        --rule-strong: #c2c2bc;
+        --ink: #14161c;
+        --ink-2: #565b66;
+        --ink-3: #7b8089;
+        --stamp: #d04a02;
+        --stamp-deep: #9e3802;
+        --stamp-tint: rgba(208, 74, 2, 0.12);
+        --attention-tint: #fdf1ea;
+        --attention-rule: #eec3ab;
+        --ok: #1c6b47;
+        --ok-tint: #e6f0e9;
+        --ok-rule: #a9c9b3;
+        --radius: 4px;
+        --radius-sm: 3px;
+        --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        --mono: ui-monospace, Consolas, 'SF Mono', Menlo, monospace;
+      }
+
+      @page {
+        size: 594mm 420mm;
+        margin: 0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--sans);
+        color: var(--ink);
+        background: var(--ground);
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .sheet {
+        width: 594mm;
+        height: 420mm;
+        padding: 11mm 12mm 9mm;
+        background: var(--ground);
+        display: flex;
+        flex-direction: column;
+        gap: 6mm;
+      }
+
+      .label {
+        font-size: 8.6pt;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+
+      /* ---------------------------------------------------------------- head */
+
+      .masthead {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 8mm;
+        padding-bottom: 4mm;
+        border-bottom: 2px solid var(--stamp);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 5mm;
+      }
+
+      .brand svg {
+        width: 17mm;
+        height: 17mm;
+        display: block;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 34pt;
+        font-weight: 750;
+        letter-spacing: -0.02em;
+        line-height: 0.95;
+      }
+
+      .brand .sub {
+        margin-top: 1.5mm;
+        font-size: 12pt;
+        font-weight: 600;
+        color: var(--ink-2);
+      }
+
+      .head-right {
+        text-align: right;
+      }
+
+      .head-right .tagline {
+        font-size: 15pt;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .head-right .where {
+        margin-top: 1.5mm;
+        font-family: var(--mono);
+        font-size: 10pt;
+        letter-spacing: 0.04em;
+        color: var(--ink-2);
+      }
+
+      /* ------------------------------------------------------------- the flow */
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 4mm;
+        margin-bottom: 2.5mm;
+      }
+
+      .section-head h2 {
+        margin: 0;
+        font-size: 15pt;
+        font-weight: 750;
+        letter-spacing: -0.015em;
+      }
+
+      .section-head .note {
+        font-size: 9.5pt;
+        color: var(--ink-2);
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 3mm;
+      }
+
+      .step {
+        position: relative;
+        background: var(--sheet);
+        border: 1px solid var(--rule-strong);
+        border-radius: var(--radius);
+        padding: 3.2mm 3.4mm 3.4mm;
+      }
+
+      .step .n {
+        display: flex;
+        align-items: center;
+        gap: 2mm;
+      }
+
+      .step .n b {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 6.6mm;
+        height: 6.6mm;
+        border-radius: var(--radius-sm);
+        background: var(--sheet);
+        border: 1px solid var(--rule-strong);
+        color: var(--ink);
+        font-size: 11pt;
+        font-weight: 750;
+      }
+
+      .step .n span {
+        font-size: 8.6pt;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+
+      .step h3 {
+        margin: 2.2mm 0 1.4mm;
+        font-size: 12.5pt;
+        font-weight: 750;
+        letter-spacing: -0.01em;
+      }
+
+      .step p {
+        margin: 0;
+        font-size: 9pt;
+        line-height: 1.42;
+        color: var(--ink-2);
+      }
+
+      .step p b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .step .arrow {
+        position: absolute;
+        top: 50%;
+        right: -2.6mm;
+        width: 2.2mm;
+        height: 2.2mm;
+        border-top: 1.2px solid var(--stamp-deep);
+        border-right: 1.2px solid var(--stamp-deep);
+        transform: translateY(-50%) rotate(45deg);
+        background: var(--ground);
+      }
+
+      .step:last-child .arrow {
+        display: none;
+      }
+
+      /* -------------------------------------------------------------- exhibits */
+
+      .exhibits {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 3mm;
+      }
+
+      .shot {
+        display: flex;
+        flex-direction: column;
+        gap: 1.6mm;
+      }
+
+      .shot figure {
+        margin: 0;
+        background: var(--sheet);
+        border: 1px solid var(--rule-strong);
+        border-radius: var(--radius);
+        overflow: hidden;
+        height: 92mm;
+      }
+
+      .shot img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: top center;
+        display: block;
+      }
+
+      .shot figcaption {
+        font-size: 8.6pt;
+        line-height: 1.3;
+        color: var(--ink-2);
+      }
+
+      .shot figcaption b {
+        display: block;
+        font-size: 9.5pt;
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      /* ------------------------------------------------------------ columns */
+
+      .cols {
+        display: grid;
+        grid-template-columns: 1.05fr 1.15fr 0.95fr;
+        gap: 6mm;
+        min-height: 0;
+      }
+
+      /* --------------------------------------------------------- bottom band */
+
+      .band {
+        display: grid;
+        grid-template-columns: 1.5fr 1fr;
+        gap: 6mm;
+        align-items: stretch;
+      }
+
+      /* The message the guide drops into the group chat, printed as it sends. */
+      .msg {
+        margin: 0;
+        font-size: 9pt;
+        line-height: 1.45;
+        color: var(--ink-2);
+      }
+
+      .msg b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .msg .link {
+        font-family: var(--mono);
+        font-size: 8.6pt;
+        color: var(--stamp-deep);
+        background: var(--stamp-tint);
+        padding: 0.4mm 1.4mm;
+        border-radius: var(--radius-sm);
+      }
+
+      .col {
+        display: flex;
+        flex-direction: column;
+        gap: 4mm;
+        min-height: 0;
+      }
+
+      .panel {
+        background: var(--sheet);
+        border: 1px solid var(--rule-strong);
+        border-radius: var(--radius);
+        padding: 3.6mm 4mm 4mm;
+      }
+
+      .panel h3 {
+        margin: 0 0 2.4mm;
+        font-size: 8.6pt;
+        font-weight: 700;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--ink-2);
+      }
+
+      .rows {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .rows li {
+        position: relative;
+        display: grid;
+        grid-template-columns: 26mm 1fr;
+        gap: 3mm;
+        /* px rather than mm so the padding sits on the 8px floor the detector
+           measures; 9px is the same 2.3mm the rest of the sheet uses. */
+        padding: 9px 0;
+        font-size: 9pt;
+        line-height: 1.4;
+      }
+
+      /* The hairline between two entries, drawn rather than bordered — the
+         same device the app uses between two rows, so it insets where the
+         text does and nothing sits flush against a rule. */
+      .rows li + li::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 1px;
+        background: var(--rule);
+      }
+
+      .rows li:first-child {
+        padding-top: 0;
+      }
+
+      .rows li:last-child {
+        padding-bottom: 0;
+      }
+
+      .rows .k {
+        font-weight: 700;
+      }
+
+      .rows .v {
+        color: var(--ink-2);
+      }
+
+      .rows .v b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .issue .k {
+        color: var(--stamp-deep);
+      }
+
+      .bullets {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 1.8mm;
+      }
+
+      .bullets li {
+        position: relative;
+        padding-left: 5.4mm;
+        font-size: 9pt;
+        line-height: 1.4;
+        color: var(--ink-2);
+      }
+
+      .bullets li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 1.4mm;
+        width: 2.6mm;
+        height: 2.6mm;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--stamp-deep);
+        background: var(--stamp-tint);
+      }
+
+      .bullets li b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      .absent .bullets li::before {
+        background: none;
+        border: 1px dashed var(--rule-strong);
+      }
+
+      .payer {
+        background: var(--attention-tint);
+        border-color: var(--attention-rule);
+      }
+
+      .payer h3 {
+        color: var(--stamp-deep);
+      }
+
+      .payer .bullets li::before {
+        border-color: var(--stamp);
+      }
+
+      /* ------------------------------------------------------------- legend */
+
+      .legend {
+        border-top: 2px solid var(--stamp);
+        padding-top: 3mm;
+        display: flex;
+        align-items: stretch;
+        gap: 7mm;
+      }
+
+      .legend .title {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-width: 44mm;
+      }
+
+      .legend .title .label {
+        margin-bottom: 1mm;
+      }
+
+      .legend .title p {
+        margin: 0;
+        font-size: 8.6pt;
+        line-height: 1.35;
+        color: var(--ink-2);
+      }
+
+      .keys {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 4mm;
+        flex: 1;
+      }
+
+      .key {
+        display: flex;
+        align-items: center;
+        gap: 2.6mm;
+      }
+
+      .key .sample {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .key p {
+        margin: 0;
+        font-size: 8.6pt;
+        line-height: 1.3;
+        color: var(--ink-2);
+      }
+
+      .key p b {
+        display: block;
+        font-size: 9.2pt;
+        color: var(--ink);
+        font-weight: 700;
+      }
+
+      .square {
+        width: 7mm;
+        height: 7mm;
+        border-radius: var(--radius-sm);
+        background: var(--sheet);
+      }
+
+      .square.dashed {
+        border: 1.5px dashed var(--ink-3);
+      }
+
+      .square.half {
+        border: 1.5px solid var(--stamp);
+        background: linear-gradient(180deg, var(--sheet) 50%, var(--stamp) 50%);
+      }
+
+      .square.pressed {
+        border: 1.5px solid var(--stamp-deep);
+        background: var(--stamp);
+      }
+
+      .stamp-mark {
+        padding: 0.6mm 1.6mm 0.8mm;
+        border: 1.5px solid var(--stamp-deep);
+        border-radius: var(--radius-sm);
+        color: var(--stamp-deep);
+        font-size: 7.4pt;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        transform: rotate(-2deg);
+        white-space: nowrap;
+      }
+
+      .attention-word {
+        color: var(--stamp-deep);
+        font-size: 9.4pt;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .money {
+        display: inline-block;
+        padding: 0.5mm 1.6mm 0.7mm;
+        border: 1px solid var(--rule-strong);
+        border-radius: var(--radius-sm);
+        background: var(--sheet);
+        color: var(--stamp-deep);
+        font-size: 9.4pt;
+        font-weight: 700;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+
+      /* ------------------------------------------------------------- footer */
+
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6mm;
+        padding-top: 2.6mm;
+        border-top: 1px solid var(--rule-strong);
+        font-size: 8.6pt;
+        color: var(--ink-2);
+      }
+
+      .footer .mono {
+        font-family: var(--mono);
+        font-size: 8.4pt;
+        letter-spacing: 0.04em;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="sheet" id="sheet">
+      <!-- ------------------------------------------------------------ head -->
+      <header class="masthead">
+        <div class="brand">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="17" y="17" width="39" height="39" rx="6" fill="none" stroke="#d04a02" stroke-width="3" opacity="0.4" />
+            <rect x="8" y="8" width="39" height="39" rx="6" fill="#d04a02" />
+            <path fill="#fff" fill-rule="evenodd" d="M19 16h9a12.5 12.5 0 0 1 0 25h-9V16Zm5.5 6v13h3a6.5 6.5 0 0 0 0-13h-3Z" />
+          </svg>
+          <div>
+            <h1>Panduan Pakai</h1>
+            <div class="sub">Dari foto struk sampai semua lunas.</div>
+          </div>
+        </div>
+        <div class="head-right">
+          <div class="tagline">Split the bill. Not the friendship.</div>
+          <div class="where">DUO · splitfair.xyz</div>
+        </div>
+      </header>
+
+      <!-- ------------------------------------------------------------ flow -->
+      <section>
+        <div class="section-head">
+          <h2>Satu struk, enam langkah</h2>
+          <span class="note">Semua orang cuma butuh langkah 5 — yang lain buat lu, si operator.</span>
+        </div>
+        <div class="flow">
+          <div class="step">
+            <div class="n"><b>1</b><span>Masuk</span></div>
+            <h3>Pasang &amp; login</h3>
+            <p>
+              Buka <b>splitfair.xyz</b>, masuk pakai akun operator. Di iPhone:
+              Share → <b>Add to Home Screen</b>. Di Android: menu →
+              <b>Install</b>. Sekali doang.
+            </p>
+            <span class="arrow"></span>
+          </div>
+          <div class="step">
+            <div class="n"><b>2</b><span>Foto</span></div>
+            <h3>Foto struknya</h3>
+            <p>
+              Tab <b>Foto</b> → Ambil foto struk, atau pilih dari galeri.
+              Modelnya baca angkanya dan ngisi; <b>lu yang cek</b>. Nggak ada
+              yang kesimpen sebelum lu simpan.
+            </p>
+            <span class="arrow"></span>
+          </div>
+          <div class="step">
+            <div class="n"><b>3</b><span>Bagi</span></div>
+            <h3>Bagi per orang</h3>
+            <p>
+              Tambahin nama, tap tiap item, pilih siapa aja yang kebagian (bisa
+              lebih dari satu). Saklar <b>“PPN sudah termasuk”</b> buat struk
+              retail. Isi rekening tujuan, terus simpan.
+            </p>
+            <span class="arrow"></span>
+          </div>
+          <div class="step">
+            <div class="n"><b>4</b><span>Kirim</span></div>
+            <h3>Kirim notanya</h3>
+            <p>
+              Di <b>Tagihan</b> → Nota &amp; WA → <b>Copy teks buat WA</b>. Satu
+              pesan berisi ringkasan, bagian tiap orang, link nota, dan semua
+              tombol bayar. Paste ke grup.
+            </p>
+            <span class="arrow"></span>
+          </div>
+          <div class="step">
+            <div class="n"><b>5</b><span>Bayar</span></div>
+            <h3>Mereka bayar</h3>
+            <p>
+              Tiap orang buka link-nya: nominal, rekening/QRIS, terus upload
+              screenshot bukti transfer. <b>Dibaca otomatis</b> — pas langsung
+              lunas, nggak pas masuk “perlu dicek”.
+            </p>
+            <span class="arrow"></span>
+          </div>
+          <div class="step">
+            <div class="n"><b>6</b><span>Pantau</span></div>
+            <h3>Tagih &amp; rekap</h3>
+            <p>
+              Sisa tagihan ada di <b>Tagihan</b> dan <b>Tagih</b>; bukti yang
+              masuk ngumpul di <b>lonceng Notifikasi</b>. Kalau beres semua,
+              rekap bulanannya ada di <b>Report</b>.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- -------------------------------------------------------- exhibits -->
+      <section>
+        <div class="exhibits">
+          <div class="shot">
+            <figure><img src="img/capture.png" alt="Layar Foto Struk" /></figure>
+            <figcaption><b>Foto struk</b>Angkat kamera, atau ambil dari galeri.</figcaption>
+          </div>
+          <div class="shot">
+            <figure><img src="img/review.png" alt="Layar Bagi Rata" /></figure>
+            <figcaption><b>Bagi rata</b>Item ke orang, PPN, rekening, simpan.</figcaption>
+          </div>
+          <div class="shot">
+            <figure><img src="img/nota.png" alt="Nota" /></figure>
+            <figcaption><b>Nota</b>Link yang dikirim ke grup; tiap orang ada tombol Pay.</figcaption>
+          </div>
+          <div class="shot">
+            <figure><img src="img/bayar.png" alt="Halaman bayar" /></figure>
+            <figcaption><b>Halaman bayar</b>Nominal, QRIS/rekening, upload bukti.</figcaption>
+          </div>
+          <div class="shot">
+            <figure><img src="img/bills.png" alt="Layar Tagihan" /></figure>
+            <figcaption><b>Tagihan</b>Siapa udah bayar, siapa belum, tanda tangan manual.</figcaption>
+          </div>
+          <div class="shot">
+            <figure><img src="img/notif.png" alt="Layar Notifikasi" /></figure>
+            <figcaption><b>Notifikasi</b>Bukti masuk per nota; yang perlu dicek ada tombolnya.</figcaption>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------------------------------------------------------- columns -->
+      <div class="cols">
+        <div class="col">
+          <div class="panel">
+            <h3>Tab lainnya</h3>
+            <ul class="rows">
+              <li><span class="k">Tagihan</span><span class="v">Semua nota + statusnya. Tap satu tagihan buat buka rinciannya: tandai lunas, atau lepas tandanya, per orang.</span></li>
+              <li><span class="k">Tagih</span><span class="v">Yang masih perlu ditagih, diurut. Cara cepat buat nge-chat satu-satu.</span></li>
+              <li><span class="k">Orang</span><span class="v">Riwayat per orang: pernah bayar apa aja, sisa berapa.</span></li>
+              <li><span class="k">Report</span><span class="v">Rekap bulan ini + yang masih di luar. <b>Export CSV</b> dan <b>print PDF</b>.</span></li>
+            </ul>
+          </div>
+          <div class="panel absent">
+            <h3>Yang sengaja nggak ada</h3>
+            <ul class="bullets">
+              <li><b>Nggak ada akun buat yang bayar</b> — mereka cuma butuh link.</li>
+              <li><b>Nggak ada netting</b> — arah utangnya selalu sama, ke yang bayar dulu.</li>
+              <li><b>Nggak ada push notification</b> — notif masuknya di lonceng dalam app.</li>
+              <li><b>Angka yang udah disimpan nggak bisa diedit</b> — hapus (bisa di-restore) terus bikin ulang.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="panel">
+            <h3>Kalau ada yang aneh</h3>
+            <ul class="rows">
+              <li class="issue"><span class="k">“Struk tidak balance”</span><span class="v">Cek angkanya sama foto. Kalau struk retail (Guardian, Indomaret) dan angkanya balance cuma kalau PPN dianggap termasuk, tekan saklar <b>“PPN sudah termasuk”</b> di layar Bagi.</span></li>
+              <li class="issue"><span class="k">“Item kedobel”</span><span class="v">Total baris item ≠ subtotal. Ada baris kebaca dua kali atau kelewat — bedah daftarnya satu-satu.</span></li>
+              <li class="issue"><span class="k">Bukti “Perlu dicek”</span><span class="v">Buka <b>Notifikasi</b> → Lihat bukti. Kalau transfernya bener, tekan <b>Tandai lunas</b>.</span></li>
+              <li class="issue"><span class="k">Salah tandai lunas</span><span class="v">Buka <b>Tagihan</b> → tap tagihannya → tap baris orangnya buat lepas tandanya.</span></li>
+              <li class="issue"><span class="k">Nota udah kepalang dikirim</span><span class="v">Hapus notanya (bisa di-restore) dan bikin ulang yang bener, terus kirim link barunya.</span></li>
+              <li class="issue"><span class="k">Link nggak kebuka</span><span class="v">Note bisa dibaca tanpa akun. Kalau tetap gagal, buka dari WA di HP.</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="col">
+          <div class="panel payer">
+            <h3>Buat yang bayar</h3>
+            <ul class="bullets">
+              <li><b>Nominal harus pas.</b> Kurang atau lebih tetap masuk, tapi ditandai “perlu dicek” dan baru lunas setelah dicek operator.</li>
+              <li><b>Transfer ke rekening yang tertera</b>, terus upload screenshot buktinya di halaman yang sama. Buktinya dibaca otomatis.</li>
+              <li><b>QRIS bisa di-scan dari halaman bayar</b> pakai m-banking atau e-wallet apa aja — kodenya nggak nyimpen nominal, jadi ketik manual sesuai angka di halamannya.</li>
+              <li><b>Nota itu rahasia grup.</b> Link di dalamnya bisa nge-lunasin bagian orang lain — jangan diteruskan ke luar.</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Etiket singkat</h3>
+            <ul class="bullets">
+              <li>Bayar sebelum ditagih dua kali.</li>
+              <li>Struk difoto pas terang, rata, nggak ketutup jari.</li>
+              <li>Kalau ragu sama angka, kirim screenshot ke operator — halaman bayar tetap nerima bukti.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- -------------------------------------------------------- bottom band -->
+      <section class="band">
+        <div class="panel message">
+          <h3>Pesan WA yang bakal kekirim (persis)</h3>
+          <p class="msg">
+            Nota <b>Lucky Cat Coffee &amp; Kitchen</b> — 26 Jun 2026<br />
+            Total <b>Rp 456.225</b><br /><br />
+            Bagiannya:<br />
+            - Budi: Rp 127.050 — udah masuk Rp 100.000, sisa Rp 27.050<br />
+            - Sarah: Rp 98.175<br />
+            - Andi: Rp 121.275 — udah lunas<br />
+            - Dewi: Rp 109.725<br /><br />
+            Buka notanya di sini, tiap orang ada tombol Pay di kartunya:<br />
+            <span class="link">splitfair.xyz/#/nota?id=b8f2…</span><br /><br />
+            Bayarnya: transfer ke BCA 1234567890 a.n. Alee, atau scan QRIS di
+            halaman bayarnya.<br /><br />
+            Upload bukti transfernya di halaman itu ya — nanti dicek otomatis.
+          </p>
+        </div>
+
+        <div class="panel">
+          <h3>Sebelum tekan Simpan, cek tiga hal</h3>
+          <ul class="rows">
+            <li><span class="k">Rekening tujuan</span><span class="v">Nomor dan nama penerimanya bener. Ini yang dipakai model buat nilai bukti transfer.</span></li>
+            <li><span class="k">Item kebagi semua</span><span class="v">Kalau ada item yang belum ada pemiliknya, tombol simpannya nggak nyala.</span></li>
+            <li><span class="k">Saklar PPN</span><span class="v">Struk warung/resto: tetap “Ditambahkan”. Struk retail (Guardian, Indomaret, Family Mart): “Sudah termasuk”.</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ----------------------------------------------------------- legend -->
+      <section class="legend">
+        <div class="title">
+          <span class="label">Cara baca kwitansinya</span>
+          <p>Tampilannya sengaja kayak formulir — ini arti tanda-tandanya.</p>
+        </div>
+        <div class="keys">
+          <div class="key">
+            <span class="sample"><span class="square dashed" style="background: var(--sheet)"></span></span>
+            <p><b>Kotak putus-putus</b>Belum lunas.</p>
+          </div>
+          <div class="key">
+            <span class="sample"><span class="square half"></span></span>
+            <p><b>Setengah tercap</b>Sebagian, atau ada bukti yang perlu dicek.</p>
+          </div>
+          <div class="key">
+            <span class="sample"><span class="square pressed"></span></span>
+            <p><b>Tercap penuh</b>Lunas.</p>
+          </div>
+          <div class="key">
+            <span class="sample"><span class="stamp-mark">Lunas</span></span>
+            <p><b>Stempel LUNAS</b>Ditulis di baris yang udah dibayar.</p>
+          </div>
+          <div class="key">
+            <span class="sample"><span class="attention-word">Perlu dicek</span></span>
+            <p><b>Tulisan orange</b>Ada yang nunggu keputusan lu.</p>
+          </div>
+          <div class="key">
+            <span class="sample"><span class="money">Rp 27.050</span></span>
+            <p><b>Angka orange</b>Uang yang masih perlu dikejar.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <span>DUO · panduan operator &amp; teman-teman satu meja · dicetak dari aplikasi yang sama yang dipandu.</span>
+        <span class="mono">splitfair.xyz · DUO-SPLIT-BILL</span>
+      </footer>
+    </div>
+  </body>
+</html>
