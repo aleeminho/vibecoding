@@ -8,7 +8,7 @@ related_targets: ["src/routes/Nota.svelte","src/routes/Bayar.svelte","src/app.cs
 # DUO — surface brief
 
 ## Scope and mode
-Operate. Every screen: the shell chrome (`src/App.svelte`), Tagihan, Foto struk, Review & Bagi, Tagih, Report, Orang, Sign in — plus the two paper documents, the nota and the payer page. Phone-first PWA; the documents also live on paper and in chat previews.
+Operate. Every screen: the shell chrome (`src/App.svelte`), Tagihan, Foto struk, Review & Bagi, Tagih, Report, Notifikasi (feed + letterhead bell), Orang, Sign in — plus the two paper documents, the nota and the payer page. Phone-first PWA; the documents also live on paper and in chat previews.
 
 ## Audience and job
 One operator, a handful of friends. Photograph the receipt, assign items, send the nota to the group, collect. Payers have no account: their whole interface is one tokenized page that states what they owe and accepts a transfer screenshot as proof.

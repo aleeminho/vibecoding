@@ -23,6 +23,7 @@ import {
   DEMO_EXPORT_BILLS,
   DEMO_FLAGGED,
   DEMO_MONTHLY,
+  DEMO_NOTIFICATIONS,
   DEMO_OUTSTANDING,
   DEMO_PEOPLE,
   demoPaymentPage,
@@ -30,7 +31,7 @@ import {
   isDemo,
 } from './demo'
 import type { ExportBill } from './export'
-import type { AssignedItem, Extraction, ParticipantShare } from './types'
+import type { AssignedItem, Extraction, NotifItem, ParticipantShare } from './types'
 
 const BUCKET = 'receipts'
 
@@ -1098,6 +1099,79 @@ export async function listFlaggedPayments(): Promise<FlaggedPayment[]> {
       verdict: p.verdict,
       note: p.note,
       image_path: p.image_path,
+      created_at: p.created_at,
+    })
+  }
+
+  return out
+}
+
+/**
+ * The operator's notification feed: every proof that landed on their bills,
+ * newest first.
+ *
+ * Unlike `listFlaggedPayments` this keeps the matched ones. The flagged queue
+ * asks "what still needs a decision" and drops anything the model settled; the
+ * feed answers "what has happened since I last looked", and a payment that
+ * settled itself is precisely the thing the operator wants to hear about — it
+ * is the money arriving.
+ *
+ * There is no notifications table and no notifier: the `payments` row already
+ * is the event, and row level security already scopes it to the operator's own
+ * bills, so this is a read over records that exist rather than a second copy
+ * that could drift from them.
+ */
+export async function listNotifications(): Promise<NotifItem[]> {
+  if (import.meta.env.DEV && isDemo()) return DEMO_NOTIFICATIONS
+
+  const { data, error } = await supabase
+    .from('payments')
+    .select(
+      'id, amount_read, verdict, created_at, image_path, bill_participants(person, amount_owed, status, bill_id, bills(place, ref_code, deleted_at))',
+    )
+    // RLS already limits this to the caller's own bills.
+    .order('created_at', { ascending: false })
+    .limit(50)
+
+  if (error) throw new Error(error.message)
+
+  type Row = {
+    id: string
+    amount_read: number | null
+    verdict: 'matched' | 'mismatch' | 'unclear'
+    created_at: string
+    image_path: string
+    bill_participants: {
+      person: string
+      amount_owed: number
+      status: string
+      bill_id: string
+      bills: { place: string; ref_code: string; deleted_at: string | null } | null
+    } | null
+  }
+
+  const rows = (data as unknown as Row[]) ?? []
+  const out: NotifItem[] = []
+
+  for (const p of rows) {
+    const share = p.bill_participants
+    const bill = share?.bills
+    // A row whose share or bill is gone, or whose bill the operator deleted. A
+    // deleted bill stays restorable in the ledger, but "someone paid" about a
+    // bill that is not on the pad is an entry nobody can act on.
+    if (!share || !bill || bill.deleted_at !== null) continue
+
+    out.push({
+      id: p.id,
+      person: share.person,
+      place: bill.place,
+      ref_code: bill.ref_code,
+      bill_id: share.bill_id,
+      verdict: p.verdict,
+      amount_read: p.amount_read,
+      amount_owed: share.amount_owed,
+      image_path: p.image_path,
+      status: share.status,
       created_at: p.created_at,
     })
   }

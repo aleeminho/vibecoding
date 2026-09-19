@@ -109,3 +109,34 @@ export interface GateReport {
   passed: boolean
   failures: GateFailure[]
 }
+
+/**
+ * One line in the operator's notification feed: a proof of payment that landed
+ * on one of their bills.
+ *
+ * Derived from a `payments` row rather than written by a notifier, which is the
+ * whole reason there is no notifications table: the proof already carries who,
+ * how much, when and which bill, and row level security already scopes it to the
+ * operator. `verdict` is what the reader decided — "matched" means the money
+ * arrived and the share settled itself; the other two mean a human should look.
+ */
+export interface NotifItem {
+  id: string
+  person: string
+  place: string
+  ref_code: string
+  bill_id: string
+  verdict: 'matched' | 'mismatch' | 'unclear'
+  /** What the model read off the screenshot. Null when it could not read one. */
+  amount_read: number | null
+  amount_owed: number
+  /** Storage path of the uploaded proof, for opening the evidence. */
+  image_path: string
+  /**
+   * The share's own state, which is not the verdict. A mismatch the operator
+   * accepted by hand has verdict 'mismatch' and status 'lunas' — the model was
+   * overruled, and the feed has to show the ruling, not the objection.
+   */
+  status: string
+  created_at: string
+}

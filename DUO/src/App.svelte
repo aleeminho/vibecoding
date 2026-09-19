@@ -17,6 +17,8 @@
   import { onMount } from 'svelte'
   import { supabaseConfigured } from './lib/supabase'
   import { session } from './lib/session.svelte'
+  import { notifications } from './lib/notifications.svelte'
+  import { bundleByBill } from './lib/notify'
   import { isDemo } from './lib/demo'
   import { applyPhoneFrame } from './lib/frame'
   import SignIn from './routes/SignIn.svelte'
@@ -28,6 +30,7 @@
   import Preview from './routes/Preview.svelte'
   import Nota from './routes/Nota.svelte'
   import Bayar from './routes/Bayar.svelte'
+  import Notif from './routes/Notif.svelte'
   import Orang from './routes/Orang.svelte'
 
   type Route =
@@ -39,6 +42,7 @@
     | 'preview'
     | 'nota'
     | 'bayar'
+    | 'notif'
     | 'orang'
 
   /** Routes that are a document rather than a screen: no chrome, white page. */
@@ -89,6 +93,7 @@
       'preview',
       'nota',
       'bayar',
+      'notif',
       'orang',
     ]
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
@@ -140,6 +145,7 @@
     preview: 'Preview',
     nota: 'Nota',
     bayar: 'Bayar',
+    notif: 'Notifikasi',
     orang: 'Orang',
   }
 
@@ -152,6 +158,44 @@
     // works if the flag is visible to the bundler right here. Behind a call, it
     // cannot be eliminated, and the code ships to the phone.
     if (import.meta.env.DEV) applyPhoneFrame()
+  })
+
+  /**
+   * Bills with something unread, not payments.
+   *
+   * The badge has to agree with the screen it opens: the feed's unit is the
+   * invoice, so a bill three people paid is one thing to look at and lights one
+   * count, not three.
+   */
+  let unreadBundles = $derived(bundleByBill(notifications.unread).length)
+
+  /**
+   * Keep the notification badge roughly current.
+   *
+   * Loaded when a session lands, on every return to the tab, and on a slow
+   * interval while the tab stays visible. No realtime subscription and no
+   * polling while hidden: the badge is a convenience, and a phone in a pocket
+   * asking the database every minute is a cost with no reader.
+   *
+   * A failed refresh is swallowed on purpose — the feed we already have is
+   * still true, and an error banner over the app because a background poll
+   * missed is worse than a badge that is a minute stale.
+   */
+  $effect(() => {
+    if (!session.current && !demo) return
+
+    void notifications.load().catch(() => {})
+
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void notifications.load().catch(() => {})
+    }
+
+    const timer = setInterval(refresh, 60_000)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', refresh)
+    }
   })
 </script>
 
@@ -180,6 +224,34 @@
       </span>
     </div>
     <div class="header-actions">
+      {#if session.email || demo}
+        <!--
+          The pad's inbox: proofs of payment that have landed since the operator
+          last looked. Drawn as a bell because that is the one control every
+          phone already taught them, then counted in a stamped square — the
+          number is attention, and attention is the stamp ink.
+        -->
+        <button
+          class="bell"
+          class:unread={unreadBundles > 0}
+          aria-label={unreadBundles > 0
+            ? `Notifikasi, ${unreadBundles} tagihan baru`
+            : 'Notifikasi'}
+          onclick={() => go('notif')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true">
+            <path
+              d="M18 8.5a6 6 0 0 0-12 0c0 6.5-2.5 8.5-2.5 8.5h17S18 15 18 8.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M13.8 20.5a2 2 0 0 1-3.6 0" stroke-linecap="round" />
+          </svg>
+          {#if unreadBundles > 0}
+            <span class="bell-badge num">{unreadBundles > 9 ? '9+' : unreadBundles}</span>
+          {/if}
+        </button>
+      {/if}
       {#if session.email}
         <span class="operator">operator <b>{session.email}</b></span>
         <button class="plain nav-action" onclick={() => session.signOut()}>Keluar</button>
@@ -262,6 +334,8 @@
           <Review onDone={() => go('bills')} />
         {:else if route === 'orang'}
           <Orang />
+        {:else if route === 'notif'}
+          <Notif />
         {:else}
           <Report />
         {/if}
@@ -367,6 +441,59 @@
   .nav-action {
     min-height: 36px;
     padding: 0 8px;
+  }
+
+  /*
+   * The notification bell. A paper control gone quiet: no fill, no frame, ink-2
+   * at rest and stamp-deep only while something is new. The count rides in a
+   * stamped square — 3px corners, the stamp fill and its deep border, white
+   * tabular figures — because the number is attention, and attention is the
+   * stamp ink everywhere else in this app.
+   */
+  .bell {
+    position: relative;
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
+    background: none;
+    border-color: transparent;
+    border-radius: var(--radius-sm);
+    color: var(--ink-2);
+  }
+
+  .bell:active:not(:disabled) {
+    opacity: 0.7;
+    transform: none;
+  }
+
+  .bell.unread {
+    color: var(--stamp-deep);
+  }
+
+  .bell svg {
+    width: 22px;
+    height: 22px;
+    display: block;
+    margin: 0 auto;
+  }
+
+  .bell-badge {
+    position: absolute;
+    top: 3px;
+    right: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 3px;
+    background: var(--stamp);
+    border: 1px solid var(--stamp-deep);
+    border-radius: var(--radius-sm);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 750;
+    line-height: 1;
   }
 
   /* The page title: large, in the content, and it scrolls away. Hidden on a

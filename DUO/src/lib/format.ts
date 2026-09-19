@@ -65,3 +65,40 @@ export function formatDateTime(iso: string): string {
   const day = `${at.getDate()} ${MONTHS[at.getMonth()]} ${at.getFullYear()}`
   return `${day}, ${time}`
 }
+
+/**
+ * A timestamp at conversation distance: "baru aja", "12 menit lalu", "3 jam
+ * lalu", "kemarin", "4 hari lalu", then `formatDate` once it is a date rather
+ * than an age.
+ *
+ * The notification feed exists to answer "what happened since I last looked",
+ * and for that the useful answer is how long ago it was, not the clock time.
+ * Past a week the age stops meaning anything and the date is the honest label.
+ *
+ * `now` is injectable so the test can pin the boundaries without racing a real
+ * clock; every caller takes the default.
+ */
+export function timeAgo(iso: string, now: Date = new Date()): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return iso
+
+  // Rounded down, not negated into the future: a timestamp a few seconds ahead
+  // of this device's clock (clock skew between the phone and the database) is
+  // "baru aja", not "-1 menit lalu".
+  const minutes = Math.floor(Math.max(0, now.getTime() - at.getTime()) / 60_000)
+  if (minutes < 1) return 'baru aja'
+  if (minutes < 60) return `${minutes} menit lalu`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} jam lalu`
+
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'kemarin'
+  if (days < 7) return `${days} hari lalu`
+
+  // Built from the local calendar fields rather than slicing the ISO string:
+  // an 06:00 WIB notification is 23:00 UTC the day before, and the slice would
+  // print yesterday's date to the one reader who cares which day it was.
+  const local = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`
+  return formatDate(local)
+}

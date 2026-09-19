@@ -27,6 +27,7 @@ import type {
   SettleUpEntry,
 } from './api'
 import type { ExportBill } from './export'
+import type { NotifItem } from './types'
 
 /**
  * True when the URL asks for fixture data. Only meaningful in a dev build.
@@ -362,5 +363,97 @@ export const DEMO_FLAGGED: FlaggedPayment[] = [
     note: 'Gambarnya kek buram, nominalnya nggak kebaca.',
     image_path: 'bukti/4XB9TMRW/1a7f3b20.jpg',
     created_at: '2026-05-31T20:41:00Z',
+  },
+]
+
+/**
+ * The notification feed, fresh every time the demo loads.
+ *
+ * Timestamps are relative to now, unlike every other fixture in this file —
+ * deliberately. `timeAgo` is the label on every row, so fixed dates would demo
+ * "3 bulan lalu" on all six entries and hide the thing the screen is for. Four
+ * recent ones and two older ones, so the new/old split has content on both
+ * sides whichever way the seen marker falls.
+ */
+const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString()
+
+export const DEMO_NOTIFICATIONS: NotifItem[] = [
+  {
+    id: 'n-1',
+    person: 'Budi',
+    place: 'Warung Bu Siti',
+    ref_code: '9PMXR2KV',
+    bill_id: 'demo-2',
+    verdict: 'matched',
+    amount_read: 42760,
+    amount_owed: 42760,
+    image_path: 'bukti/9PMXR2KV/2b1f4a90.jpg',
+    status: 'lunas',
+    created_at: minutesAgo(4),
+  },
+  {
+    id: 'n-2',
+    person: 'Sarah',
+    place: 'Lucky Cat Coffee & Kitchen',
+    ref_code: 'YQ3HWJDM',
+    bill_id: 'demo-1',
+    verdict: 'matched',
+    amount_read: 98175,
+    amount_owed: 98175,
+    image_path: 'bukti/YQ3HWJDM/7d3c8e12.jpg',
+    status: 'lunas',
+    created_at: minutesAgo(52),
+  },
+  {
+    id: 'n-3',
+    person: 'Andi',
+    place: 'Lucky Cat Coffee & Kitchen',
+    ref_code: 'YQ3HWJDM',
+    bill_id: 'demo-1',
+    verdict: 'mismatch',
+    amount_read: 100000,
+    amount_owed: 121275,
+    image_path: 'bukti/YQ3HWJDM/3f2a1b9c.jpg',
+    status: 'belum lunas',
+    created_at: minutesAgo(3 * 60 + 10),
+  },
+  {
+    id: 'n-4',
+    person: 'Dewi',
+    place: 'Lucky Cat Coffee & Kitchen',
+    ref_code: 'YQ3HWJDM',
+    bill_id: 'demo-1',
+    verdict: 'matched',
+    amount_read: 109725,
+    amount_owed: 109725,
+    image_path: 'bukti/YQ3HWJDM/9c4d2e7f.jpg',
+    status: 'lunas',
+    created_at: minutesAgo(26 * 60),
+  },
+  {
+    id: 'n-5',
+    person: 'Rina',
+    place: 'Sate Taichan Bang Jali',
+    ref_code: '4XB9TMRW',
+    bill_id: 'demo-3',
+    verdict: 'unclear',
+    amount_read: null,
+    amount_owed: 78000,
+    image_path: 'bukti/4XB9TMRW/1a7f3b20.jpg',
+    status: 'belum lunas',
+    created_at: minutesAgo(2 * 24 * 60),
+  },
+  {
+    id: 'n-6',
+    person: 'Tono',
+    place: 'Kopi Kenangan Senopati',
+    ref_code: 'K7M2QX9P',
+    bill_id: 'demo-4',
+    verdict: 'matched',
+    amount_read: 35000,
+    amount_owed: 35000,
+    image_path: 'bukti/K7M2QX9P/5e8b0c41.jpg',
+    status: 'lunas',
+    created_at: minutesAgo(9 * 24 * 60),
   },
 ]

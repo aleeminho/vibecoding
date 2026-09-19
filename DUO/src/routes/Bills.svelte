@@ -177,10 +177,22 @@
   }
 
   async function openReceipt(path: string) {
+    // Opened inside the tap gesture, before anything is awaited: waiting for
+    // the signed URL first drops the user activation, and mobile Safari then
+    // blocks the new tab as a popup. The placeholder window is given its
+    // address once the link resolves.
+    const tab = window.open('', '_blank')
+    // Same isolation the old `noopener` gave, without giving up the handle that
+    // is needed to set the address after the await.
+    if (tab) tab.opener = null
     try {
       const url = await signedReceiptUrl(path)
-      window.open(url, '_blank', 'noopener')
+      if (tab) tab.location.href = url
+      // Popups blocked outright: navigating this tab at least shows the image,
+      // and the back gesture returns to the app.
+      else window.location.href = url
     } catch (err) {
+      tab?.close()
       message = (err as Error).message
     }
   }

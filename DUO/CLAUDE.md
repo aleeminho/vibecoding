@@ -164,6 +164,20 @@ the 2px-double total rule and the due band on `src/routes/Nota.svelte`, the
   `DPP (harga jual)` = `total - tax`; the receipt's own `DPP (VAT Base)` is DPP
   Nilai Lain (eleven twelfths of the real base) and a different number, which is
   why the nota's is qualified.
+- **There is no notifications table and no push, on purpose.** The feed is a
+  read over `payments` (`listNotifications`): the proof row already is the event
+  — who, how much, when, which bill — and RLS already scopes it to the operator.
+  Unread is a device-local marker (`duo.notifSeenAt`), and the feed's unit is
+  the invoice, not the transfer: `bundleByBill` in `notify.ts` folds a bill's
+  proofs into one row and the bell counts those bundles. Push was offered and
+  declined; it would mean a service worker, VAPID keys and a subscriptions
+  table, so do not reintroduce it without asking.
+- **A signed URL must open its tab inside the tap gesture.** `signedReceiptUrl`
+  is async, and mobile Safari blocks a tab opened after an await as a popup —
+  so `window.open('')` first, set `tab.location.href` once the link resolves,
+  and `tab.opener = null` to keep the isolation `noopener` used to give. Both
+  `Notif.viewProof` and `Bills.openReceipt` do this; the Bills one shipped the
+  broken way first.
 
 ---
 
