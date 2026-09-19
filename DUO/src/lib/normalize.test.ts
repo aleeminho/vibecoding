@@ -27,6 +27,7 @@ const clean = {
   subtotal: 71000,
   discount: 5000,
   tax: 6600,
+  tax_inclusive: false,
   service_charge: 3300,
   rounding_adjustment: 0,
   total: 75900,

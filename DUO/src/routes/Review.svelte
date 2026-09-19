@@ -73,6 +73,10 @@
         ext.total,
         roster,
         rounding,
+        // Trailing rather than sitting next to `tax`, matching the signature:
+        // every existing call keeps its argument order and an omission falls
+        // back to the exclusive arithmetic, which gate 4 rejects loudly.
+        ext.tax_inclusive,
       )
     } catch (err) {
       return { error: (err as Error).message }
@@ -275,6 +279,7 @@
         subtotal,
         discount: ext.discount,
         tax: ext.tax,
+        taxInclusive: ext.tax_inclusive,
         serviceCharge: ext.service_charge,
         roundingAdjustment: ext.rounding_adjustment,
         total: ext.total,
@@ -455,6 +460,35 @@
               <MoneyInput label="Service" value={ext.service_charge} onchange={(v) => patchHeader({ service_charge: v })} />
               <MoneyInput label="Pembulatan" value={ext.rounding_adjustment} onchange={(v) => patchHeader({ rounding_adjustment: v })} />
               <MoneyInput label="Total" value={ext.total} onchange={(v) => patchHeader({ total: v })} />
+            </div>
+
+            <!--
+              Which convention this receipt is printed under, as a switch rather
+              than a number: it is a fact about the whole slip, and the gate that
+              trips when it is wrong names this switch in its message.
+
+              Under the keyboard's thumb, not buried in the fields, because the
+              one moment it matters is the moment gate 1 refuses to balance and
+              the operator is looking for what to press.
+            -->
+            <div class="row inclusive">
+              <span class="dim small">PPN</span>
+              <div class="picks">
+                <button
+                  class="pick"
+                  class:on={!ext.tax_inclusive}
+                  onclick={() => patchHeader({ tax_inclusive: false })}
+                >
+                  Ditambahkan
+                </button>
+                <button
+                  class="pick"
+                  class:on={ext.tax_inclusive}
+                  onclick={() => patchHeader({ tax_inclusive: true })}
+                >
+                  Sudah termasuk
+                </button>
+              </div>
             </div>
           </div>
         {/if}
@@ -724,7 +758,9 @@
                   {#if share.discount_share > 0}
                     <span class="term">− {rupiah(share.discount_share)}</span>
                   {/if}
-                  <span class="term">+ {rupiah(share.tax_share)}</span>
+                  {#if !ext.tax_inclusive}
+                    <span class="term">+ {rupiah(share.tax_share)}</span>
+                  {/if}
                   <span class="term">+ {rupiah(share.service_share)}</span>
                   {#if share.rounding_share}
                     <span class="term attention">
@@ -1049,6 +1085,14 @@
   .rounding {
     justify-content: space-between;
     gap: 8px;
+  }
+
+  /* The PPN convention switch, laid out like the rounding rule: a label giving
+     way on the left, the picks holding their width on the right. */
+  .inclusive {
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0;
   }
 
   /* Amounts are atomic; the line breaks between them. */

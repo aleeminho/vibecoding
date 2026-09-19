@@ -137,7 +137,14 @@
    * negative, and calling a negative figure "PPN & service" would be the
    * document lying about the largest number on it.
    */
-  const chargeLabel = (p: PersonBreakdown) => (p.extra < 0 ? 'Discount' : 'Tax + service')
+  const chargeLabel = (p: PersonBreakdown) =>
+    bill?.tax_inclusive
+      ? p.extra < 0
+        ? 'Discount'
+        : 'Service'
+      : p.extra < 0
+        ? 'Discount'
+        : 'Tax + service'
 
   /**
    * The same figure with its sign, for the ledger.
@@ -157,9 +164,18 @@
    * discount makes that line negative, and a column headed "PPN & service"
    * holding a discount is the table saying something untrue about the money.
    */
-  let chargeHeader = $derived(
-    breakdown.some((p) => p.extra < 0) ? 'Tax, service & discount' : 'Tax + service',
-  )
+  let chargeHeader = $derived.by(() => {
+    const hasDiscount = breakdown.some((p) => p.extra < 0)
+
+    // On an inclusive bill the tax is inside the prices, so this column can
+    // never contain any — and a column headed "Tax + service" holding an all
+    // zero row is the document naming a charge that is not there. The VAT is
+    // not lost, it moves to the bill-level note below the ledger, which is
+    // where it can be stated once and truthfully.
+    if (bill?.tax_inclusive) return hasDiscount ? 'Service & discount' : 'Service'
+
+    return hasDiscount ? 'Tax, service & discount' : 'Tax + service'
+  })
 
   /**
    * Who a share is owed to, said as a sentence rather than as a state.
@@ -325,6 +341,29 @@
             </tfoot>
           </table>
         </div>
+
+        <!--
+          The VAT, once, for the bill.
+
+          Derived from `total`, not from `subtotal`: on an inclusive bill those
+          two are equal only while there is no discount, and the price before
+          VAT is a fact about the money that was actually paid.
+
+          The qualifier on DPP is load-bearing. A retail receipt breaks its VAT
+          out the same way this does but prints `DPP (VAT Base)` — which under
+          Indonesia's 12% regime is DPP Nilai Lain, eleven twelfths of the real
+          base, and so a different number under a name the reader is holding in
+          their other hand. On the Guardian slip that line reads 48.723 while
+          the price before VAT is 53.153. Printing a bare "DPP" of 53.153 next
+          to a receipt saying "DPP 48.723" would look like an error in our
+          arithmetic rather than two different quantities.
+        -->
+        {#if bill.tax_inclusive && bill.tax > 0}
+          <p class="section-note">
+            Prices above already include PPN {rupiah(bill.tax)}. Price before
+            VAT — DPP (harga jual) — {rupiah(bill.total - bill.tax)}.
+          </p>
+        {/if}
 
         <!--
           The reconciliation, said out loud only when it fails. A row of

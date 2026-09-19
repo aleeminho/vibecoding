@@ -59,6 +59,19 @@ export function computeSplit(
   total: number,
   roster: string[] = [],
   rounding: RoundingMode = 0,
+  /**
+   * True when the printed item prices already contain `tax`.
+   *
+   * Every share keeps a populated `tax_share` — it is what the nota prints, and
+   * it is already a column — but it stops being added to `amount_owed`, because
+   * it is a breakdown of the item subtotal rather than a charge on top of it.
+   *
+   * Trailing rather than sitting next to `tax` where it belongs, so that the
+   * call site in Review.svelte and the thirty-odd in the tests keep their
+   * argument order. A caller who forgets it gets today's arithmetic, which gate
+   * 4 rejects loudly rather than accepting a wrong number.
+   */
+  taxInclusive = false,
 ): SplitResult {
   if (subtotal <= 0) {
     throw new Error('subtotal must be positive; cannot allocate shares against zero')
@@ -90,7 +103,12 @@ export function computeSplit(
       discount_share,
       tax_share,
       service_share,
-      amount_owed: item_subtotal - discount_share + tax_share + service_share,
+      // Tax either sits on top of the items or inside them, and only the first
+      // kind is money added to what someone owes. Either way `tax_share` is
+      // reported, because the nota prints how much of a share is VAT.
+      amount_owed: taxInclusive
+        ? item_subtotal - discount_share + service_share
+        : item_subtotal - discount_share + tax_share + service_share,
       rounding_share: 0,
     }
   })
@@ -190,18 +208,64 @@ export function computeSplit(
  * Because rounding_adjustment is captured as its own field, a correct
  * extraction always balances exactly, so this is not a tolerance problem.
  * Anything beyond one rupiah means a digit was misread (section 9).
+ *
+ * Two conventions reach this function and they cannot share an identity. A
+ * warung adds PPN on top of the items; a retailer prints a shelf price that
+ * already contains it and breaks the VAT out underneath the total. The two
+ * differ by exactly `tax`, so a receipt filed under the wrong one fails here —
+ * which is what makes it safe to let the model guess at the flag rather than
+ * asking the operator on every bill.
  */
 export function checkGate1(e: Extraction): GateFailure[] {
   const failures: GateFailure[] = []
   const subtotal = e.subtotal ?? 0
-  const lhs =
-    subtotal - e.discount + e.tax + e.service_charge + e.rounding_adjustment
+
+  const additive = subtotal - e.discount + e.tax + e.service_charge + e.rounding_adjustment
+  const contained = subtotal - e.discount + e.service_charge + e.rounding_adjustment
+
+  const lhs = e.tax_inclusive ? contained : additive
   const diff = Math.abs(lhs - e.total)
 
   if (diff > GATE1_TOLERANCE) {
+    const terms = e.tax_inclusive
+      ? `${subtotal} - ${e.discount} + ${e.service_charge} + ${e.rounding_adjustment}`
+      : `${subtotal} - ${e.discount} + ${e.tax} + ${e.service_charge} + ${e.rounding_adjustment}`
+
+    // Name the one correction this screen can actually make.
+    //
+    // Without this the gate is a dead end rather than a prompt to look: when
+    // the tax convention is what is wrong, the subtotal that balances gate 1 is
+    // exactly the one that fails gate 2, so no value the operator can type
+    // clears both. Section 9 asks a strict gate to send them back to the photo;
+    // it must not send them somewhere with no way out.
+    const flipped = Math.abs((e.tax_inclusive ? additive : contained) - e.total) <= GATE1_TOLERANCE
+
     failures.push({
       gate: 1,
-      message: `Struk tidak balance: ${subtotal} - ${e.discount} + ${e.tax} + ${e.service_charge} + ${e.rounding_adjustment} = ${lhs}, tapi total tercetak ${e.total} (selisih ${diff}). Cek angkanya sama foto.`,
+      message:
+        `Struk tidak balance: ${terms} = ${lhs}, tapi total tercetak ${e.total} (selisih ${diff}). ` +
+        (flipped
+          ? `Angkanya balance kalau PPN ${e.tax_inclusive ? 'ditambahkan di atas' : 'dianggap sudah termasuk dalam'} total — cek saklar "PPN sudah termasuk".`
+          : 'Cek angkanya sama foto.'),
+    })
+  }
+
+  // For an inclusive receipt `tax` drops out of the identity above, and that
+  // leaves it as the one number on the bill no gate checks at all: a misread
+  // VAT is invisible to gate 1, invisible to gate 4 (it is not in amount_owed)
+  // and invisible to v_bill_imbalance. The nota would then print it, and a
+  // document four people are asked to pay against would carry a wrong figure
+  // with nothing anywhere having objected. This bound is the cheapest thing
+  // that gives it a check again.
+  //
+  // Loose on purpose. It is not auditing the rate — 11%, 12% and PB1's 10% are
+  // all legitimate and goods on one receipt can carry different ones — it is
+  // catching the class of misread this app's own prompt warns about, where a
+  // thousands separator moves a number by a factor of ten.
+  if (e.tax_inclusive && e.total > 0 && e.tax / e.total > 0.25) {
+    failures.push({
+      gate: 1,
+      message: `PPN ${e.tax} itu ${Math.round((e.tax / e.total) * 100)}% dari total — kayaknya kebaca salah. Kalau PPN-nya memang segitu, matiin "PPN sudah termasuk".`,
     })
   }
 

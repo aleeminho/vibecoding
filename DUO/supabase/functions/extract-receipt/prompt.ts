@@ -95,6 +95,11 @@ export const EXTRACTION_SCHEMA = {
     },
     discount: { type: 'number', description: 'Positive number. 0 if none is printed.' },
     tax: { type: 'number', description: 'PPN. 0 if none is printed.' },
+    tax_inclusive: {
+      type: 'boolean',
+      description:
+        'True when the printed item prices already contain the tax, so the total is NOT the items plus tax. False on an ordinary restaurant receipt, where tax is added on top. See "Tax already inside the price" below.',
+    },
     service_charge: { type: 'number', description: '0 if none is printed.' },
     rounding_adjustment: {
       type: 'number',
@@ -113,6 +118,7 @@ export const EXTRACTION_SCHEMA = {
     'subtotal',
     'discount',
     'tax',
+    'tax_inclusive',
     'service_charge',
     'rounding_adjustment',
     'total',
@@ -155,6 +161,16 @@ Formatting rules for Indonesian receipts:
   These are ordinary, expected labels. Do not record them in confidence_notes as if something
   were unclear — a note there is reserved for numbers you genuinely could not read.
 - Tax may also be labeled "Pajak" or "Pajak 11%".
+- Tax already inside the price. Retail receipts, unlike restaurant ones, often print prices that
+  already contain the tax and then break it out beneath the total, in a block like "Purchase",
+  "DPP (VAT Base)" and "VAT Amount". There the printed total is what the customer pays and the VAT
+  is a part of it, not an addition to it: set tax_inclusive to true. Report subtotal as the sum of
+  the printed line totals, which already include that tax, so subtotal and total will be equal. Do
+  not add the tax on top, and do not subtract it from the subtotal.
+- "DPP" and "VAT Base" are not the subtotal. Under Indonesia's 12% VAT that line is often DPP
+  Nilai Lain, a notional base of eleven twelfths of the real selling price, so it is smaller than
+  what the goods actually cost. Never report it as the subtotal and never compute anything from
+  it. When the receipt prints a "Purchase" or "Harga Jual" line, that is the price before VAT.
 - Service charge may be labeled "Service", "Svc", or "Service Charge".
 - Discount may be labeled "Diskon", "Disc", or "Potongan". Report it as a positive number representing the amount subtracted.
 - A rounding line may be labeled "Pembulatan". Report it exactly as printed, it can be negative.

@@ -154,6 +154,16 @@ the 2px-double total rule and the due band on `src/routes/Nota.svelte`, the
 - **`sum(integer)` returns `bigint`; `sum(bigint)` returns `numeric`.** So
   `create or replace view` refuses a definition that changes a column's type —
   `SQLSTATE 42P16`. Drop the view first.
+- **Two receipt conventions, one gate.** Retail slips (Guardian, Indomaret,
+  Family Mart) print prices with PPN already inside and break it out beneath the
+  total; warung and restaurant slips add PPN on top. `Extraction.tax_inclusive`
+  says which, and it flips gate 1's identity, the `bills_arithmetic_balances`
+  constraint and whether `tax_share` joins `amount_owed`. `subtotal` keeps
+  meaning "sum of printed line totals" under both, which is what leaves gate 2
+  untouched. On an inclusive bill the nota states the VAT once at bill level as
+  `DPP (harga jual)` = `total - tax`; the receipt's own `DPP (VAT Base)` is DPP
+  Nilai Lain (eleven twelfths of the real base) and a different number, which is
+  why the nota's is qualified.
 
 ---
 

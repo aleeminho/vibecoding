@@ -16,6 +16,20 @@ export interface Extraction {
   subtotal: number | null
   discount: number
   tax: number
+  /**
+   * True when the printed prices already contain the tax rather than having it
+   * added on top.
+   *
+   * Indonesia prints receipts under two conventions and they need different
+   * arithmetic. A warung adds PPN to the food total; a retailer like Guardian
+   * prints a shelf price that already includes it and then breaks the VAT out
+   * underneath, as a Purchase / DPP / VAT Amount block below the total.
+   *
+   * It changes what `subtotal` and `total` mean relative to each other, so it is
+   * not a display flag: gate 1 drops `tax` from the identity when this is set,
+   * and `computeSplit` stops adding `tax_share` to `amount_owed`.
+   */
+  tax_inclusive: boolean
   service_charge: number
   /** Can be negative. Only set when the receipt explicitly prints a rounding line. */
   rounding_adjustment: number

@@ -61,13 +61,20 @@ interface Fixture {
    * a different venue or a truncated read.
    */
   placeContains: string
-  date: string
+  /**
+   * Null when the receipt genuinely prints no date — the Guardian slip does not
+   * — so the fixture states null rather than being impossible to fill in.
+   */
+  date: string | null
   itemCount: number
   subtotal: number
   discount: number
   tax: number
+  tax_inclusive: boolean
   service_charge: number
   total: number
+  /** Lowercased, punctuation-stripped fragments that must each appear. */
+  itemNames: string[]
 }
 
 const FIXTURES: Record<string, Fixture> = {
@@ -93,8 +100,43 @@ const FIXTURES: Record<string, Fixture> = {
     subtotal: 395000,
     discount: 0,
     tax: 41475,
+    tax_inclusive: false,
     service_charge: 19750,
     total: 456225,
+    itemNames: [
+      'longblack',
+      'icecaramellatte',
+      'lycheetea',
+      'peachtea',
+      'icelatte',
+      'japanese',
+      'aquareflectionsnatural',
+    ],
+  },
+  // The receipt that forced the tax-inclusive split. A Guardian (PT DFI Retail
+  // Nusantara Tbk) slip with no printed date and a VAT block below the total:
+  //
+  //   Total (Rp)      59.000   <- what the customer pays, VAT is inside it
+  //   Purchase        53.153   <- price before VAT
+  //   DPP (VAT Base)  48.723   <- DPP Nilai Lain, 53153 x 11/12
+  //   VAT Amount       5.847
+  //
+  // Until `tax_inclusive` existed this could not be saved at all: gate 1 read
+  // the 59.000 as items-plus-tax and rejected every value the operator could
+  // type. The exact numbers are kept here so a prompt regression that flips the
+  // flag back shows up as a failed assertion.
+  'WhatsApp Image 2026-09-18 at 03.37.49.jpeg': {
+    note: 'Guardian WTC 2, no printed date, 2 lines, VAT already inside the total',
+    placeContains: 'guard',
+    date: null,
+    itemCount: 2,
+    subtotal: 59000,
+    discount: 0,
+    tax: 5847,
+    tax_inclusive: true,
+    service_charge: 0,
+    total: 59000,
+    itemNames: ['freshcaresmashmatcha', 'salonpas'],
   },
 }
 
@@ -331,6 +373,11 @@ const split = computeSplit(
   raw.service_charge,
   raw.total,
   ['TEST'],
+  0,
+  // Trailing, matching the signature. Without it an inclusive receipt adds the
+  // VAT a second time and a one-person split no longer reproduces the total —
+  // the assertion below is exactly what catches that.
+  raw.tax_inclusive,
 )
 const only = split.participants[0]
 if (only.amount_owed !== raw.total) {
@@ -362,6 +409,7 @@ if (fixture) {
     ['subtotal', raw.subtotal, fixture.subtotal],
     ['discount', raw.discount, fixture.discount],
     ['tax', raw.tax, fixture.tax],
+    ['tax_inclusive', raw.tax_inclusive, fixture.tax_inclusive],
     ['service_charge', raw.service_charge, fixture.service_charge],
     ['total', raw.total, fixture.total],
   ]
@@ -377,23 +425,14 @@ if (fixture) {
   }
 
   const names = raw.items.map((i) => normalize(i.name))
-  const expectedNames = [
-    'longblack',
-    'icecaramellatte',
-    'lycheetea',
-    'peachtea',
-    'icelatte',
-    'japanese',
-    'aquareflectionsnatural',
-  ]
-  for (const expected of expectedNames) {
+  for (const expected of fixture.itemNames) {
     if (!names.some((n) => n.includes(expected))) {
       fail(
         `item "${expected}" nggak ketemu. Model balikin: ${raw.items.map((i) => i.name).join(', ')}`,
       )
     }
   }
-  ok(`semua ${expectedNames.length} nama item ketemu`)
+  ok(`semua ${fixture.itemNames.length} nama item ketemu`)
 }
 
 console.log(`\n  LULUS — ${elapsed}s\n`)

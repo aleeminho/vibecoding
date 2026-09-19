@@ -24,6 +24,7 @@ const receipt: Extraction = {
   subtotal: 71000,
   discount: 5000,
   tax: 6600,
+  tax_inclusive: false,
   service_charge: 3300,
   rounding_adjustment: 0,
   total: 75900,
@@ -187,6 +188,61 @@ describe('gate 1 — receipt arithmetic', () => {
       total: 75500,
     }
     expect(checkGate1(withRounding)).toEqual([])
+  })
+})
+
+/**
+ * The Guardian slip that forced the second convention: total 59.000 with the
+ * VAT 5.847 already inside it, broken out underneath as Purchase 53.153 and
+ * VAT Amount 5.847. Same numbers test-extract.ts asserts against a live scan.
+ */
+const guardian: Extraction = {
+  place: 'GUARD WTC 2',
+  date: null,
+  items: [
+    { name: 'FRESHCARESMASHMATCHA', qty: 2, line_total: 37000 },
+    { name: 'SALONPAS EXTRAHOT10S', qty: 2, line_total: 22000 },
+  ],
+  subtotal: 59000,
+  discount: 0,
+  tax: 5847,
+  tax_inclusive: true,
+  service_charge: 0,
+  rounding_adjustment: 0,
+  total: 59000,
+  confidence_notes: null,
+}
+
+describe('tax-inclusive receipts', () => {
+  test('gate 1 drops the tax from the identity when it is already inside', () => {
+    expect(checkGate1(guardian)).toEqual([])
+  })
+
+  test('the same numbers flagged exclusive name the switch that fixes them', () => {
+    const failures = checkGate1({ ...guardian, tax_inclusive: false })
+    expect(failures).toHaveLength(1)
+    expect(failures[0].message).toContain('PPN sudah termasuk')
+  })
+
+  test('a share reports the contained VAT without adding it to what is owed', () => {
+    const items: AssignedItem[] = guardian.items.map((item, i) => ({
+      ...item,
+      position: i + 1,
+      assigned_to: ['A'],
+    }))
+    const split = computeSplit(
+      items,
+      guardian.subtotal!,
+      guardian.discount,
+      guardian.tax,
+      guardian.service_charge,
+      guardian.total,
+      ['A'],
+      0,
+      guardian.tax_inclusive,
+    )
+    expect(split.participants[0].amount_owed).toBe(59000)
+    expect(split.participants[0].tax_share).toBe(5847)
   })
 })
 

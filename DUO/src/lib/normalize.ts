@@ -72,6 +72,30 @@ function textOrNull(value: unknown): string | null {
 }
 
 /**
+ * A boolean that may have arrived as a boolean, a number, or a string.
+ *
+ * This provider has no `json_schema` mode, so a field the schema declares as
+ * `type: "boolean"` can still come back as "true", "ya" or 1. Reading those is
+ * safe rather than slack, because a wrong answer here cannot reach a bill: the
+ * two summary conventions differ by exactly `tax` in gate 1, so a receipt
+ * flagged the wrong way fails the balance check and the operator is told which
+ * toggle fixes it. The only case where the choice is invisible is `tax = 0`,
+ * where it does not change any number.
+ *
+ * Defaulting to false is therefore the conservative direction — it leaves an
+ * ordinary warung bill on exactly the arithmetic it uses today.
+ */
+function boolOrFalse(value: unknown): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value === 1
+  if (typeof value === 'string') {
+    const text = value.trim().toLowerCase()
+    return text === 'true' || text === 'ya' || text === 'yes' || text === '1'
+  }
+  return false
+}
+
+/**
  * Accept only a real ISO date.
  *
  * A wrong date is not cosmetic: it selects which day's reference sequence the
@@ -151,6 +175,7 @@ export function normalizeExtraction(raw: unknown): Extraction {
     subtotal: moneyOrNull(o.subtotal, 'subtotal'),
     discount: money(o.discount, 'discount'),
     tax: money(o.tax, 'tax'),
+    tax_inclusive: boolOrFalse(o.tax_inclusive),
     service_charge: money(o.service_charge, 'service_charge'),
     rounding_adjustment: money(o.rounding_adjustment, 'rounding_adjustment'),
     total: money(o.total, 'total'),
@@ -162,6 +187,13 @@ export function normalizeExtraction(raw: unknown): Extraction {
   // wrong amount. Negative means the model misread a sign.
   if (extraction.discount < 0) extraction.discount = -extraction.discount
   if (extraction.service_charge < 0) extraction.service_charge = -extraction.service_charge
+
+  // Tax for the same reason, but only where it has to be caught here rather
+  // than in gate 1. On an exclusive bill a negative tax breaks the balance and
+  // the gate says so. On an inclusive one it has left the identity entirely —
+  // it would pass every gate and print a "price before VAT" larger than the
+  // total it was subtracted from.
+  if (extraction.tax < 0) extraction.tax = -extraction.tax
 
   if (extraction.total <= 0) {
     throw new Error('Total struk kebaca 0 atau negatif — cek fotonya.')

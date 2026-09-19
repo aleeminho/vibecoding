@@ -46,6 +46,10 @@ const bill: ExportBill = {
   bill_date: '2026-09-12',
   place: 'Warung Bu Siti',
   total: 75900,
+  // Same convention as the spec example this fixture is built from: a warung
+  // adds PPN on top, so the bill is exclusive and `tax` is charged separately.
+  tax: 6600,
+  tax_inclusive: false,
   bank_name: 'BCA',
   account_number: '1234567890',
   account_holder: 'Alee',

@@ -68,6 +68,18 @@ export interface ExportBill {
    * check would be a tautology and would pass on a bill that does not balance.
    */
   total: number
+  /**
+   * The printed VAT, and whether it is already inside `total`.
+   *
+   * Both bill level, and the nota prints the VAT from here rather than summing
+   * the per-person `tax_share` values. Those are rounded individually — a
+   * 5.847 VAT split two ways gives 2.924 each, which sums to 5.848 — and on an
+   * inclusive bill nothing reconciles that: the tax is outside `amount_owed`,
+   * so gate 4 and v_bill_imbalance are both blind to it, and the nota would
+   * disagree with its own total by a rupiah in front of whoever is checking.
+   */
+  tax: number
+  tax_inclusive: boolean
   bank_name: string | null
   account_number: string | null
   account_holder: string | null
@@ -296,7 +308,15 @@ export function allocateBill(bill: ExportBill): PersonBreakdown[] {
 
     const components: { label: string; amount: number }[] = []
     if (share.discount_share) components.push({ label: 'Diskon', amount: -share.discount_share })
-    if (share.tax_share) components.push({ label: 'PPN', amount: share.tax_share })
+    // No PPN line on an inclusive bill. `amount_owed` no longer contains the
+    // tax there, so a PPN component would be an addition the total does not
+    // make — and the residue logic below would answer it with an equal and
+    // opposite "Penyesuaian", leaving a pair of lines that sum to zero and tell
+    // the reader nothing true about what was charged. The VAT is still on the
+    // document: it is printed once at bill level, from `bill.tax`.
+    if (share.tax_share && !bill.tax_inclusive) {
+      components.push({ label: 'PPN', amount: share.tax_share })
+    }
     if (share.service_share) components.push({ label: 'Service', amount: share.service_share })
     if (share.rounding_share) {
       components.push({ label: 'Pembulatan', amount: share.rounding_share })

@@ -603,6 +603,8 @@ export interface CommitInput {
   subtotal: number
   discount: number
   tax: number
+  /** True when the printed prices already contain `tax`; see Extraction. */
+  taxInclusive: boolean
   serviceCharge: number
   roundingAdjustment: number
   total: number
@@ -647,6 +649,12 @@ export async function commitBill(input: CommitInput): Promise<void> {
     p_subtotal: input.subtotal,
     p_discount: input.discount,
     p_tax: input.tax,
+    // Sent unconditionally, and deliberately with no fallback if the RPC does
+    // not know it. A retry that dropped this argument would save an inclusive
+    // bill as an exclusive one — silently, permanently, and onto a document
+    // other people have already been asked to pay. A loud PGRST202 naming a
+    // migration that has not run is the better failure.
+    p_tax_inclusive: input.taxInclusive,
     p_service_charge: input.serviceCharge,
     p_rounding_adjustment: input.roundingAdjustment,
     p_total: input.total,
@@ -802,7 +810,7 @@ export async function restoreBill(billId: string, refCode: string): Promise<void
  * bill. Written twice they drifted the moment a column was added, which is
  * exactly what happened when `total` was introduced.
  */
-const EXPORT_BASE = `total, ref_code, bill_date, place, bank_name, account_number, account_holder, paid_by_person, qris_path, payment_method,
+const EXPORT_BASE = `total, tax, tax_inclusive, ref_code, bill_date, place, bank_name, account_number, account_holder, paid_by_person, qris_path, payment_method,
    bill_items (position, name, qty, line_total, bill_item_assignees (bill_participants (person))),
    bill_participants (person, pay_token, discount_share, tax_share, service_share, rounding_share, amount_owed, status, paid_date`
 
@@ -811,6 +819,8 @@ const EXPORT_WITH_PAYMENTS = `${EXPORT_BASE}, payments(amount_read, amount_due, 
 
 type ExportRow = {
   total: number
+  tax: number
+  tax_inclusive: boolean
   ref_code: string
   bill_date: string
   place: string
@@ -838,6 +848,11 @@ function mapExportBill(bill: ExportRow): ExportBill {
     bill_date: bill.bill_date,
     place: bill.place,
     total: bill.total,
+    // `=== true` rather than a cast: this is the same posture as the rest of
+    // this mapper, and a null read here would otherwise make every branch on it
+    // take the exclusive path by accident.
+    tax: Number(bill.tax) || 0,
+    tax_inclusive: bill.tax_inclusive === true,
     bank_name: bill.bank_name,
     account_number: bill.account_number,
     account_holder: bill.account_holder,
