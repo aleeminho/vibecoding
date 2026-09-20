@@ -23,6 +23,19 @@ out/
 *.pem
 *.key
 
+# The private half of the backup (machine memory, loose files, credentials) is
+# checked out at private/ as its own repo. It is never part of this one, so any
+# stray `git add .` here must not pick it up.
+private/
+
+# Loose root files kept for local use only (scratch, machine logs and one-off
+# scripts). They were deliberately pulled from this repo's tree and live in the
+# private backup; they must never be tracked here again.
+/extract_bupot.py
+/main.py
+/test.CSV
+/test - Copy.CSV
+
 # Editor and OS
 .vscode/*
 !.vscode/extensions.json
