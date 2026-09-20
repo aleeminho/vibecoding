@@ -43,16 +43,6 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Projects that are NOT part of this repository.
-#
-# Both are git repositories in their own right, which makes them a trap rather
-# than an inconvenience: `git add -A` from the root does not publish their
-# contents, it records a broken pointer to a repository nobody else has, and
-# prints a hint that reads like it worked. Listing them here makes that
-# impossible by accident. Remove a line when that project is actually wanted.
-uno/
-netlimiterlite/
-
 # Supabase CLI local state. The CLI writes this wherever it is run from, so a
 # stray copy appears at the root whenever a command is issued from here rather
 # than from DUO/. It is machine-local and meaningless to anyone else.
