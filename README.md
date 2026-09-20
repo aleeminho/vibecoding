@@ -1,17 +1,16 @@
-# vibecoding
+# DUO — split-bill PWA
 
-Personal projects. Each lives in its own folder with its own README, its own
-`.env.example`, and its own toolchain — this file is only a map.
+Photograph a receipt, assign each item to the people who ordered it, and
+send the group a nota they can read and pay from. Indonesian UI, one
+operator per account, a handful of friends per bill. **Live at
+<https://splitfair.xyz>.**
 
-| Folder | What it is | Stack |
-|---|---|---|
-| [`DUO/`](DUO/) | Split-bill PWA. Photograph a receipt, the model reads it, you assign each line to whoever ordered it, and it tracks who has paid you back. | Vite + Svelte 5, Supabase, Bun |
+Everything lives in `DUO/`. **Read [`DUO/CLAUDE.md`](DUO/CLAUDE.md) before
+touching anything** — it carries the deploy model (code ships itself, the
+schema does not), the design constraints, and the traps that look like bugs
+and are not.
 
-## Notes
+Deploys run from `.github/workflows/` on a push to `main`.
 
-- **Nothing here is deployed from this repository.** DUO's front end runs
-  locally and is installed to a phone as a PWA; its one server-side piece is a
-  Supabase Edge Function, deployed with the Supabase CLI.
-- **No credentials are committed.** Every project reads its keys from a
-  gitignored `.env.local`. The `.env.example` files in each project list the
-  variables and where to get them, with empty values.
+**No credentials are committed.** DUO reads its keys from a gitignored
+`.env.local`; `DUO/.env.example` lists the variables and where to get them.
