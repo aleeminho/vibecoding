@@ -14,6 +14,7 @@
  */
 
 import { supabase } from './supabase'
+import { normaliseAccountNumber } from './destination'
 import { looksLikeSamePlace } from './duplicate'
 import { normalizeExtraction, stripCodeFence } from './normalize'
 import {
@@ -177,6 +178,35 @@ export async function setBillPayment(
   if (patch.qrisPath !== undefined) row.qris_path = patch.qrisPath
 
   const { error } = await supabase.from('bills').update(row).eq('id', billId)
+  if (error) throw new Error(error.message)
+}
+
+/**
+ * Change where a bill's money goes.
+ *
+ * A separate update from the commit, for the same reason `setBillPayment` is:
+ * `commit_bill` is the one path that creates a bill and widening it means
+ * dropping and recreating it. The owner's RLS policy already allows updating
+ * `bills`, so no migration — the payer page and the nota read these columns
+ * live and pick the new values up on their next load.
+ *
+ * The account number is normalised before it is written, the same way Review
+ * does it at commit time, so one account never appears two ways.
+ */
+export async function setBillDestination(
+  billId: string,
+  destination: Destination,
+): Promise<void> {
+  if (import.meta.env.DEV && isDemo()) return
+
+  const { error } = await supabase
+    .from('bills')
+    .update({
+      bank_name: destination.bankName.trim(),
+      account_number: normaliseAccountNumber(destination.accountNumber),
+      account_holder: destination.accountHolder.trim(),
+    })
+    .eq('id', billId)
   if (error) throw new Error(error.message)
 }
 
@@ -586,17 +616,6 @@ export interface Destination {
   accountHolder: string
 }
 
-/**
- * Digits only, so the same account is written the same way every time.
- *
- * Bank apps print account numbers with dots, dashes and spaces depending on the
- * bank, and a CSV where the same account appears three ways is a CSV you cannot
- * group by. Stripping here means the database check can stay strict.
- */
-export function normaliseAccountNumber(input: string): string {
-  return input.replace(/[^0-9]/g, '')
-}
-
 export interface CommitInput {
   refCode: string
   place: string
@@ -686,6 +705,7 @@ export type AuditAction =
   | 'bill.deleted'
   | 'bill.restored'
   | 'bill.amount_changed'
+  | 'bill.destination_changed'
   | 'share.paid'
   | 'share.unpaid'
 

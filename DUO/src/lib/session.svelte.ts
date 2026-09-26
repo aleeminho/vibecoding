@@ -59,6 +59,30 @@ class SessionStore {
     if (error) throw new Error(error.message)
   }
 
+  /**
+   * Create an account and land inside the app.
+   *
+   * Plain `signUp`, no gate: the user wants registration open to everyone, so
+   * the only prerequisite is the dashboard keeping "Allow new users to sign
+   * up" ON and "Confirm email" OFF (see CLAUDE.md). With confirmation off,
+   * Supabase returns the session directly and the auth listener swaps the
+   * shell over on its own.
+   */
+  async signUp(email: string, password: string): Promise<void> {
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    })
+    if (error) {
+      if (/already registered/i.test(error.message)) {
+        throw new Error('Email ini sudah terdaftar. Langsung masuk aja.')
+      }
+      throw new Error(error.message)
+    }
+    // Confirmation is off, so a session comes back and lands the user inside.
+    if (!data.session) throw new Error('Akun dibuat — coba masuk.')
+  }
+
   async signOut(): Promise<void> {
     await supabase.auth.signOut()
   }

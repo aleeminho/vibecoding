@@ -29,6 +29,8 @@
     listBills,
     listFlaggedPayments,
     listOutstanding,
+    logAudit,
+    setBillDestination,
     setBillPayment,
     setBillStatus,
     setShareStatus,
@@ -42,6 +44,7 @@
     type PaymentMethod,
     type Outstanding,
   } from '../lib/api'
+  import { destinationError, normaliseAccountNumber } from '../lib/destination'
   import { isDemo } from '../lib/demo'
   import { session } from '../lib/session.svelte'
   import { desktop } from '../lib/viewport.svelte'
@@ -231,6 +234,70 @@
 
   let payOpen = $state<string | null>(null)
 
+  // ---- the destination, editable after the split ------------------------
+
+  /** Which bill the destination draft belongs to. */
+  let destBill = $state<string | null>(null)
+  let destBank = $state('')
+  let destAccount = $state('')
+  let destHolder = $state('')
+  let destError = $state<string | null>(null)
+  let destSaving = $state(false)
+
+  /**
+   * Opening the payment disclosure seeds the draft from the bill, so what the
+   * inputs show is the truth and not a stale copy of some other bill.
+   */
+  function togglePay(bill: BillWithShares) {
+    if (payOpen === bill.id) {
+      payOpen = null
+      return
+    }
+    destBill = bill.id
+    destBank = bill.bank_name ?? ''
+    destAccount = bill.account_number ?? ''
+    destHolder = bill.account_holder ?? ''
+    destError = null
+    payOpen = bill.id
+  }
+
+  /** The same rules Review enforces at commit time — the two cannot drift. */
+  let destProblem = $derived(destinationError(destBank, destAccount, destHolder))
+
+  /** True when the draft says something the bill does not already say. */
+  let destDirty = $derived.by(() => {
+    const bill = bills.find((b) => b.id === destBill)
+    if (!bill) return false
+    return (
+      destBank.trim() !== (bill.bank_name ?? '') ||
+      normaliseAccountNumber(destAccount) !== (bill.account_number ?? '') ||
+      destHolder.trim() !== (bill.account_holder ?? '')
+    )
+  })
+
+  async function saveDestination(bill: BillWithShares) {
+    destError = null
+    if (destProblem) {
+      destError = destProblem
+      return
+    }
+    destSaving = true
+    try {
+      await setBillDestination(bill.id, {
+        bankName: destBank,
+        accountNumber: destAccount,
+        accountHolder: destHolder,
+      })
+      // Logged after the write so a failed update never claims it happened.
+      await logAudit('bill.destination_changed', { billId: bill.id, refCode: bill.ref_code })
+      await load({ silent: true })
+    } catch (err) {
+      message = (err as Error).message
+    } finally {
+      destSaving = false
+    }
+  }
+
   /**
    * What the payer page will actually show.
    *
@@ -322,7 +389,7 @@
     if (import.meta.env.DEV && isDemo() && bills.length > 0) {
       open = bills[0].id
       selected = bills[0].id
-      payOpen = bills[0].id
+      togglePay(bills[0])
     }
   })
 </script>
@@ -411,7 +478,7 @@
     was and a control that is always open is a control that gets
     scrolled past.
   -->
-  <button class="row tappable" onclick={() => (payOpen = payOpen === bill.id ? null : bill.id)}>
+  <button class="row tappable" onclick={() => togglePay(bill)}>
     <div class="stack">
       <span class="strong">Cara bayar</span>
       <span class="faint small">{methodLabel(bill)}</span>
@@ -420,6 +487,65 @@
   </button>
 
   {#if payOpen === bill.id}
+    <!--
+      Where the money goes, editable after the fact. A wrong number here is a
+      bill nobody can pay, and the operator is the one who discovers it — so
+      the correction belongs on the ledger, not only on the screen that first
+      wrote it. The payer page and the nota read these columns live, so a
+      saved change reaches links that were shared before it.
+    -->
+    <label class="row">
+      <span class="key">Bank / e-wallet</span>
+      <input
+        class="inline"
+        type="text"
+        placeholder="BCA, GoPay, …"
+        bind:value={destBank}
+        oninput={() => (destError = null)}
+        disabled={destSaving || busy === bill.id}
+      />
+    </label>
+    <label class="row">
+      <span class="key">Nomor tujuan</span>
+      <input
+        class="inline num"
+        type="text"
+        inputmode="numeric"
+        placeholder="1234567890"
+        bind:value={destAccount}
+        oninput={() => (destError = null)}
+        disabled={destSaving || busy === bill.id}
+      />
+    </label>
+    <label class="row">
+      <span class="key">Nama penerima</span>
+      <input
+        class="inline"
+        type="text"
+        placeholder="Nama di rekening"
+        bind:value={destHolder}
+        oninput={() => (destError = null)}
+        disabled={destSaving || busy === bill.id}
+      />
+    </label>
+
+    <div class="row dest-save">
+      <span class="faint small">
+        {#if destError}
+          <span class="attention">{destError}</span>
+        {:else}
+          Nota dan halaman bayar ikut berubah begitu disimpan.
+        {/if}
+      </span>
+      <button
+        class="plain"
+        disabled={!destDirty || destSaving || Boolean(destProblem)}
+        onclick={() => saveDestination(bill)}
+      >
+        {destSaving ? 'Menyimpan…' : 'Simpan rekening'}
+      </button>
+    </div>
+
     <div class="row pay-choice">
       <span class="dim small">Yang ditampilin ke yang bayar</span>
       <div class="segments">
@@ -765,6 +891,48 @@
   .dest {
     gap: 8px;
     flex-wrap: wrap;
+  }
+
+  /* The destination editor inside the Cara bayar disclosure. The same label
+     column and chromeless field as Review's Rekening tujuan, so the same
+     control looks the same on both screens. */
+  .key {
+    width: 116px;
+    flex-shrink: 0;
+    color: var(--ink);
+    font-size: var(--text-sm);
+  }
+
+  .inline {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    padding: 0;
+    min-height: auto;
+    text-align: right;
+    border-radius: 0;
+    font-size: var(--text-base);
+  }
+
+  .inline:focus {
+    outline: none;
+    box-shadow: none;
+  }
+
+  .row:focus-within {
+    background: var(--sheet-2);
+  }
+
+  .dest-save {
+    gap: 8px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .dest-save .faint {
+    min-width: 0;
   }
 
   .destructive-text {

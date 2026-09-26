@@ -22,6 +22,7 @@
   import { isDemo } from './lib/demo'
   import { applyPhoneFrame } from './lib/frame'
   import SignIn from './routes/SignIn.svelte'
+  import SignUp from './routes/SignUp.svelte'
   import Bills from './routes/Bills.svelte'
   import Capture from './routes/Capture.svelte'
   import Review from './routes/Review.svelte'
@@ -44,6 +45,7 @@
     | 'bayar'
     | 'notif'
     | 'orang'
+    | 'daftar'
 
   /** Routes that are a document rather than a screen: no chrome, white page. */
   const PAPER: Route[] = ['nota', 'bayar']
@@ -95,6 +97,7 @@
       'bayar',
       'notif',
       'orang',
+      'daftar',
     ]
     return known.includes(raw as Route) ? (raw as Route) : 'bills'
   }
@@ -126,6 +129,13 @@
     return () => document.body.classList.remove('paper')
   })
 
+  // Signing up flips the session while the hash still says #/daftar, and the
+  // signed-in route table has no case for it — so the moment a session exists,
+  // that address stops meaning anything and is sent home.
+  $effect(() => {
+    if (route === 'daftar' && session.current) location.hash = '#/bills'
+  })
+
   /**
    * True when the URL asks for fixture data (see lib/demo.ts). Re-read whenever
    * the route changes, because the flag lives in the hash and the hash is not
@@ -147,6 +157,7 @@
     bayar: 'Bayar',
     notif: 'Notifikasi',
     orang: 'Orang',
+    daftar: 'Daftar',
   }
 
   onMount(() => {
@@ -298,6 +309,14 @@
     </div>
   {:else if !demo && !session.ready}
     <main><p class="dim">Memuat…</p></main>
+  {:else if !demo && route === 'daftar'}
+    <!--
+      The second door, ahead of the session gate the same way its sibling is
+      behind it: someone on this screen does not have a session, that is what
+      the screen is for. The moment one exists (signup done, or an account that
+      signed in elsewhere), the effect above sends the route home.
+    -->
+    <main><SignUp /></main>
   {:else if !demo && !session.current}
     <main><SignIn /></main>
   {:else}

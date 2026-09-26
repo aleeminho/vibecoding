@@ -37,10 +37,10 @@
     setPaidBy,
     setShareStatus,
     newRefCode,
-    normaliseAccountNumber,
     uploadReceipt,
   } from '../lib/api'
   import type { Destination, DuplicateCandidate, KnownPerson } from '../lib/api'
+  import { destinationError, normaliseAccountNumber } from '../lib/destination'
   import type { Extraction, GateReport, RoundingMode } from '../lib/types'
 
   let { onDone }: { onDone: () => void } = $props()
@@ -167,16 +167,12 @@
 
   /**
    * Required before commit, per the PRD: a split nobody can pay is not
-   * finished. Checked client side where it can be explained, rather than left
-   * to the database where a failure arrives as a constraint name.
+   * finished. The same rules as the post-split editor on Bills, shared so the
+   * two screens cannot drift.
    */
-  let destinationProblem = $derived.by(() => {
-    if (!destination.bankName.trim()) return 'Bank atau e-wallet belum diisi.'
-    if (!destination.accountHolder.trim()) return 'Nama penerima belum diisi.'
-    const digits = normaliseAccountNumber(destination.accountNumber)
-    if (digits.length < 6) return 'Nomor tujuan minimal 6 angka.'
-    return null
-  })
+  let destinationProblem = $derived(
+    destinationError(destination.bankName, destination.accountNumber, destination.accountHolder),
+  )
 
   let committing = $state(false)
   let commitError = $state<string | null>(null)

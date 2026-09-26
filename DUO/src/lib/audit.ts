@@ -13,6 +13,7 @@ export type AuditAction =
   | 'bill.deleted'
   | 'bill.restored'
   | 'bill.amount_changed'
+  | 'bill.destination_changed'
   | 'share.paid'
   | 'share.unpaid'
 
@@ -49,6 +50,8 @@ export function describeAudit(entry: AuditLike): string {
       return 'Tagihan dihapus'
     case 'bill.restored':
       return 'Tagihan dikembalikan'
+    case 'bill.destination_changed':
+      return 'Rekening tujuan diubah'
     case 'share.paid':
       return `${who} ditandai lunas`
     case 'share.unpaid':

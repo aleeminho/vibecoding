@@ -205,8 +205,15 @@ Both PRDs are in the repo (`split_bill_app_prd.md`,
 `split_bill_app_prd_fitur_tambahan.md`). Every acceptance criterion is met
 except these, all deliberate:
 
-- **Item 1, self-serve signup** — the PRD itself makes it conditional on opening
-  up beyond a small circle. The user has not. Not built.
+- **Item 1, self-serve signup** — **built, open to everyone.** Plain
+  `auth.signUp` from `#/daftar`; nothing in code gates it, which is the user's
+  choice. It works because of one dashboard setting, and nothing in the repo
+  asserts it: Authentication → Sign In / Providers → Email must keep
+  **"Allow new users to sign up" ON and "Confirm email" OFF** (off is what
+  makes signup land inside the app without an inbox). If the circle should
+  ever tighten again, that is the one switch — plus a gate on top if it must
+  be selective. New accounts are empty: RLS scopes everything to the owner,
+  so a stranger can only see their own bills.
 - **Item 7, debt netting** — **cannot be built on this data model.** One owner
   per bill, every participant owes that owner, so all debts point the same way
   and netting has nothing to net. The settle-up screen says this out loud.

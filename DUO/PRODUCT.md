@@ -48,9 +48,10 @@ reviewed and assigned it.
 
 - Svelte 5 + Vite + TypeScript on bun; Supabase for Postgres, RLS, storage, and
   one edge function; hash-routed SPA.
-- One operator account, created by hand in the Supabase dashboard. No self-serve
-  signup: the PRD makes it conditional on opening up beyond a small circle, and
-  that has not happened.
+- Self-serve signup, open to everyone: `#/daftar` calls Supabase's own
+  `signUp`, with no gate in code. Depends on the dashboard keeping "Allow new
+  users to sign up" on and "Confirm email" off; RLS still scopes every new
+  account to its own bills.
 - The model is used only to read receipts. Normalisation, validation gates, and
   split arithmetic are deterministic client code.
 - Payment proof validation is a public edge function keyed only by the pay
@@ -94,8 +95,8 @@ reviewed and assigned it.
    states a mismatch out loud instead of hiding it.
 4. Documents leave the app. Nota, proofs, and reports are read in chats, on
    paper, and in screenshots; they are designed for that scene.
-5. One operator until the circle widens: signup, netting, and multi-operator
-   work wait on a product decision, not on an implementation gap.
+5. Signup is open; netting and multi-operator work wait on a product
+   decision, not on an implementation gap.
 
 ## Accessibility & Inclusion
 

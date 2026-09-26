@@ -1,27 +1,18 @@
 <script lang="ts">
   /**
-   * Sign in. Accounts are made on the signup screen (`#/daftar`), open to
-   * everyone — see SignUp.svelte and session.svelte.ts.
+   * Sign up. Open to everyone — no invite code.
    *
-   * Password and not a magic link — see the note in session.svelte.ts for why
-   * that changed.
+   * The account is made by Supabase's own `signUp` (see session.svelte.ts);
+   * this screen only collects the two fields and shows what the server
+   * answers. Registration works because the dashboard keeps "Allow new users
+   * to sign up" on and "Confirm email" off — nothing in code gates it.
    *
-   * On success the session lands in localStorage and refreshes itself, so this
-   * screen is seen once and then not again until a sign out or a cleared
-   * browser.
+   * On success the session arrives with the response and the shell swaps this
+   * screen out; the hash moves to Tagihan so the signed-in route table has a
+   * case for it.
    *
-   * On the layout, which was three nested rectangles.
-   *
-   * The hero sat in its own card, the form sat in a second card, and each field
-   * carried the global `input` border on top of that — so the screen was a box
-   * inside a box inside a box, with the actual content being two hollow
-   * outlines you were meant to type into. `.flex` removed the background and
-   * the radius but not the border, which is the whole bug in one line.
-   *
-   * A settings-style field does not need a box. The row already has a hairline
-   * under it and a label at its left edge; that is enough to say "type here",
-   * and it is what every iOS form does. Focus highlights the ROW rather than
-   * ringing an input that is no longer visible.
+   * Layout mirrors SignIn — same rows, same field rules, same eye toggle — so
+   * the two doors of the same house do not look like two different houses.
    */
   import { session } from '../lib/session.svelte'
 
@@ -36,9 +27,8 @@
     busy = true
     error = null
     try {
-      await session.signIn(email, password)
-      // No navigation here: the auth listener flips `session.current`, and the
-      // app shell swaps this screen out on its own.
+      await session.signUp(email, password)
+      location.hash = '#/bills'
     } catch (err) {
       error = (err as Error).message
       password = ''
@@ -49,11 +39,8 @@
 </script>
 
 <div class="screen">
-  <!-- No card. The title is the screen's anchor, not a panel — and no second
-       stamp mark, because the letterhead above already prints the one the pad
-       owns. -->
   <div class="hero">
-    <h1 class="hero-title">Masuk ke DUO</h1>
+    <h1 class="hero-title">Daftar ke DUO</h1>
     <p class="hero-sub">Split the bill. Not the friendship.</p>
   </div>
 
@@ -79,18 +66,13 @@
             class="flex"
             type={show ? 'text' : 'password'}
             required
-            autocomplete="current-password"
-            placeholder="••••••••"
+            minlength="6"
+            autocomplete="new-password"
+            placeholder="minimal 6 karakter"
             bind:value={password}
             disabled={busy}
           />
-          <!--
-            The eye. A bare glyph rather than a text toggle: the row already
-            says what it is at its left edge, and the icon is the one symbol a
-            password field recognises without reading. Swaps between an open
-            eye (tap to show) and a slashed one (tap to hide), same stroke
-            language as the tab icons.
-          -->
+          <!-- Same eye as SignIn: bare glyph, swaps open/slashed, 44px target. -->
           <button
             type="button"
             class="reveal"
@@ -120,9 +102,6 @@
         <div class="list tint-bad">
           <div class="row error-row">
             <span class="error">{error}</span>
-            <span class="error-hint">
-              Kalau salah password, reset-nya dari Supabase dashboard: Authentication → Users.
-            </span>
           </div>
         </div>
       </div>
@@ -130,13 +109,13 @@
 
     <div class="group submit">
       <button class="primary" type="submit" disabled={busy || !email.trim() || !password}>
-        {busy ? 'Masuk…' : 'Masuk'}
+        {busy ? 'Mendaftar…' : 'Daftar'}
       </button>
     </div>
 
     <div class="group signup-link">
-      <button class="link" onclick={() => (location.hash = '#/daftar')}>
-        Belum punya akun? Daftar
+      <button class="link" onclick={() => (location.hash = '#/bills')}>
+        Sudah punya akun? Masuk
       </button>
     </div>
   </form>
@@ -152,9 +131,6 @@
     margin: 0 auto;
   }
 
-  /* The gaps live here, not only on .screen. The form is a single child of
-     .screen, so .screen's gap never applied between the form's own children —
-     which put the error card flush against the field card, zero pixels apart. */
   .form {
     display: flex;
     flex-direction: column;
@@ -188,8 +164,6 @@
     color: var(--ink-2);
   }
 
-  /* The label column and the field on one row, which is how a settings form is
-     laid out. */
   .key {
     width: 88px;
     flex-shrink: 0;
@@ -197,12 +171,6 @@
     font-size: var(--text-base);
   }
 
-  /*
-   * A field with no chrome of its own.
-   *
-   * `border: none` is the line that matters. Without it the global `input`
-   * rule draws its rounded outline here, inside a card that already has one.
-   */
   .flex {
     flex: 1;
     min-width: 0;
@@ -217,8 +185,6 @@
 
   .flex:focus {
     outline: none;
-    /* The global focus ring would draw an orange halo around a box that is no
-       longer there. The row highlights instead — see .field:focus-within. */
     box-shadow: none;
   }
 
@@ -234,11 +200,6 @@
     background: var(--sheet-2);
   }
 
-  /*
-   * The eye toggle. A bare glyph with a full-size tap target, bleeding to the
-   * row's edge so the input still owns the rest of the line. No border, no
-   * fill — the row's hairline is the chrome this form gets.
-   */
   .reveal {
     flex-shrink: 0;
     display: grid;
@@ -263,6 +224,12 @@
     height: 20px;
   }
 
+  .error-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
   .signup-link {
     align-items: center;
   }
@@ -278,16 +245,5 @@
   .link:active:not(:disabled) {
     transform: none;
     color: var(--ink);
-  }
-
-  .error-row {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
-  }
-
-  .error-hint {
-    font-size: var(--text-sm);
-    color: var(--ink-2);
   }
 </style>

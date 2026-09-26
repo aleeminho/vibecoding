@@ -105,7 +105,7 @@
 {#snippet entry(n: NotifItem)}
   {@const done = isSettled(n)}
   <div class="inner-item">
-    <button class="row tappable inner" class:has-actions={!done} onclick={() => openEntry(n)}>
+    <button class="row tappable inner has-actions" onclick={() => openEntry(n)}>
       <span class="stack">
         <span class="strong">
           {n.verdict === 'matched'
@@ -121,14 +121,21 @@
       {/if}
     </button>
 
-    {#if !done}
-      <div class="actions">
-        <button class="plain" onclick={() => viewProof(n)}>Lihat bukti</button>
+    <!--
+      Lihat bukti is NOT hidden once settled. A stamped payment is a finished
+      event, not a closed one: the operator can still want to see the transfer
+      again (a friend asking "kapan gue transfer?", a dispute, a recheck), and
+      hiding the image once the work is done made the feed forget its own
+      evidence. Only the action that settles stays conditional.
+    -->
+    <div class="actions">
+      <button class="plain" onclick={() => viewProof(n)}>Lihat bukti</button>
+      {#if !done}
         <button class="plain" disabled={busy === n.id} onclick={() => accept(n)}>
           {busy === n.id ? 'Menyimpan…' : 'Tandai lunas'}
         </button>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 {/snippet}
 
